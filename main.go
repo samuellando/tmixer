@@ -2,13 +2,14 @@ package main
 
 import (
 	"flag"
-	"strings"
 	"fmt"
+	"log/slog"
 	"maps"
 	"os"
 	"os/exec"
-	"log/slog"
 	"path/filepath"
+	"strings"
+	"io"
 
 	"github.com/goccy/go-yaml"
 )
@@ -27,6 +28,27 @@ type Session struct {
 	Active   bool
 	Attached bool
 	Project  *Project
+}
+
+func (s *Session) String() string {
+	icon := "."
+	if s.Active {
+		icon = "*"
+	}
+	if s.Attached {
+		icon = "+"
+	}
+	return fmt.Sprintf("%s %s", icon, s.Name)
+} 
+
+func CleanName(name string) string {
+	return strings.Split(strings.TrimSpace(name), " ")[1]
+}
+
+func (s *Session) Swap() {
+}
+
+func (s *Session) Reset() {
 }
 
 type Project struct {
@@ -86,6 +108,27 @@ func tmuxStartServer() error {
 	return err
 }
 
+func tmuxSessions() map[string]*Session {
+	out, err := tmux("list-sessions", "-F", "#{session_name} #{session_attached}")
+	if err != nil {
+		panic(err)
+	}
+	sessions := make(map[string]*Session, 0)
+	for info := range strings.SplitSeq(string(out), "\n") {
+		if len(info) > 0 {
+			name := strings.Split(info, " ")[0]
+			attached := strings.Split(info, " ")[1]
+			session := Session{
+				Name:     name,
+				Attached: attached == "1",
+				Active:   true,
+			}
+			sessions[name] = &session
+		}
+	}
+	return sessions
+}
+
 func loadCofigProjects(files ...string) map[string]*Project {
 	projects := make(map[string]*Project)
 	for _, f := range files {
@@ -137,8 +180,8 @@ func loadSubDirectories(projects map[string]*Project) {
 			}
 			for _, f := range dirEntries {
 				if f.IsDir() {
-					p := Project {
-						Directory: filepath.Join(proj.Directory, f.Name()),
+					p := Project{
+						Directory:      filepath.Join(proj.Directory, f.Name()),
 						SubDirectories: false,
 						StartupWindows: proj.StartupWindows,
 						SwitchCommands: proj.SwitchCommands,
@@ -150,8 +193,40 @@ func loadSubDirectories(projects map[string]*Project) {
 	}
 }
 
-func tmuxSessions() []Session {
-	return nil
+func linkProjectSessions(sessions map[string]*Session, projects map[string]*Project) {
+	for name, proj := range projects {
+		if session, ok := sessions[name]; ok {
+			session.Project = proj
+		} else {
+			session := Session{
+				Name: name,
+				Active: false,
+				Attached: false,
+				Project: proj,
+			}
+			sessions[name] = &session
+		}
+	}
+}
+
+func Fzf(sessions map[string]*Session) *Session {
+	cmd := exec.Command("fzf")
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		panic(stdin)
+	}
+	go func() {
+		defer stdin.Close()
+		for _, session := range sessions {
+			io.WriteString(stdin, session.String() + "\n")
+		}
+	}()
+	out, err := cmd.Output()
+	if err != nil {
+		return nil
+	}
+	selected := CleanName(string(out))
+	return sessions[selected]
 }
 
 func main() {
@@ -166,20 +241,23 @@ func main() {
 		logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: programLevel}))
 		slog.SetDefault(logger)
 	}
-
-	projects := loadCofigProjects(append(CONFIG_FILES, config)...)
-
-	for n, p := range projects {
-		fmt.Println(n, *p)
-	}
-
 	err := tmuxStartServer()
 	if err != nil {
 		panic(err)
 	}
+	sessions := tmuxSessions()
+
+	projects := loadCofigProjects(append(CONFIG_FILES, config)...)
+
+	linkProjectSessions(sessions, projects)
+
+	var selected *Session
 	if inputProject != "" {
-		fmt.Println("Swap project")
+		selected = sessions[inputProject]
 	} else {
-		fmt.Println("Run fzf")
+		selected = Fzf(sessions)
+	}
+	if selected != nil {
+		fmt.Println(selected.String())
 	}
 }
