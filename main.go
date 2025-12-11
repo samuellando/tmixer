@@ -3,12 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/exec"
-	"io"
-	"samuellando.com/tmixer/internal/tmux"
 	"samuellando.com/tmixer/internal/project"
+	"samuellando.com/tmixer/internal/tmux"
 )
 
 var CONFIG_FILES = []string{"~/.tmixer.yml", "~/.config/tmixer/config.yml"}
@@ -65,14 +65,14 @@ func Fzf(sessions map[string]*tmux.Session) *tmux.Session {
 	go func() {
 		defer stdin.Close()
 		for _, session := range sessions {
-			io.WriteString(stdin, session.String() + "\n")
+			io.WriteString(stdin, session.String()+"\n")
 		}
 	}()
 	out, err := cmd.Output()
 	if err != nil {
 		return nil
 	}
-	selected := tmux.CleanName(string(out))
+	selected := tmux.RemoveIcon(string(out))
 	return sessions[selected]
 }
 
@@ -82,16 +82,20 @@ func main() {
 		displayHelpMessage()
 		return
 	}
+	programLevel := new(slog.LevelVar)
 	if verbose {
-		programLevel := new(slog.LevelVar)
 		programLevel.Set(slog.LevelDebug)
-		logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: programLevel}))
-		slog.SetDefault(logger)
 	}
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level:     programLevel,
+		AddSource: true,
+	}))
+	slog.SetDefault(logger)
 	err := tmux.StartServer()
 	if err != nil {
 		panic(err)
 	}
+
 	sessions := tmux.Sessions()
 
 	projects := project.LoadCofig(append(CONFIG_FILES, config)...)
@@ -102,9 +106,13 @@ func main() {
 	if inputProject != "" {
 		selected = sessions[inputProject]
 	} else {
+		slog.Debug("Calling fzf")
 		selected = Fzf(sessions)
 	}
 	if selected != nil {
-		fmt.Println(selected.Name)
+		slog.Debug(fmt.Sprintf("Session %s was selected", selected.Name))
+		selected.Swap()
+	} else {
+		fmt.Println("No selection")
 	}
 }
