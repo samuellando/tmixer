@@ -4,14 +4,11 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
-	"maps"
 	"os"
 	"os/exec"
-	"path/filepath"
-	"strings"
 	"io"
-
-	"github.com/goccy/go-yaml"
+	"samuellando.com/tmixer/internal/tmux"
+	"samuellando.com/tmixer/internal/project"
 )
 
 var CONFIG_FILES = []string{"~/.tmixer.yml", "~/.config/tmixer/config.yml"}
@@ -22,45 +19,6 @@ var verbose bool
 var reset bool
 var config string
 var inputProject string
-
-type Session struct {
-	Name     string
-	Active   bool
-	Attached bool
-	Project  *Project
-}
-
-func (s *Session) String() string {
-	icon := "."
-	if s.Active {
-		icon = "*"
-	}
-	if s.Attached {
-		icon = "+"
-	}
-	return fmt.Sprintf("%s %s", icon, s.Name)
-} 
-
-func CleanName(name string) string {
-	return strings.Split(strings.TrimSpace(name), " ")[1]
-}
-
-func (s *Session) Swap() {
-}
-
-func (s *Session) Reset() {
-}
-
-type Project struct {
-	Directory      string              `yaml:"directory"`
-	SubDirectories bool                `yaml:"subDirectories"`
-	StartupWindows []map[string]Window `yaml:"startupWindows"`
-	SwitchCommands [][]string          `yaml:"switchCommands"`
-}
-
-type Window struct {
-	Command string
-}
 
 func parseCommandLine() {
 	flag.BoolVar(&help, "h", false, "Display this help message")
@@ -84,132 +42,21 @@ func displayHelpMessage() {
 	fmt.Println()
 	fmt.Print(`Config file example (~/.config.yml):
 -------------------------------------------
-	bin:
-	  diectory: "~/bin"
-	projects:
-	  diectory: "~/projects"
-	  subDirectories: true
-	  startupWindows:
-	    - nvim:
-        	command: "nivm ."
-	  startupCommands:
-	    - "ln -sfn /opt/example/config $(pwd)"
-	    - "ln -sfn $(pwd)/.nvim.lua ~/Projects/.nvim.lua"
+bin:
+  diectory: "~/bin"
+projects:
+  diectory: "~/projects"
+  subDirectories: true
+  startupWindows:
+	- nvim:
+		command: "nivm ."
+  startupCommands:
+	- "ln -sfn /opt/example/config $(pwd)"
+	- "ln -sfn $(pwd)/.nvim.lua ~/Projects/.nvim.lua"
 -------------------------------------------`)
 }
 
-func tmux(args ...string) ([]byte, error) {
-	cmd := exec.Command("tmux", args...)
-	return cmd.Output()
-}
-
-func tmuxStartServer() error {
-	_, err := tmux("start-server")
-	return err
-}
-
-func tmuxSessions() map[string]*Session {
-	out, err := tmux("list-sessions", "-F", "#{session_name} #{session_attached}")
-	if err != nil {
-		panic(err)
-	}
-	sessions := make(map[string]*Session, 0)
-	for info := range strings.SplitSeq(string(out), "\n") {
-		if len(info) > 0 {
-			name := strings.Split(info, " ")[0]
-			attached := strings.Split(info, " ")[1]
-			session := Session{
-				Name:     name,
-				Attached: attached == "1",
-				Active:   true,
-			}
-			sessions[name] = &session
-		}
-	}
-	return sessions
-}
-
-func loadCofigProjects(files ...string) map[string]*Project {
-	projects := make(map[string]*Project)
-	for _, f := range files {
-		if f != "" {
-			bytes, err := os.ReadFile(f)
-			if err != nil {
-				slog.Debug(err.Error())
-				continue
-			}
-			data := make(map[string]*Project)
-			err = yaml.Unmarshal(bytes, &data)
-			if err != nil {
-				slog.Debug(err.Error())
-			}
-			maps.Copy(projects, data)
-		}
-	}
-	convertToAbsolutePaths(projects)
-	loadSubDirectories(projects)
-	return projects
-}
-
-func convertToAbsolutePaths(projects map[string]*Project) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		panic(err)
-	}
-	for name, proj := range projects {
-		if strings.HasPrefix(proj.Directory, "~/") {
-			proj.Directory = filepath.Join(homeDir, proj.Directory[2:])
-		}
-		abs, err := filepath.Abs(proj.Directory)
-		if err != nil {
-			delete(projects, name)
-			slog.Error(err.Error())
-		}
-		proj.Directory = abs
-	}
-}
-
-func loadSubDirectories(projects map[string]*Project) {
-	for name, proj := range projects {
-		if proj.SubDirectories {
-			delete(projects, name)
-			dirEntries, err := os.ReadDir(proj.Directory)
-			if err != nil {
-				slog.Error(err.Error())
-				continue
-			}
-			for _, f := range dirEntries {
-				if f.IsDir() {
-					p := Project{
-						Directory:      filepath.Join(proj.Directory, f.Name()),
-						SubDirectories: false,
-						StartupWindows: proj.StartupWindows,
-						SwitchCommands: proj.SwitchCommands,
-					}
-					projects[fmt.Sprintf("%s--%s", name, f.Name())] = &p
-				}
-			}
-		}
-	}
-}
-
-func linkProjectSessions(sessions map[string]*Session, projects map[string]*Project) {
-	for name, proj := range projects {
-		if session, ok := sessions[name]; ok {
-			session.Project = proj
-		} else {
-			session := Session{
-				Name: name,
-				Active: false,
-				Attached: false,
-				Project: proj,
-			}
-			sessions[name] = &session
-		}
-	}
-}
-
-func Fzf(sessions map[string]*Session) *Session {
+func Fzf(sessions map[string]*tmux.Session) *tmux.Session {
 	cmd := exec.Command("fzf")
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -225,7 +72,7 @@ func Fzf(sessions map[string]*Session) *Session {
 	if err != nil {
 		return nil
 	}
-	selected := CleanName(string(out))
+	selected := tmux.CleanName(string(out))
 	return sessions[selected]
 }
 
@@ -241,23 +88,23 @@ func main() {
 		logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: programLevel}))
 		slog.SetDefault(logger)
 	}
-	err := tmuxStartServer()
+	err := tmux.StartServer()
 	if err != nil {
 		panic(err)
 	}
-	sessions := tmuxSessions()
+	sessions := tmux.Sessions()
 
-	projects := loadCofigProjects(append(CONFIG_FILES, config)...)
+	projects := project.LoadCofig(append(CONFIG_FILES, config)...)
 
-	linkProjectSessions(sessions, projects)
+	tmux.LinkProjectsToSessions(sessions, projects)
 
-	var selected *Session
+	var selected *tmux.Session
 	if inputProject != "" {
 		selected = sessions[inputProject]
 	} else {
 		selected = Fzf(sessions)
 	}
 	if selected != nil {
-		fmt.Println(selected.String())
+		fmt.Println(selected.Name)
 	}
 }
