@@ -16,32 +16,35 @@ var CONFIG_FILES = []string{"~/.tmixer.yml", "~/.config/tmixer/config.yml"}
 // Command line flags
 var help bool
 var verbose bool
-var reset bool
 var config string
+var command string
 var inputProject string
 
 func parseCommandLine() {
 	flag.BoolVar(&help, "h", false, "Display this help message")
 	flag.BoolVar(&verbose, "v", false, "Display debug logs")
-	flag.BoolVar(&reset, "r", false, "Reset the session for the project, will use the current project's session if not specified")
 	flag.StringVar(&config, "c", "", "Provide an additional config.yml file will by default read ~/.tmixer.yml and ~/.config/tmixer/config.yml")
 	flag.Parse()
-	inputProject = flag.Arg(0)
+	command = flag.Arg(0)
+	inputProject = flag.Arg(1)
 }
 
 func displayHelpMessage() {
-	fmt.Println("**************** Tmixer ****************")
-	fmt.Println("Quickly switch between your projects")
-	fmt.Println("----------------------------------------")
-	fmt.Println()
-	fmt.Println("tmixer [flags] [project_name]")
-	fmt.Println()
-	fmt.Println("flags:")
+	fmt.Println(`tmixer [flags] [command] [project_name]
+
+Commands:
+- switch (default)
+- start
+- stop
+- reset
+
+If no project name is provided, fzf will be opened to select the project
+
+Flags:`)
 	flag.PrintDefaults()
 	fmt.Println()
-	fmt.Println()
-	fmt.Print(`Config file example (~/.config.yml):
--------------------------------------------
+	fmt.Println(`Config file example (~/.tmixer.yml):
+"""
 bin:
   diectory: "~/bin"
 projects:
@@ -53,7 +56,7 @@ projects:
   startupCommands:
 	- "ln -sfn /opt/example/config $(pwd)"
 	- "ln -sfn $(pwd)/.nvim.lua ~/Projects/.nvim.lua"
--------------------------------------------`)
+"""`)
 }
 
 func Fzf(sessions map[string]*tmux.Session) *tmux.Session {

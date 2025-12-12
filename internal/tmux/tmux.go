@@ -13,29 +13,55 @@ import (
 )
 
 type Session struct {
-	Name     string
-	Active   bool
-	Attached bool
-	Project  *project.Project
+	Name    string
+	Project *project.Project
+}
+
+type sessionInfo struct {
+	active   bool
+	attached bool
+}
+
+func (s *Session) Active() bool {
+	return s.getInfo().active
+}
+
+func (s *Session) Attached() bool {
+	return s.getInfo().attached
 }
 
 func (s *Session) String() string {
 	icon := "."
-	if s.Active {
+	if s.Active() {
 		icon = "*"
 	}
-	if s.Attached {
+	if s.Attached() {
 		icon = "+"
 	}
 	return fmt.Sprintf("%s %s", icon, s.Name)
 }
 
+func (s *Session) getInfo() sessionInfo {
+	out, err := tmux("display", "-p", "-t", "="+s.Name+":", "#{?session_name,true,false}|#{session_attached_list}")
+	if err != nil {
+		panic(err)
+	}
+	parts := strings.Split(strings.TrimSpace(string(out)), "|")
+	active, err := strconv.ParseBool(parts[0])
+	if err != nil {
+		slog.Error(fmt.Sprintf("Failed to parse active in %s", string(out)))
+		panic(err)
+	}
+	attached := strings.Contains(parts[1], getCleint())
+	return sessionInfo{attached: attached, active: active}
+}
+
 func (s *Session) Swap() {
-	if s.Attached {
+	if s.Attached() {
 		slog.Debug(fmt.Sprintf("Allready attached to session %s", s.Name))
 		return
 	}
-	if !s.Active {
+	if !s.Active() {
 		slog.Debug(fmt.Sprintf("Session %s is not active, starting..", s.Name))
 		s.Reset()
 	}
@@ -43,39 +69,48 @@ func (s *Session) Swap() {
 	slog.Debug(fmt.Sprintf("Switched to session %s", s.Name))
 }
 
-func (s *Session) Reset() {
-	uuid := uuid.NewString()
-	if s.Attached {
-		// Crate a temp session to switch to temporarly
-		_, err := tmux("new", "-s", uuid, "-d")
-		if err != nil {
-			panic(err)
-		}
-		_, err = tmux("switchc", "-c", getCleint(), "-t", uuid)
-		if err != nil {
-			panic(err)
-		}
-	}
-	if s.Active {
-		_, err := tmux("kill-session", "-t", s.Name, "-d")
-		if err != nil {
-			panic(err)
-		}
-	}
+func (s *Session) Start() {
 	_, err := tmux("new", "-s", s.Name, "-d")
 	if err != nil {
 		panic(err)
 	}
-	if s.Attached {
-		// Crat a temp session to switch to temporarly
-		_, err := tmux("kill-session", "-t", uuid)
-		if err != nil {
-			panic(err)
-		}
-		_, err = tmux("switchc", "-c", getCleint(), "-t", s.Name)
-		if err != nil {
-			panic(err)
-		}
+}
+
+func (s *Session) Stop() {
+	_, err := tmux("kill-session", "-t", s.Name, "-d")
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (s *Session) Reset() {
+	var temp *Session
+	if s.Attached() {
+		temp = switchToTempSession()
+	}
+	if s.Active() {
+		s.Stop()
+	}
+	s.Start()
+	if temp != nil {
+		s.Swap()
+		temp.Stop()
+	}
+}
+
+func switchToTempSession() *Session {
+	uuid := uuid.NewString()
+	// Crate a temp session to switch to temporarly
+	_, err := tmux("new", "-s", uuid, "-d")
+	if err != nil {
+		panic(err)
+	}
+	_, err = tmux("switchc", "-c", getCleint(), "-t", uuid)
+	if err != nil {
+		panic(err)
+	}
+	return &Session{
+		Name: uuid,
 	}
 }
 
@@ -93,29 +128,17 @@ func StartServer() error {
 }
 
 func Sessions() map[string]*Session {
-	out, err := tmux("list-sessions", "-F", "#{session_name} #{session_attached} #{session_attached_list}")
+	out, err := tmux("list-sessions", "-F", "#{session_name}")
 	if err != nil {
 		panic(err)
 	}
 	sessions := make(map[string]*Session, 0)
-	for info := range strings.SplitSeq(string(out), "\n") {
-		if len(info) > 0 {
-			name := strings.Split(info, " ")[0]
-			attached := strings.Split(info, " ")[1]
-			if attached == "1" {
-				client := strings.Split(info, " ")[2]
-				if client != getCleint() {
-					attached = "0"
-				}
-			}
-			session := Session{
-				Name:     cleanName(name),
-				Attached: attached == "1",
-				Active:   true,
-			}
-			slog.Debug(fmt.Sprintf("Detected tmux session %+v", session))
-			sessions[name] = &session
+	for name := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
+		session := Session{
+			Name: cleanName(name),
 		}
+		slog.Debug(fmt.Sprintf("Detected tmux session %+v", session))
+		sessions[name] = &session
 	}
 	return sessions
 }
@@ -123,14 +146,12 @@ func Sessions() map[string]*Session {
 func LinkProjectsToSessions(sessions map[string]*Session, projects map[string]*project.Project) {
 	for name, proj := range projects {
 		if session, ok := sessions[cleanName(name)]; ok {
-			slog.Debug(fmt.Sprintf("Found active session for project %s", name))
+			slog.Debug(fmt.Sprintf("Found existing session for project %s", name))
 			session.Project = proj
 		} else {
 			slog.Debug(fmt.Sprintf("Createing inactive session for project %s", name))
 			session := Session{
 				Name:     cleanName(name),
-				Active:   false,
-				Attached: false,
 				Project:  proj,
 			}
 			sessions[name] = &session
