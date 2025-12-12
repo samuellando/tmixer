@@ -1,12 +1,15 @@
-bin:
-  directory: "~/bin"
+defaultProject: projects--dots
 
 projects:
-  directory: "~/Projects"
-  subDirectories: true
-  startupWindows:
-    - nvim:
-        command: "nivm ."
-  switchCommands:
-    - ["ln", "-sfn", "/opt/example/config $(pwd)"]
-    - ["ln", "-sfn", "$(pwd)/.nvim.lua ~/Projects/.nvim.lua"]
+  bin:
+    directory: "~/bin"
+
+  projects:
+    directory: "~/Projects"
+    subDirectories: true
+    startupWindows:
+      - nvim:
+          command: "nivm ."
+    switchCommands:
+      - ["ln", "-sfn", "/opt/example/config $(pwd)"]
+      - ["ln", "-sfn", "$(pwd)/.nvim.lua ~/Projects/.nvim.lua"]

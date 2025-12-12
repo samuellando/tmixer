@@ -1,28 +1,33 @@
 package project
 
 import (
+	"fmt"
+	"github.com/goccy/go-yaml"
 	"log/slog"
 	"maps"
-	"github.com/goccy/go-yaml"
-	"path/filepath"
 	"os"
-	"fmt"
+	"path/filepath"
 	"strings"
 )
 
+type Config struct {
+	DefaultProject *string             `yaml:"defaultProject"`
+	Projects       map[string]*Project `yaml:"projects"`
+}
+
 type Project struct {
-	Directory      string                   `yaml:"directory"`
-	SubDirectories bool                     `yaml:"subDirectories"`
+	Directory      string              `yaml:"directory"`
+	SubDirectories bool                `yaml:"subDirectories"`
 	StartupWindows []map[string]Window `yaml:"startupWindows"`
-	SwitchCommands [][]string               `yaml:"switchCommands"`
+	SwitchCommands [][]string          `yaml:"switchCommands"`
 }
 
 type Window struct {
 	Command string
 }
 
-
-func LoadCofig(files ...string) map[string]*Project {
+func LoadCofig(files ...string) Config {
+	config := Config{}
 	projects := make(map[string]*Project)
 	for _, f := range files {
 		if f != "" {
@@ -31,17 +36,17 @@ func LoadCofig(files ...string) map[string]*Project {
 				slog.Debug(err.Error())
 				continue
 			}
-			data := make(map[string]*Project)
-			err = yaml.Unmarshal(bytes, &data)
+			err = yaml.Unmarshal(bytes, &config)
 			if err != nil {
 				slog.Debug(err.Error())
 			}
-			maps.Copy(projects, data)
+			maps.Copy(projects, config.Projects)
 		}
 	}
-	convertToAbsolutePaths(projects)
-	loadSubDirectories(projects)
-	return projects
+	config.Projects = projects
+	convertToAbsolutePaths(config.Projects)
+	loadSubDirectories(config.Projects)
+	return config
 }
 
 func convertToAbsolutePaths(projects map[string]*Project) {
