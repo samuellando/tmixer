@@ -19,18 +19,21 @@ var help bool
 var verbose bool
 var config string
 var command string
+var logfile string
 var inputProject string
 
 func parseCommandLine() {
 	flag.BoolVar(&help, "h", false, "Display this help message")
 	flag.BoolVar(&verbose, "v", false, "Display debug logs")
+	flag.StringVar(&logfile, "l", "", "Output logs to a file instead of std out")
 	flag.StringVar(&config, "c", "", "Provide an additional config.yml file will by default read ~/.tmixer.yml and ~/.config/tmixer/config.yml")
 	flag.Parse()
 	if flag.NArg() == 0 {
 		command = "switch"
+	} else {
+		command = flag.Arg(0)
+		inputProject = flag.Arg(1)
 	}
-	command = flag.Arg(0)
-	inputProject = flag.Arg(1)
 }
 
 func displayHelpMessage() {
@@ -95,7 +98,18 @@ func main() {
 	if verbose {
 		programLevel.Set(slog.LevelDebug)
 	}
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+	var logWriter io.Writer	
+	if logfile != "" {
+		f, err := os.OpenFile(logfile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			panic(err)
+		}
+		defer f.Close()
+		logWriter = f
+	} else {
+		logWriter = os.Stdout
+	}
+	logger := slog.New(slog.NewTextHandler(logWriter, &slog.HandlerOptions{
 		Level:     programLevel,
 		AddSource: true,
 	}))
@@ -182,7 +196,16 @@ func main() {
 	}
 	if selected != nil {
 		slog.Debug(fmt.Sprintf("Session %s was selected", selected.Name))
-		selected.Swap()
+		switch command {
+		case "switch":
+			selected.Switch()
+		case "stop":
+			selected.Stop()
+		case "reset":
+			selected.Reset()
+		default:
+			slog.Error(fmt.Sprintf("Command: %s not recognized", command))
+		}
 	} else {
 		fmt.Println("No selection")
 	}

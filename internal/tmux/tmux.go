@@ -13,10 +13,19 @@ import (
 	"samuellando.com/tmixer/internal/project"
 )
 
+type Window struct {
+	Id string
+}
+
+func (w *Window) Link(s *Session) {
+	tmux("link-window", "-s", w.Id, "-t", s.Name)
+}
+
 type Session struct {
 	Name    string
 	Project *project.Project
 }
+
 
 type sessionInfo struct {
 	active       bool
@@ -34,6 +43,22 @@ func (s *Session) Attached() bool {
 
 func (s *Session) LastActivity() *time.Time {
 	return s.getInfo().lastActivity
+}
+
+func (s *Session) Windows() []*Window {
+	out, err := tmux("list-windows", "-t", "="+s.Name+":", "-F", "#{window_id}")
+	if err != nil {
+		slog.Debug("No TMUX server")
+		return nil
+	}
+	rows := strings.Split(strings.TrimSpace(string(out)), "\n")
+	windows := make([]*Window, 0)
+	for _, row := range rows {
+		parts := strings.Split(strings.TrimSpace(row), "|")
+		w := Window{Id: parts[0]}
+		windows = append(windows, &w)
+	}
+	return windows
 }
 
 func (s *Session) String() string {
@@ -73,7 +98,7 @@ func (s *Session) getInfo() sessionInfo {
 	return sessionInfo{attached: attached, active: active, lastActivity: lastActivity}
 }
 
-func (s *Session) Swap() {
+func (s *Session) Switch() {
 	client := getClient()
 	if client == nil {
 		slog.Error("No client found")
@@ -131,28 +156,34 @@ func (s *Session) executeSwitchCommands() {
 }
 
 func (s *Session) Stop() {
-	_, err := tmux("kill-session", "-t", s.Name, "-d")
-	if err != nil {
-		panic(err)
+	if s.Active() {
+		_, err := tmux("kill-session", "-t", s.Name)
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		slog.Error(fmt.Sprintf("Session: %s is not active", s.Name))
 	}
 }
 
 func (s *Session) Reset() {
-	var temp *Session
-	if s.Attached() {
-		temp = switchToTempSession()
+	attached := s.Attached()
+	temp := createTempSession()
+	for _, window := range s.Windows() {
+		window.Link(temp)
 	}
-	if s.Active() {
-		s.Stop()
+	if attached {
+		temp.Switch()
 	}
+	s.Stop()
 	s.Start()
-	if temp != nil {
-		s.Swap()
-		temp.Stop()
+	if attached {
+		s.Switch()
 	}
+	temp.Stop()
 }
 
-func switchToTempSession() *Session {
+func createTempSession() *Session {
 	client := getClient()
 	if client == nil {
 		slog.Error("No client found")
@@ -160,10 +191,6 @@ func switchToTempSession() *Session {
 	uuid := uuid.NewString()
 	// Crate a temp session to switch to temporarly
 	_, err := tmux("new", "-s", uuid, "-d")
-	if err != nil {
-		panic(err)
-	}
-	_, err = tmux("switchc", "-c", *client, "-t", uuid)
 	if err != nil {
 		panic(err)
 	}
@@ -256,7 +283,7 @@ func getClient() *string {
 	sort.Sort(sort.Reverse(sort.IntSlice(times)))
 	if len(clients) > 0 {
 		cachedClient = clients[times[0]]
-		slog.Debug(fmt.Sprintf("Caching client %s for the rest of the execution", cachedClient))
+		slog.Debug(fmt.Sprintf("Caching client %s for the rest of the execution", *cachedClient))
 		return cachedClient
 	} else {
 		return nil
