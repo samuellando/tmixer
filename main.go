@@ -40,10 +40,26 @@ func displayHelpMessage() {
 	fmt.Println(`tmixer [flags] [command] [project_name]
 
 Commands:
-- switch (default)
-- start
-- stop
-- reset
+
+switch (default)
+	switch the active tmux client to the session. If it has a configured project
+	the project windows are crteated and the switch commands are run.
+
+	Note that switching windows in tmux will also call the switch commands by utilizing 
+	a hook, as long as tmixer was called aty some point on the server session.
+
+start
+	start the session, create project windows
+
+stop
+	kill the session
+
+reset
+	reset session, recreate project windows
+
+notify-switch 
+	Internal command used to hook into tmux for when it switches session
+	tmixer automatically sets up the tmux hook when it is run.
 
 If no project name is provided, fzf will be opened to select the project. For
 the start command it will default to the last active session, or the default 
@@ -98,7 +114,7 @@ func main() {
 	if verbose {
 		programLevel.Set(slog.LevelDebug)
 	}
-	var logWriter io.Writer	
+	var logWriter io.Writer
 	if logfile != "" {
 		f, err := os.OpenFile(logfile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
@@ -116,10 +132,7 @@ func main() {
 	slog.SetDefault(logger)
 	slog.Debug(fmt.Sprintf("Parsed args: -h=%t -v=%t -c=%s %s %s", help, verbose, config, command, inputProject))
 
-	err := tmux.StartServer()
-	if err != nil {
-		panic(err)
-	}
+	tmux.SetupHooks()
 
 	sessions := tmux.Sessions()
 
@@ -173,19 +186,21 @@ func main() {
 			slog.Error("Already in TMUX")
 		} else {
 			slog.Debug("Starting tmux")
-			wait := make(chan bool)
-			go func() {
-				cmd := exec.Command("tmux", "-u", "attach", "-t", selected.Name)
-				cmd.Stdin = os.Stdin
-				cmd.Stdout = os.Stdout
-				cmd.Stderr = os.Stderr
-				err := cmd.Run()
-				if err != nil {
-					panic(err)
-				}
-				wait <- true
-			}()
-			<-wait
+			cmd := exec.Command("tmux", "-u", "attach", "-t", selected.Name)
+			cmd.Stdin = os.Stdin
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			err := cmd.Start()
+			if err != nil {
+				panic(err)
+			}
+			tmux.WaitForServer()
+			tmux.SetupHooks()
+			selected.ExecuteSwitchCommands()
+			err = cmd.Wait()
+			if err != nil {
+				panic(err)
+			}
 		}
 		return
 	}
@@ -203,6 +218,8 @@ func main() {
 			selected.Stop()
 		case "reset":
 			selected.Reset()
+		case "notify-switch":
+			selected.ExecuteSwitchCommands()
 		default:
 			slog.Error(fmt.Sprintf("Command: %s not recognized", command))
 		}

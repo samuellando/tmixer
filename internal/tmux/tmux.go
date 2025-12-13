@@ -26,7 +26,6 @@ type Session struct {
 	Project *project.Project
 }
 
-
 type sessionInfo struct {
 	active       bool
 	lastActivity *time.Time
@@ -113,7 +112,6 @@ func (s *Session) Switch() {
 	}
 	tmux("switchc", "-c", *client, "-t", s.Name)
 	slog.Debug(fmt.Sprintf("Switched to session %s", s.Name))
-	s.executeSwitchCommands()
 }
 
 func (s *Session) Start() {
@@ -145,7 +143,7 @@ func (s *Session) createStartupWindows() {
 	}
 }
 
-func (s *Session) executeSwitchCommands() {
+func (s *Session) ExecuteSwitchCommands() {
 	if s.Project == nil {
 		return
 	}
@@ -207,9 +205,21 @@ func CleanName(name string) string {
 	return strings.ReplaceAll(name, ".", "_")
 }
 
-func StartServer() error {
-	_, err := tmux("start-server")
-	return err
+func WaitForServer() error {
+	for range 100 {
+		_, err := tmux("list-clients")
+		if err == nil {
+			return nil
+		}
+		time.Sleep(10*time.Millisecond)
+	}
+	return fmt.Errorf("tmux server startup timed out")
+}
+
+func SetupHooks() {
+	cmd :=`run-shell "tmixer notify-switch #{session_name}"` 
+	tmux("set-hook", "-g", "client-session-changed[2000]", cmd)
+	tmux("set-hook", "-g", "client-attached[2000]", cmd)
 }
 
 func Sessions() map[string]*Session {
