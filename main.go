@@ -7,9 +7,11 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"sort"
+	"time"
+
 	"samuellando.com/tmixer/internal/project"
 	"samuellando.com/tmixer/internal/tmux"
-	"time"
 )
 
 var CONFIG_FILES = []string{"~/.tmixer.yml", "~/.config/tmixer/config.yml"}
@@ -92,7 +94,25 @@ func Fzf(sessions map[string]*tmux.Session) *tmux.Session {
 	}
 	go func() {
 		defer stdin.Close()
+		session_list := make([]*tmux.Session, 0)
 		for _, session := range sessions {
+			session_list = append(session_list, session)
+		}
+		sort.Slice(session_list, func(i, j int) bool {
+			lai := session_list[i].LastActivity()
+			laj := session_list[j].LastActivity()
+			if lai == nil && laj == nil {
+				return session_list[i].Name > session_list[j].Name
+			}
+			if lai == nil {
+				return false
+			}
+			if laj == nil {
+				return true
+			}
+			return lai.After(*laj)
+		})
+		for _, session := range session_list {
 			io.WriteString(stdin, session.String()+"\n")
 		}
 	}()

@@ -198,7 +198,8 @@ func createTempSession() *Session {
 }
 
 func RemoveIcon(name string) string {
-	return strings.Split(strings.TrimSpace(name), " ")[1]
+	parts :=  strings.Split(strings.TrimSpace(name), " ")
+	return strings.TrimSpace(parts[len(parts) - 1])
 }
 
 func CleanName(name string) string {
@@ -250,7 +251,7 @@ func LinkProjectsToSessions(sessions map[string]*Session, projects map[string]*p
 				Name:    CleanName(name),
 				Project: proj,
 			}
-			sessions[name] = &session
+			sessions[CleanName(name)] = &session
 		}
 	}
 }
