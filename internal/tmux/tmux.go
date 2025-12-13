@@ -61,14 +61,14 @@ func (s *Session) Windows() []*Window {
 }
 
 func (s *Session) String() string {
-	icon := "."
+	icon := "\uf114"
 	if s.Active() {
-		icon = "*"
+		icon = "\uf07b"
 	}
 	if s.Attached() {
-		icon = "+"
+		icon = "\033[31m\uf07b\033[0m"
 	}
-	return fmt.Sprintf("%s %s", icon, s.Name)
+	return fmt.Sprintf("%s   %s", icon, s.Name)
 }
 
 func (s *Session) getInfo() sessionInfo {

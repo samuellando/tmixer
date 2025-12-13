@@ -85,7 +85,7 @@ projects:
 }
 
 func Fzf(sessions map[string]*tmux.Session) *tmux.Session {
-	cmd := exec.Command("fzf")
+	cmd := exec.Command("fzf", "--ansi")
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		panic(err)
