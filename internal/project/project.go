@@ -16,13 +16,14 @@ type Config struct {
 }
 
 type Project struct {
-	Directory      string              `yaml:"directory"`
-	SubDirectories bool                `yaml:"subDirectories"`
-	StartupWindows []map[string]Window `yaml:"startupWindows"`
-	SwitchCommands [][]string          `yaml:"switchCommands"`
+	Directory      string     `yaml:"directory"`
+	SubDirectories bool       `yaml:"subDirectories"`
+	StartupWindows []Window   `yaml:"startupWindows"`
+	SwitchCommands []string `yaml:"switchCommands"`
 }
 
 type Window struct {
+	Name    string
 	Command string
 }
 
@@ -31,7 +32,7 @@ func LoadCofig(files ...string) Config {
 	projects := make(map[string]*Project)
 	for _, f := range files {
 		if f != "" {
-			bytes, err := os.ReadFile(f)
+			bytes, err := os.ReadFile(absPath(f))
 			if err != nil {
 				slog.Debug(err.Error())
 				continue
@@ -47,6 +48,21 @@ func LoadCofig(files ...string) Config {
 	convertToAbsolutePaths(config.Projects)
 	loadSubDirectories(config.Projects)
 	return config
+}
+
+func absPath(path string) string {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		panic(err)
+	}
+	if strings.HasPrefix(path, "~/") {
+		path = filepath.Join(homeDir, path[2:])
+	}
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		slog.Error(err.Error())
+	}
+	return abs
 }
 
 func convertToAbsolutePaths(projects map[string]*Project) {

@@ -39,7 +39,6 @@ func displayHelpMessage() {
 Commands:
 - switch (default)
 - start
-- start
 - stop
 - reset
 

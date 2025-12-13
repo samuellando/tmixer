@@ -8,8 +8,9 @@ projects:
     directory: "~/Projects"
     subDirectories: true
     startupWindows:
-      - nvim:
-          command: "nivm ."
+      - name: nvim
+        command: "nivm ."
+      - name: shell
     switchCommands:
       - ["ln", "-sfn", "/opt/example/config $(pwd)"]
       - ["ln", "-sfn", "$(pwd)/.nvim.lua ~/Projects/.nvim.lua"]

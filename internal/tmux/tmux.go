@@ -88,12 +88,45 @@ func (s *Session) Swap() {
 	}
 	tmux("switchc", "-c", *client, "-t", s.Name)
 	slog.Debug(fmt.Sprintf("Switched to session %s", s.Name))
+	s.executeSwitchCommands()
 }
 
 func (s *Session) Start() {
-	_, err := tmux("new", "-s", s.Name, "-d")
+	args := []string{"new", "-s", s.Name, "-d"}
+	if s.Project != nil {
+		args = append(args, "-c", s.Project.Directory)
+	}
+	_, err := tmux(args...)
 	if err != nil {
 		panic(err)
+	}
+	s.createStartupWindows()
+}
+
+func (s *Session) createStartupWindows() {
+	if s.Project == nil {
+		return
+	}
+	if len(s.Project.StartupWindows) > 0 {
+		for i, window := range s.Project.StartupWindows {
+			tmux("new-window", "-d", "-a", "-t", s.Name+":1", "-c", s.Project.Directory, "-n", window.Name)
+			if window.Command != "" {
+				tmux("send-keys", "-t", s.Name+":"+window.Name, window.Command, "enter")
+			}
+			if i == 0 {
+				tmux("kill-window", "-t", s.Name+":1")
+			}
+		}
+	}
+}
+
+func (s *Session) executeSwitchCommands() {
+	if s.Project == nil {
+		return
+	}
+	for _, cmd := range s.Project.SwitchCommands {
+		tmux("split-window", "-t", s.Name, "-v")
+		tmux("send-keys", "-t", s.Name, cmd+" && exit", "enter")
 	}
 }
 
