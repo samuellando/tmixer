@@ -1,0 +1,101 @@
+package tmuxv2
+
+import (
+	"bytes"
+	"os/exec"
+	"strings"
+)
+
+type cmd struct {
+	tmuxFlags [][]string
+	command   string
+	flags     [][]string
+	arguments []string
+}
+
+func command(c string) cmd {
+	return cmd{
+		tmuxFlags: make([][]string, 0),
+		command:   c,
+		flags:     make([][]string, 0),
+		arguments: make([]string, 0),
+	}
+}
+
+func (c cmd) withFlag(flagValues ...string) cmd {
+	c.flags = append(c.flags, flagValues)
+	return c
+}
+
+func (c cmd) withTmuxFlag(flagValues ...string) cmd {
+	c.tmuxFlags = append(c.tmuxFlags, flagValues)
+	return c
+}
+
+func (c cmd) withArgument(arg string) cmd {
+	c.arguments = append(c.arguments, arg)
+	return c
+}
+
+func (c cmd) withTargetClient(t *Client) cmd {
+	return c.withFlag("-t", t.Id)
+}
+
+func (c cmd) withTargetSession(t *Session) cmd {
+	return c.withFlag("-t", t.Id)
+}
+
+func (c cmd) withTargetSessionName(name string) cmd {
+	return c.withFlag("-t", "="+name)
+}
+
+func (c cmd) withSession(name string) cmd {
+	return c.withFlag("-s", name)
+}
+
+func (c cmd) withWorkingDirectory(path string) cmd {
+	return c.withFlag("-c", path)
+}
+
+func (c cmd) withFormat(format string) cmd {
+	return c.withFlag("-F", format)
+}
+
+func (c cmd) detached() cmd {
+	return c.withFlag("-d")
+}
+
+func (c cmd) print() cmd {
+	return c.withFlag("-P")
+}
+
+func (c cmd) Run() ([]string, error) {
+	cmd := c.getExecCmd()
+	out, err := cmd.CombinedOutput()
+	lines := make([]string, 0)
+	for _, line := range bytes.Split(out, []byte{'\n'}) {
+		lines = append(lines, strings.TrimSpace(string(line)))
+	}
+	return lines, err
+}
+
+func (c cmd) String() string {
+	return strings.Join(c.tmuxArguments(), " ")
+}
+
+func (c cmd) getExecCmd() *exec.Cmd {
+	return exec.Command("tmux", c.tmuxArguments()...)
+}
+
+func (c cmd) tmuxArguments() []string {
+	args := make([]string, 0)
+	for _, flag := range c.tmuxFlags {
+		args = append(args, flag...)
+	}
+	args = append(args, c.command)
+	for _, flag := range c.flags {
+		args = append(args, flag...)
+	}
+	args = append(args, c.arguments...)
+	return args
+}

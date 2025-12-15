@@ -9,29 +9,29 @@ type Session struct {
 	Project *project.Project
 }
 
-func (s *Session) New() *Session {
-
-}
-
-func (s *Session) ListSessions() []*Session {
-}
-
-func (s *Session) HasSession() bool {
-
-}
-
-func (s *Session) Rename() *Session {
-
-}
-
-func (s *Session) Windows() {
-
-}
-
-func (s *Session) Kill() {
-
-}
-
-func (s *Session) Lock() {
-
-}
+// func (s *Session) New() *Session {
+//
+// }
+//
+// func (s *Session) ListSessions() []*Session {
+// }
+//
+// func (s *Session) HasSession() bool {
+//
+// }
+//
+// func (s *Session) Rename() *Session {
+//
+// }
+//
+// func (s *Session) Windows() {
+//
+// }
+//
+// func (s *Session) Kill() {
+//
+// }
+//
+// func (s *Session) Lock() {
+//
+// }

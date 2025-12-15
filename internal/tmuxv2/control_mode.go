@@ -2,6 +2,7 @@ package tmuxv2
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os/exec"
@@ -10,71 +11,81 @@ import (
 
 var (
 	controlModeCmd       *exec.Cmd
-	controlModeCmdStdIn  io.WriteCloser
 	controlModeCmdStdOut io.ReadCloser
-	controlModeStdIn     *bufio.Writer
+	controlModeStdIn     io.WriteCloser
 	controlModeStdOut    *bufio.Reader
 )
 
+const CONTROL_SESSION_NAME = "__tmixer_control__"
+
 func startControlMode() error {
 	if controlModeCmd != nil {
-		return fmt.Errorf("Call close on the previous session first!")
+		return fmt.Errorf("Call close on the previous client first!")
 	}
-	controlModeCmd = exec.Command("tmux", "-C")
-	err := controlModeCmd.Start()
+	cmd := command("new-session")
+	cmd = cmd.withTmuxFlag("-C").withSession(CONTROL_SESSION_NAME).withFlag("-A")
+	controlModeCmd = cmd.getExecCmd()
+	var err error
+	controlModeStdIn, err = controlModeCmd.StdinPipe()
+	controlModeCmdStdOut, err = controlModeCmd.StdoutPipe()
 	if err != nil {
-		closeControlMode()
-		return err
+		return errors.Join(err, closeControlMode())
 	}
-	stdIn, err := controlModeCmd.StdinPipe()
+	controlModeStdOut = bufio.NewReader(controlModeCmdStdOut)
+	err = controlModeCmd.Start()
 	if err != nil {
-		closeControlMode()
-		return err
+		return errors.Join(err, closeControlMode())
 	}
-	controlModeStdIn = bufio.NewWriter(stdIn)
-	stdOut, err := controlModeCmd.StdoutPipe()
+	_, err = readMessage()
 	if err != nil {
-		closeControlMode()
-		return err
+		return errors.Join(err, closeControlMode())
 	}
-	controlModeStdOut = bufio.NewReader(stdOut)
-	return nil
+	return err
 }
 
 func closeControlMode() error {
-	err := controlModeCmd.Process.Kill()
-	if err != nil {
-		return err
+	if controlModeCmd == nil {
+		return fmt.Errorf("controlMode already closed")
 	}
-	err = controlModeCmdStdIn.Close()
+	err := controlModeStdIn.Close()
 	if err != nil {
-		return err
-	}
-	err = controlModeCmdStdIn.Close()
-	if err != nil {
-		return err
+		return fmt.Errorf("error when closing stdin %w", err)
 	}
 	err = controlModeCmd.Wait()
+	if err != nil {
+		return fmt.Errorf("error when waiting for command to exit %w", err)
+	}
+	controlModeCmd = nil
+	controlModeStdIn = nil
+	controlModeStdOut = nil
+	controlModeCmdStdOut = nil
+	cmd := command("kill-session").withTargetSessionName(CONTROL_SESSION_NAME)
+	_, err = cmd.Run()
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func runControlModeCommand(cmd string) ([]string, error) {
-	_, err := controlModeStdIn.WriteString(cmd + "\n")
+func sendControlModeCommand(c cmd) ([]string, error) {
+	_, err := controlModeStdIn.Write([]byte(c.String() + "\n"))
 	if err != nil {
 		return nil, err
 	}
+	return readMessage()
+}
+
+func readMessage() ([]string, error) {
 	readState := "before"
 	out := make([]string, 0)
 	for {
 		outLine, err := controlModeStdOut.ReadString('\n')
 		if err != nil {
-			return nil, err
+			panic(err)
 		}
 		if strings.HasPrefix(outLine, "%begin") {
 			readState = "inside"
+			continue
 		}
 		if strings.HasPrefix(outLine, "%end") {
 			readState = "done"
@@ -85,7 +96,7 @@ func runControlModeCommand(cmd string) ([]string, error) {
 			break
 		}
 		if readState == "inside" {
-			out = append(out, outLine)
+			out = append(out, strings.TrimSpace(outLine))
 		}
 	}
 	if readState == "done" {
