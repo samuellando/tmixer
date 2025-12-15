@@ -12,7 +12,7 @@ import (
 func TestMain(m *testing.M) {
 	// Setup
 	c := command("list-sessions")
-	out, err := c.run()
+	_, err := c.run()
 	var client *exec.Cmd
 	if err != nil {
 		fmt.Println("Starting tmux server")
@@ -22,9 +22,7 @@ func TestMain(m *testing.M) {
 		if err != nil {
 			panic(err)
 		}
-	} else if strings.Contains(strings.Join(out, "\n"), CONTROL_SESSION_NAME) {
-		panic("CONTROL_SESSION_NAME detected")
-	}
+	} 
 	// Run tests
 	code := m.Run()
 	// cleanup server
@@ -42,12 +40,13 @@ func TestMain(m *testing.M) {
 }
 
 func TestStartStopControlMode(t *testing.T) {
+	session_name := "__test_tmixer_control_mode_st__"
 	for range 10 {
-		err := StartControlMode()
+		client, err := StartControlMode(session_name)
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = CloseControlMode()
+		err = client.Close()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -57,14 +56,43 @@ func TestStartStopControlMode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	} 
-	if strings.Contains(strings.Join(out, "\n"), CONTROL_SESSION_NAME) {
+	if strings.Contains(strings.Join(out, "\n"), session_name) {
+		t.Fatal("CONTROL_SESSION_NAME detected")
+	}
+}
+
+func TestStartStopControlModeSimul(t *testing.T) {
+	session_name := "__test_tmixer_control_mode_simul__"
+	n := 10
+	clients := make([]*controlModeClient, n)
+	var err error
+	for i := range n {
+		clients[i], err = StartControlMode(session_name)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := range n {
+		err = clients[i].Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	c := command("list-sessions")
+	out, err := c.run()
+	if err != nil {
+		t.Fatal(err)
+	} 
+	if strings.Contains(strings.Join(out, "\n"), session_name) {
 		t.Fatal("CONTROL_SESSION_NAME detected")
 	}
 }
 
 func TestRunCommand(t *testing.T) {
-	StartControlMode()
-	defer CloseControlMode()
+	session_name := "__test_tmixer_control_mode_run__"
+	client, _ := StartControlMode(session_name)
+	SetDefaultClient(client)
+	defer client.Close()
 	c := command("list-sessions")
 	lines, err := c.run()
 	if err != nil {
@@ -72,7 +100,7 @@ func TestRunCommand(t *testing.T) {
 	} 
 	found := false
 	for _, line := range lines {
-		if strings.Contains(line, CONTROL_SESSION_NAME) {
+		if strings.Contains(line, session_name) {
 			found = true
 		}
 	}
@@ -93,8 +121,9 @@ func TestUsesControlMode(t *testing.T) {
 		}
 	}
 	psTime := time.Since(start)
-	StartControlMode()
-	defer CloseControlMode()
+	client, _ := StartControlMode()
+	SetDefaultClient(client)
+	defer client.Close()
 	start = time.Now()
 	for range n {
 		_, err := c.run()
@@ -115,22 +144,23 @@ func BenchmarkRun(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		if strings.Contains(strings.Join(out, " "), CONTROL_SESSION_NAME) {
+		if strings.Contains(strings.Join(out, " "), DEFAULT_CONTROL_SESSION_NAME) {
 			b.Fail()
 		}
     }
 }
 
 func BenchmarkControlModeRun(b *testing.B) {
-	StartControlMode()
-	defer CloseControlMode()
+	client, _ := StartControlMode()
+	SetDefaultClient(client)
+	defer client.Close()
 	c := command("list-sessions")
     for b.Loop() {
-		out, err := sendControlModeCommand(c)
+		out, err := c.run()
 		if err != nil {
 			b.Fatal(err)
 		}
-		if !strings.Contains(strings.Join(out, " "), CONTROL_SESSION_NAME) {
+		if !strings.Contains(strings.Join(out, " "), DEFAULT_CONTROL_SESSION_NAME) {
 			b.Fail()
 		}
     }

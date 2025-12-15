@@ -7,82 +7,112 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"slices"
 	"strings"
 )
 
-var (
+type controlModeClient struct {
+	killed               bool
+	sessionName          string
 	controlModeCmd       *exec.Cmd
 	controlModeCmdStdOut io.ReadCloser
 	controlModeStdIn     io.WriteCloser
 	controlModeStdOut    *bufio.Reader
-)
-
-const CONTROL_SESSION_NAME = "__tmixer_control__"
-
-func StartControlMode() error {
-	if controlModeCmd != nil {
-		return fmt.Errorf("Call close on the previous client first!")
-	}
-	cmd := command("new-session")
-	cmd = cmd.withTmuxFlag("-C").withSession(CONTROL_SESSION_NAME).withFlag("-A")
-	controlModeCmd = cmd.getExecCmd()
-	var err error
-	controlModeStdIn, err = controlModeCmd.StdinPipe()
-	controlModeCmdStdOut, err = controlModeCmd.StdoutPipe()
-	if err != nil {
-		return errors.Join(err, CloseControlMode())
-	}
-	controlModeStdOut = bufio.NewReader(controlModeCmdStdOut)
-	err = controlModeCmd.Start()
-	if err != nil {
-		return errors.Join(err, CloseControlMode())
-	}
-	_, err = readMessage()
-	if err != nil {
-		return errors.Join(err, CloseControlMode())
-	}
-	return err
 }
 
-func CloseControlMode() error {
-	if controlModeCmd == nil {
+const DEFAULT_CONTROL_SESSION_NAME = "__tmixer_control__"
+
+var DEFAULT_CLIENT *controlModeClient
+
+func SetDefaultClient(client *controlModeClient) {
+	DEFAULT_CLIENT = client
+}
+
+func StartControlMode(sessionNames ...string) (*controlModeClient, error) {
+	sessionName := DEFAULT_CONTROL_SESSION_NAME
+	if len(sessionNames) > 0 {
+		sessionName = sessionNames[0]
+	}
+	client := controlModeClient{sessionName: sessionName}
+	cmd := command("new-session")
+	cmd = cmd.withTmuxFlag("-C").withFlag("-A").withSession(sessionName)
+	client.controlModeCmd = cmd.getExecCmd()
+	var err error
+	client.controlModeStdIn, err = client.controlModeCmd.StdinPipe()
+	client.controlModeCmdStdOut, err = client.controlModeCmd.StdoutPipe()
+	if err != nil {
+		return nil, errors.Join(err, client.Close())
+	}
+	client.controlModeStdOut = bufio.NewReader(client.controlModeCmdStdOut)
+	err = client.controlModeCmd.Start()
+	if err != nil {
+		return nil, errors.Join(err, client.Close())
+	}
+	_, err = client.readMessage()
+	if err != nil {
+		return nil, errors.Join(err, client.Close())
+	}
+	return &client, nil
+}
+
+func (client *controlModeClient) Close() error {
+	if client.controlModeCmd == nil {
 		return fmt.Errorf("controlMode already closed")
 	}
-	err := controlModeStdIn.Close()
+	err := client.controlModeStdIn.Close()
 	if err != nil {
 		return fmt.Errorf("error when closing stdin %w", err)
 	}
-	err = controlModeCmd.Wait()
+	err = client.controlModeCmd.Wait()
 	if err != nil {
 		return fmt.Errorf("error when waiting for command to exit %w", err)
 	}
-	controlModeCmd = nil
-	controlModeStdIn = nil
-	controlModeStdOut = nil
-	controlModeCmdStdOut = nil
-	cmd := command("kill-session").withTargetSessionName(CONTROL_SESSION_NAME)
-	_, err = cmd.run()
+	client.killed = true
+	return client.cleanUpSession()
+}
+
+func (client *controlModeClient) cleanUpSession() error {
+	cmd := command("list-clients").withFilter(fmt.Sprintf("#{?client_control_mode,#{?#{==:#{client_session},%s},1,},}", client.sessionName))
+	lines, err := cmd.run()
 	if err != nil {
-		return err
+		return fmt.Errorf("Error when requesting session info %w", err)
+	}
+	// Remove empty lines
+	lines = slices.DeleteFunc(lines, func(s string) bool { return len(s) == 0})
+	if len(lines) == 0 {
+		cmd := command("kill-session").withTargetSessionName(client.sessionName)
+		_, err = cmd.run()
+		if err != nil {
+			return fmt.Errorf("Error while killing session %w", err)
+		}
 	}
 	return nil
 }
 
-func sendControlModeCommand(c cmd) ([]string, error) {
-	_, err := controlModeStdIn.Write([]byte(c.String() + "\n"))
-	if err != nil {
-		return nil, err
+func (client *controlModeClient) sendCommand(c cmd) ([]string, error) {
+	if client.killed {
+		return nil, fmt.Errorf("Client has been killed")
 	}
-	return readMessage()
+	_, err := client.controlModeStdIn.Write([]byte(c.String() + "\n"))
+	if err != nil {
+		return nil, fmt.Errorf("Failed to write to stdin: %w", err)
+	}
+	return client.readMessage()
 }
 
-func readMessage() ([]string, error) {
+func (client *controlModeClient) readMessage() ([]string, error) {
+	if client.killed {
+		return nil, fmt.Errorf("Client has been killed")
+	}
 	readState := "before"
 	out := make([]string, 0)
 	for {
-		outLine, err := controlModeStdOut.ReadString('\n')
+		outLine, err := client.controlModeStdOut.ReadString('\n')
+		if err == io.EOF {
+			return nil, nil
+		}
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
 		if strings.HasPrefix(outLine, "%begin") {
 			readState = "inside"
@@ -108,8 +138,8 @@ func readMessage() ([]string, error) {
 }
 
 func runCommandInControlModeIfStarted(c cmd) ([]string, error) {
-	if controlModeCmd != nil {
-		return sendControlModeCommand(c)
+	if DEFAULT_CLIENT != nil && !DEFAULT_CLIENT.killed {
+		return DEFAULT_CLIENT.sendCommand(c)
 	}
 	cmd := c.getExecCmd()
 	out, err := cmd.CombinedOutput()
@@ -119,4 +149,3 @@ func runCommandInControlModeIfStarted(c cmd) ([]string, error) {
 	}
 	return lines, err
 }
-

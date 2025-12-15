@@ -46,7 +46,7 @@ func TestCombination(t *testing.T) {
 // Test each helper
 
 func TestWithTargetClient(t *testing.T) {
-	client := Client{Id: "/pty/25"}
+	client := Client{Name: "/pty/25"}
 	c := command("test").withTargetClient(&client)
 	assertString(c.String(), "test -t /pty/25", t)
 }
@@ -59,7 +59,7 @@ func TestWithTargetSession(t *testing.T) {
 
 func TestWithTargetSessionName(t *testing.T) {
 	c := command("test").withTargetSessionName("__hello__")
-	assertString(c.String(), "test -t =__hello__", t)
+	assertString(c.String(), "test -t =__hello__:", t)
 }
 
 func TestWithSession(t *testing.T) {
@@ -75,6 +75,11 @@ func TestWithWorkingDirectory(t *testing.T) {
 func TestWithFormat(t *testing.T) {
 	c := command("test").withFormat("#{session_name}")
 	assertString(c.String(), "test -F #{session_name}", t)
+}
+
+func TestWithFilter(t *testing.T) {
+	c := command("test").withFilter("#{session_name}")
+	assertString(c.String(), "test -f #{session_name}", t)
 }
 
 func TestDetached(t *testing.T) {
