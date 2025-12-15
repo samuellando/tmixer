@@ -2,6 +2,7 @@ package tmuxv2
 
 import (
 	"os"
+	"time"
 	"os/exec"
 	"strings"
 	"testing"
@@ -11,12 +12,13 @@ import (
 func TestMain(m *testing.M) {
 	// Setup
 	c := command("list-sessions")
-	out, err := c.Run()
+	out, err := c.run()
 	var client *exec.Cmd
 	if err != nil {
 		fmt.Println("Starting tmux server")
 		c := command("new").withTmuxFlag("-C")
-		_, err := c.Run()
+		client = c.getExecCmd()
+		err := client.Start()
 		if err != nil {
 			panic(err)
 		}
@@ -29,7 +31,7 @@ func TestMain(m *testing.M) {
 	if client != nil {
 		fmt.Println("Stoping tmux server")
 		c := command("kill-server")
-		_, err := c.Run()
+		_, err := c.run()
 		if err != nil {
 			panic(err)
 		}
@@ -41,17 +43,17 @@ func TestMain(m *testing.M) {
 
 func TestStartStopControlMode(t *testing.T) {
 	for range 10 {
-		err := startControlMode()
+		err := StartControlMode()
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = closeControlMode()
+		err = CloseControlMode()
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 	c := command("list-sessions")
-	out, err := c.Run()
+	out, err := c.run()
 	if err != nil {
 		t.Fatal(err)
 	} 
@@ -60,11 +62,11 @@ func TestStartStopControlMode(t *testing.T) {
 	}
 }
 
-func TestSendCommand(t *testing.T) {
-	startControlMode()
-	defer closeControlMode()
+func TestRunCommand(t *testing.T) {
+	StartControlMode()
+	defer CloseControlMode()
 	c := command("list-sessions")
-	lines, err := sendControlModeCommand(c)
+	lines, err := c.run()
 	if err != nil {
 		t.Fatal(err)
 	} 
@@ -79,24 +81,49 @@ func TestSendCommand(t *testing.T) {
 	}
 }
 
+func TestUsesControlMode(t *testing.T) {
+	// Since control mode is so much fater (~7000x) this is a reliable test
+	c := command("list-sessions")
+	n := 100
+	start := time.Now()
+	for range n {
+		_, err := c.run()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	psTime := time.Since(start)
+	StartControlMode()
+	defer CloseControlMode()
+	start = time.Now()
+	for range n {
+		_, err := c.run()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	cmTime := time.Since(start)
+	if !(20*cmTime <= psTime) {
+		t.Fatal("Should be slower")
+	}
+}
+
 func BenchmarkRun(b *testing.B) {
-	startControlMode()
-	defer closeControlMode()
 	c := command("list-sessions")
     for b.Loop() {
-		out, err := c.Run()
+		out, err := c.run()
 		if err != nil {
 			b.Fatal(err)
 		}
-		if !strings.Contains(strings.Join(out, " "), CONTROL_SESSION_NAME) {
+		if strings.Contains(strings.Join(out, " "), CONTROL_SESSION_NAME) {
 			b.Fail()
 		}
     }
 }
 
 func BenchmarkControlModeRun(b *testing.B) {
-	startControlMode()
-	defer closeControlMode()
+	StartControlMode()
+	defer CloseControlMode()
 	c := command("list-sessions")
     for b.Loop() {
 		out, err := sendControlModeCommand(c)

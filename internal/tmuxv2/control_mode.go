@@ -2,6 +2,7 @@ package tmuxv2
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -18,7 +19,7 @@ var (
 
 const CONTROL_SESSION_NAME = "__tmixer_control__"
 
-func startControlMode() error {
+func StartControlMode() error {
 	if controlModeCmd != nil {
 		return fmt.Errorf("Call close on the previous client first!")
 	}
@@ -29,21 +30,21 @@ func startControlMode() error {
 	controlModeStdIn, err = controlModeCmd.StdinPipe()
 	controlModeCmdStdOut, err = controlModeCmd.StdoutPipe()
 	if err != nil {
-		return errors.Join(err, closeControlMode())
+		return errors.Join(err, CloseControlMode())
 	}
 	controlModeStdOut = bufio.NewReader(controlModeCmdStdOut)
 	err = controlModeCmd.Start()
 	if err != nil {
-		return errors.Join(err, closeControlMode())
+		return errors.Join(err, CloseControlMode())
 	}
 	_, err = readMessage()
 	if err != nil {
-		return errors.Join(err, closeControlMode())
+		return errors.Join(err, CloseControlMode())
 	}
 	return err
 }
 
-func closeControlMode() error {
+func CloseControlMode() error {
 	if controlModeCmd == nil {
 		return fmt.Errorf("controlMode already closed")
 	}
@@ -60,7 +61,7 @@ func closeControlMode() error {
 	controlModeStdOut = nil
 	controlModeCmdStdOut = nil
 	cmd := command("kill-session").withTargetSessionName(CONTROL_SESSION_NAME)
-	_, err = cmd.Run()
+	_, err = cmd.run()
 	if err != nil {
 		return err
 	}
@@ -105,3 +106,17 @@ func readMessage() ([]string, error) {
 		return out, fmt.Errorf("Command returned an error")
 	}
 }
+
+func runCommandInControlModeIfStarted(c cmd) ([]string, error) {
+	if controlModeCmd != nil {
+		return sendControlModeCommand(c)
+	}
+	cmd := c.getExecCmd()
+	out, err := cmd.CombinedOutput()
+	lines := make([]string, 0)
+	for line := range bytes.SplitSeq(out, []byte{'\n'}) {
+		lines = append(lines, strings.TrimSpace(string(line)))
+	}
+	return lines, err
+}
+

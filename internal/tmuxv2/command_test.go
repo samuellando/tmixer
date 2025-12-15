@@ -91,7 +91,7 @@ func TestPrint(t *testing.T) {
 
 func TestRun(t *testing.T) {
 	c := command("test").withTmuxFlag("-V")
-	out, err := c.Run()
+	out, err := c.run()
 	if err != nil {
 		t.Fatal("Should not return an error")
 	}
@@ -102,7 +102,7 @@ func TestRun(t *testing.T) {
 
 func TestRunBadCommand(t *testing.T) {
 	c := command("test")
-	out, err := c.Run()
+	out, err := c.run()
 	if err == nil {
 		t.Fatal("Should return an error")
 	}

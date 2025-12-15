@@ -1,7 +1,6 @@
 package tmuxv2
 
 import (
-	"bytes"
 	"os/exec"
 	"strings"
 )
@@ -20,6 +19,10 @@ func command(c string) cmd {
 		flags:     make([][]string, 0),
 		arguments: make([]string, 0),
 	}
+}
+
+func (c cmd) run() ([]string, error) {
+	return runCommandInControlModeIfStarted(c)
 }
 
 func (c cmd) withFlag(flagValues ...string) cmd {
@@ -67,16 +70,6 @@ func (c cmd) detached() cmd {
 
 func (c cmd) print() cmd {
 	return c.withFlag("-P")
-}
-
-func (c cmd) Run() ([]string, error) {
-	cmd := c.getExecCmd()
-	out, err := cmd.CombinedOutput()
-	lines := make([]string, 0)
-	for _, line := range bytes.Split(out, []byte{'\n'}) {
-		lines = append(lines, strings.TrimSpace(string(line)))
-	}
-	return lines, err
 }
 
 func (c cmd) String() string {
