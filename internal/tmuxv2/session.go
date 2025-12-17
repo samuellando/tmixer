@@ -29,16 +29,6 @@ func (srv *Server) ListSessions() ([]*Session, error) {
 	return sessions, err
 }
 
-func (s *Session) Windows() ([]*Window, error) {
-	lines, err := s.server.command("list-windows").withTargetSession(s).withFormat("#{window_id}").run()
-	window := make([]*Window, 0)
-	for _, line := range lines {
-		window = append(window, &Window{Id: line})
-	}
-	return window, err
-
-}
-
 func (s *Session) Kill() error {
 	_, err := s.server.command("kill-session").withTargetSession(s).run()
 	return err
@@ -47,4 +37,21 @@ func (s *Session) Kill() error {
 func (srv *Server) KillSessionWithName(s string) error {
 	_, err := srv.command("kill-session").withTargetSessionName(s).run()
 	return err
+}
+
+func (s *Session) NewWindow(dir, name, command string) (*Window, error) {
+	lines, err := s.server.command("new-window").withWorkingDirectory(dir).withName(name).withArgument(command).print().withFormat("#{window_id}").run()
+	if len(lines) == 0 {
+		return nil, fmt.Errorf("Got no window id %w", err)
+	}
+	return &Window{Id: lines[0], server: s.server}, err
+}
+
+func (s *Session) Windows() ([]*Window, error) {
+	lines, err := s.server.command("list-windows").withTargetSession(s).withFormat("#{window_id}").run()
+	windows := make([]*Window, 0)
+	for _, line := range lines {
+		windows = append(windows, &Window{Id: line, server: s.server})
+	}
+	return windows, err
 }

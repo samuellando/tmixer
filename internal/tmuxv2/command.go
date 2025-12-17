@@ -52,12 +52,24 @@ func (c cmd) withTargetSession(t *Session) cmd {
 	return c.withFlag("-t", t.Id)
 }
 
+func (c cmd) withTargetWindow(t *Window) cmd {
+	return c.withFlag("-t", t.Id)
+}
+
+func (c cmd) withTargetPane(t *Pane) cmd {
+	return c.withFlag("-t", t.Id)
+}
+
 func (c cmd) withTargetSessionName(name string) cmd {
 	return c.withFlag("-t", "="+name+":")
 }
 
 func (c cmd) withSession(name string) cmd {
 	return c.withFlag("-s", name)
+}
+
+func (c cmd) withName(n string) cmd {
+	return c.withFlag("-n", n)
 }
 
 func (c cmd) withWorkingDirectory(path string) cmd {

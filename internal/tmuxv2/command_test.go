@@ -57,6 +57,20 @@ func TestWithTargetSession(t *testing.T) {
 	assertString(c.String(), "test -t $19", t)
 }
 
+func TestWithTargetWindow(t *testing.T) {
+	tmux := Tmux()
+	window := Window{Id: "@19"}
+	c := tmux.command("test").withTargetWindow(&window)
+	assertString(c.String(), "test -t @19", t)
+}
+
+func TestWithTargetPane(t *testing.T) {
+	tmux := Tmux()
+	window := Window{Id: "%19"}
+	c := tmux.command("test").withTargetWindow(&window)
+	assertString(c.String(), "test -t %19", t)
+}
+
 func TestWithTargetSessionName(t *testing.T) {
 	tmux := Tmux()
 	c := tmux.command("test").withTargetSessionName("__hello__")
@@ -79,6 +93,12 @@ func TestWithFormat(t *testing.T) {
 	tmux := Tmux()
 	c := tmux.command("test").withFormat("#{session_name}")
 	assertString(c.String(), "test -F #{session_name}", t)
+}
+
+func TestWithName(t *testing.T) {
+	tmux := Tmux()
+	c := tmux.command("test").withName("nvim")
+	assertString(c.String(), "test -n nvim", t)
 }
 
 func TestWithFilter(t *testing.T) {
