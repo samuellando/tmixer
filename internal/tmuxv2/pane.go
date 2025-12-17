@@ -10,23 +10,23 @@ type Pane struct {
 }
 
 func (p *Pane) Split() (*Pane, error) {
-	lines, err := p.server.command("split-window").withTargetPane(p).withFlag("-v").withFormat("#{pane_id}").run()
+	lines, err := p.server.command("split-window").withTargetPane(p).withFlag("-v").print().withFormat("#{pane_id}").run()
 	if len(lines) == 0 {
-		return nil, fmt.Errorf("Got no window id %w", err)
+		return nil, fmt.Errorf("Got no pane id %w", err)
 	}
 	return &Pane{Id: lines[0], server: p.server}, err
 }
 
 func (p *Pane) SplitHorizontally() (*Pane, error) {
-	lines, err := p.server.command("split-window").withTargetPane(p).withFlag("-h").withFormat("#{pane_id}").run()
+	lines, err := p.server.command("split-window").withTargetPane(p).withFlag("-h").print().withFormat("#{pane_id}").run()
 	if len(lines) == 0 {
-		return nil, fmt.Errorf("Got no window id %w", err)
+		return nil, fmt.Errorf("Got no pane id %w", err)
 	}
 	return &Pane{Id: lines[0], server: p.server}, err
 }
 
 func (p *Pane) SendKeys(keys string) error {
-	_, err := p.server.command("send-keys").withTargetPane(p).withArgument(keys).run()
+	_, err := p.server.command("send-keys").withTargetPane(p).withArgument(keys).withArgument("enter").run()
 	return err
 }
 
