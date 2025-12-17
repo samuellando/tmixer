@@ -12,75 +12,77 @@ import (
 )
 
 type controlModeClient struct {
-	killed               bool
-	sessionName          string
 	controlModeCmd       *exec.Cmd
-	controlModeCmdStdOut io.ReadCloser
 	controlModeStdIn     io.WriteCloser
 	controlModeStdOut    *bufio.Reader
 }
 
-const DEFAULT_CONTROL_SESSION_NAME = "__tmixer_control__"
+const CONTROL_SESSION_NAME = "__tmixer_control__"
 
-var DEFAULT_CLIENT *controlModeClient
-
-func SetDefaultClient(client *controlModeClient) {
-	DEFAULT_CLIENT = client
-}
-
-func StartControlMode(sessionNames ...string) (*controlModeClient, error) {
-	sessionName := DEFAULT_CONTROL_SESSION_NAME
-	if len(sessionNames) > 0 {
-		sessionName = sessionNames[0]
-	}
-	client := controlModeClient{sessionName: sessionName}
-	cmd := command("new-session")
-	cmd = cmd.withTmuxFlag("-C").withFlag("-A").withSession(sessionName)
+func (srv *Server) StartControlMode() error {
+	client := controlModeClient{}
+	cmd := srv.command("new-session")
+	cmd = cmd.withTmuxFlag("-C").withFlag("-A").withSession(CONTROL_SESSION_NAME)
+	// Escape and setup stdin and stdout
 	client.controlModeCmd = cmd.getExecCmd()
+	srv.controlModeClient = &client
+	rollback := func(err error) error {
+		err2 := srv.cleanUpControlSession()
+		srv.controlModeClient = nil
+		return errors.Join(err, err2)
+	}
 	var err error
 	client.controlModeStdIn, err = client.controlModeCmd.StdinPipe()
-	client.controlModeCmdStdOut, err = client.controlModeCmd.StdoutPipe()
 	if err != nil {
-		return nil, errors.Join(err, client.Close())
+		return rollback(err)
 	}
-	client.controlModeStdOut = bufio.NewReader(client.controlModeCmdStdOut)
+	stdout, err := client.controlModeCmd.StdoutPipe()
+	if err != nil {
+		return rollback(err)
+	}
+	client.controlModeStdOut = bufio.NewReader(stdout)
 	err = client.controlModeCmd.Start()
 	if err != nil {
-		return nil, errors.Join(err, client.Close())
+		return rollback(err)
 	}
 	_, err = client.readMessage()
 	if err != nil {
-		return nil, errors.Join(err, client.Close())
+		return rollback(err)
 	}
-	return &client, nil
+	return nil
 }
 
-func (client *controlModeClient) Close() error {
-	if client.controlModeCmd == nil {
+func (srv *Server) StopControlMode() error {
+	if srv.controlModeClient == nil {
 		return fmt.Errorf("controlMode already closed")
 	}
-	err := client.controlModeStdIn.Close()
+	err := srv.controlModeClient.controlModeStdIn.Close()
 	if err != nil {
 		return fmt.Errorf("error when closing stdin %w", err)
 	}
-	err = client.controlModeCmd.Wait()
+	err = srv.controlModeClient.controlModeCmd.Wait()
 	if err != nil {
 		return fmt.Errorf("error when waiting for command to exit %w", err)
 	}
-	client.killed = true
-	return client.cleanUpSession()
+	srv.controlModeClient = nil
+	// Finally clean up the session if we can
+	err = srv.cleanUpControlSession()
+	if err != nil {
+		return fmt.Errorf("error when cleaning up session %w", err)
+	}
+	return nil
 }
 
-func (client *controlModeClient) cleanUpSession() error {
-	cmd := command("list-clients").withFilter(fmt.Sprintf("#{?client_control_mode,#{?#{==:#{client_session},%s},1,},}", client.sessionName))
+func (srv *Server) cleanUpControlSession() error {
+	cmd := srv.command("list-clients").withFilter(fmt.Sprintf("#{?client_control_mode,#{?#{==:#{client_session},%s},1,},}", CONTROL_SESSION_NAME))
 	lines, err := cmd.run()
 	if err != nil {
 		return fmt.Errorf("Error when requesting session info %w", err)
 	}
 	// Remove empty lines
-	lines = slices.DeleteFunc(lines, func(s string) bool { return len(s) == 0})
+	lines = slices.DeleteFunc(lines, func(s string) bool { return len(s) == 0 })
 	if len(lines) == 0 {
-		cmd := command("kill-session").withTargetSessionName(client.sessionName)
+		cmd := srv.command("kill-session").withTargetSessionName(CONTROL_SESSION_NAME)
 		_, err = cmd.run()
 		if err != nil {
 			return fmt.Errorf("Error while killing session %w", err)
@@ -90,9 +92,6 @@ func (client *controlModeClient) cleanUpSession() error {
 }
 
 func (client *controlModeClient) sendCommand(c cmd) ([]string, error) {
-	if client.killed {
-		return nil, fmt.Errorf("Client has been killed")
-	}
 	_, err := client.controlModeStdIn.Write([]byte(c.String() + "\n"))
 	if err != nil {
 		return nil, fmt.Errorf("Failed to write to stdin: %w", err)
@@ -101,9 +100,6 @@ func (client *controlModeClient) sendCommand(c cmd) ([]string, error) {
 }
 
 func (client *controlModeClient) readMessage() ([]string, error) {
-	if client.killed {
-		return nil, fmt.Errorf("Client has been killed")
-	}
 	readState := "before"
 	out := make([]string, 0)
 	for {
@@ -137,15 +133,18 @@ func (client *controlModeClient) readMessage() ([]string, error) {
 	}
 }
 
-func runCommandInControlModeIfStarted(c cmd) ([]string, error) {
-	if DEFAULT_CLIENT != nil && !DEFAULT_CLIENT.killed {
-		return DEFAULT_CLIENT.sendCommand(c)
+func (srv *Server) runCommandInControlModeIfStarted(c cmd) ([]string, error) {
+	if srv.controlModeClient != nil {
+		return srv.controlModeClient.sendCommand(c)
 	}
 	cmd := c.getExecCmd()
 	out, err := cmd.CombinedOutput()
 	lines := make([]string, 0)
 	for line := range bytes.SplitSeq(out, []byte{'\n'}) {
-		lines = append(lines, strings.TrimSpace(string(line)))
+		l := strings.TrimSpace(string(line))
+		if len(l) > 0 {
+			lines = append(lines, l)
+		}
 	}
 	return lines, err
 }

@@ -1,106 +1,76 @@
 package tmuxv2
 
 import (
-	"os"
-	"time"
-	"os/exec"
 	"strings"
 	"testing"
-	"fmt"
+	"time"
 )
 
-func TestMain(m *testing.M) {
-	// Setup
-	c := command("list-sessions")
-	_, err := c.run()
-	var client *exec.Cmd
-	if err != nil {
-		fmt.Println("Starting tmux server")
-		c := command("new").withTmuxFlag("-C")
-		client = c.getExecCmd()
-		err := client.Start()
-		if err != nil {
-			panic(err)
-		}
-	} 
-	// Run tests
-	code := m.Run()
-	// cleanup server
-	if client != nil {
-		fmt.Println("Stoping tmux server")
-		c := command("kill-server")
-		_, err := c.run()
-		if err != nil {
-			panic(err)
-		}
-		client.Wait()
-	}
-	// Exit with the proper code
-	os.Exit(code)
-}
-
 func TestStartStopControlMode(t *testing.T) {
-	session_name := "__test_tmixer_control_mode_st__"
+	tmux := setupTestServer(t)
+	defer teardownTestServer(tmux)
 	for range 10 {
-		client, err := StartControlMode(session_name)
+		err := tmux.StartControlMode()
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = client.Close()
+		err = tmux.StopControlMode()
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
-	c := command("list-sessions")
+	c := tmux.command("list-sessions")
 	out, err := c.run()
 	if err != nil {
 		t.Fatal(err)
-	} 
-	if strings.Contains(strings.Join(out, "\n"), session_name) {
+	}
+	if strings.Contains(strings.Join(out, "\n"), CONTROL_SESSION_NAME) {
 		t.Fatal("CONTROL_SESSION_NAME detected")
 	}
 }
 
 func TestStartStopControlModeSimul(t *testing.T) {
-	session_name := "__test_tmixer_control_mode_simul__"
+	tmux := setupTestServer(t)
+	defer teardownTestServer(tmux)
 	n := 10
-	clients := make([]*controlModeClient, n)
+	servers := make([]*Server, n)
 	var err error
 	for i := range n {
-		clients[i], err = StartControlMode(session_name)
+		servers[i] = Tmux(tmux.socketPath)
+		servers[i].StartControlMode()
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 	for i := range n {
-		err = clients[i].Close()
+		err = servers[i].StopControlMode()
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
-	c := command("list-sessions")
+	c := tmux.command("list-sessions")
 	out, err := c.run()
 	if err != nil {
 		t.Fatal(err)
-	} 
-	if strings.Contains(strings.Join(out, "\n"), session_name) {
+	}
+	if strings.Contains(strings.Join(out, "\n"), CONTROL_SESSION_NAME) {
 		t.Fatal("CONTROL_SESSION_NAME detected")
 	}
 }
 
 func TestRunCommand(t *testing.T) {
-	session_name := "__test_tmixer_control_mode_run__"
-	client, _ := StartControlMode(session_name)
-	SetDefaultClient(client)
-	defer client.Close()
-	c := command("list-sessions")
+	tmux := setupTestServer(t)
+	defer teardownTestServer(tmux)
+	tmux.StartControlMode()
+	defer tmux.StopControlMode()
+	c := tmux.command("list-sessions")
 	lines, err := c.run()
 	if err != nil {
 		t.Fatal(err)
-	} 
+	}
 	found := false
 	for _, line := range lines {
-		if strings.Contains(line, session_name) {
+		if strings.Contains(line, CONTROL_SESSION_NAME) {
 			found = true
 		}
 	}
@@ -110,8 +80,10 @@ func TestRunCommand(t *testing.T) {
 }
 
 func TestUsesControlMode(t *testing.T) {
+	tmux := setupTestServer(t)
+	defer teardownTestServer(tmux)
 	// Since control mode is so much fater (~7000x) this is a reliable test
-	c := command("list-sessions")
+	c := tmux.command("list-sessions")
 	n := 100
 	start := time.Now()
 	for range n {
@@ -121,9 +93,8 @@ func TestUsesControlMode(t *testing.T) {
 		}
 	}
 	psTime := time.Since(start)
-	client, _ := StartControlMode()
-	SetDefaultClient(client)
-	defer client.Close()
+	tmux.StartControlMode()
+	defer tmux.StopControlMode()
 	start = time.Now()
 	for range n {
 		_, err := c.run()
@@ -138,30 +109,33 @@ func TestUsesControlMode(t *testing.T) {
 }
 
 func BenchmarkRun(b *testing.B) {
-	c := command("list-sessions")
-    for b.Loop() {
+	tmux := setupTestServer(b)
+	defer teardownTestServer(tmux)
+	c := tmux.command("list-sessions")
+	for b.Loop() {
 		out, err := c.run()
 		if err != nil {
 			b.Fatal(err)
 		}
-		if strings.Contains(strings.Join(out, " "), DEFAULT_CONTROL_SESSION_NAME) {
+		if strings.Contains(strings.Join(out, " "), CONTROL_SESSION_NAME) {
 			b.Fail()
 		}
-    }
+	}
 }
 
 func BenchmarkControlModeRun(b *testing.B) {
-	client, _ := StartControlMode()
-	SetDefaultClient(client)
-	defer client.Close()
-	c := command("list-sessions")
-    for b.Loop() {
+	tmux := setupTestServer(b)
+	defer teardownTestServer(tmux)
+	tmux.StartControlMode()
+	defer tmux.StopControlMode()
+	c := tmux.command("list-sessions")
+	for b.Loop() {
 		out, err := c.run()
 		if err != nil {
 			b.Fatal(err)
 		}
-		if !strings.Contains(strings.Join(out, " "), DEFAULT_CONTROL_SESSION_NAME) {
+		if !strings.Contains(strings.Join(out, " "), CONTROL_SESSION_NAME) {
 			b.Fail()
 		}
-    }
+	}
 }

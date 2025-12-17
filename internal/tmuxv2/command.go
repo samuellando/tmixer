@@ -10,19 +10,27 @@ type cmd struct {
 	command   string
 	flags     [][]string
 	arguments []string
+	server *Server
 }
 
-func command(c string) cmd {
-	return cmd{
+
+func (srv *Server) command(c string) cmd {
+	cmd := cmd{
 		tmuxFlags: make([][]string, 0),
 		command:   c,
 		flags:     make([][]string, 0),
 		arguments: make([]string, 0),
+		server: srv,
+	}
+	if srv.socketPath != "" {
+		return cmd.withTmuxFlag("-S", srv.socketPath)
+	} else {
+		return cmd
 	}
 }
 
 func (c cmd) run() ([]string, error) {
-	return runCommandInControlModeIfStarted(c)
+	return c.server.runCommandInControlModeIfStarted(c)
 }
 
 func (c cmd) withFlag(flagValues ...string) cmd {
@@ -38,10 +46,6 @@ func (c cmd) withTmuxFlag(flagValues ...string) cmd {
 func (c cmd) withArgument(arg string) cmd {
 	c.arguments = append(c.arguments, arg)
 	return c
-}
-
-func (c cmd) withTargetClient(t *Client) cmd {
-	return c.withFlag("-t", t.Name)
 }
 
 func (c cmd) withTargetSession(t *Session) cmd {
@@ -77,7 +81,7 @@ func (c cmd) print() cmd {
 }
 
 func (c cmd) String() string {
-	return strings.Join(c.tmuxArguments(), " ")
+	return strings.Join(c.internalArguments(), " ")
 }
 
 func (c cmd) getExecCmd() *exec.Cmd {
@@ -89,6 +93,11 @@ func (c cmd) tmuxArguments() []string {
 	for _, flag := range c.tmuxFlags {
 		args = append(args, flag...)
 	}
+	return append(args, c.internalArguments()...)
+}
+
+func (c cmd) internalArguments() []string {
+	args := make([]string, 0)
 	args = append(args, c.command)
 	for _, flag := range c.flags {
 		args = append(args, flag...)

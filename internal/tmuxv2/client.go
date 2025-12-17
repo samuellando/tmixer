@@ -1,22 +1,11 @@
 package tmuxv2
 
-type Client struct {
-	Id string
+func (srv *Server) Switch(s *Session) error {
+	_, err := srv.command("switch-client").withTargetSession(s).run()
+	return err
 }
 
-// func ListClients() []*Client {
-//
-// }
-//
-// func (c *Client) Switch() error {
-// }
-//
-// func (c *Client) Suspend() error {
-// }
-//
-// func (c *Client) ShowMessages() error {
-// }
-//
-// func (s *Client) Lock() {
-//
-// }
+func (srv *Server) DisplayMessage(m string) error {
+	_, err := srv.command("suspend-client").withArgument(m).run()
+	return err
+}
