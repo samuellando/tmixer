@@ -21,12 +21,34 @@ const (
 var ErrSessionNotFound = errors.New("session not found")
 
 type Project struct {
-	Config *config.ProjectConfig
+	name string
+	config *config.ProjectConfig
 	server *tmuxv2.Server
 }
 
-func List(tmux *tmuxv2.Server) ([]*Project, error) {
-	// TODO
+func List(tmux *tmuxv2.Server, config *config.Config) ([]*Project, error) {
+	sessionsMatched := make(map[string]bool)
+	projects := make([]*Project, 0)
+	for name, projectConfig := range config.Projects {
+		project := &Project{name: name, config: projectConfig, server: tmux}
+		projects = append(projects, project)
+		sessionsMatched[project.tmuxSessionName()] = true
+	}
+	sessions, err := tmux.ListSessions()
+	if err != nil {
+		return projects, fmt.Errorf("when listing sessions for project list: %w", err)
+	}
+	for _, session := range sessions {
+		name, err := session.Name()
+		if err != nil {
+			return projects, fmt.Errorf("when getting session name for project list: %w", err)
+		}
+		if _, ok := sessionsMatched[name]; !ok {
+			project := &Project{name: name, server: tmux}
+			projects = append(projects, project)
+		}
+	}
+	return projects, nil
 }
 
 func (p *Project) Session() (*tmuxv2.Session, error) {
@@ -56,7 +78,7 @@ func (p *Project) Status() (ProjectState, error) {
 	if err != nil {
 		return status, fmt.Errorf("when geting active session name status: %w", err)
 	}
-	if name == p.Config.Name {
+	if name == p.tmuxSessionName() {
 		status = PROJECT_STATUS_ATTACHED
 	} else if p.server.HasSessionWithName(p.tmuxSessionName()) {
 		status = PROJECT_STATUS_ACTIVE
@@ -84,11 +106,11 @@ func (p *Project) Start() error {
 }
 
 func (p *Project) createStartupWindows(s *tmuxv2.Session) error {
-	if p.Config != nil {
+	if p.config != nil {
 		return nil
 	}
-	for _, windowConfig := range p.Config.StartupWindows {
-		_, err := s.NewWindow(p.Config.Directory, windowConfig.Name, windowConfig.Command)
+	for _, windowConfig := range p.config.StartupWindows {
+		_, err := s.NewWindow(p.config.Directory, windowConfig.Name, windowConfig.Command)
 		if err != nil {
 			return fmt.Errorf("when creating window: %", err)
 		}
@@ -145,7 +167,7 @@ func (p *Project) runSwitchCommands(session *tmuxv2.Session) error {
 		return fmt.Errorf("when getting panes for switch commands: %w", err)
 	}
 	pane := panes[0]
-	for _, cmd := range p.Config.SwitchCommands {
+	for _, cmd := range p.config.SwitchCommands {
 		cmdPane, err := pane.SplitHorizontally()
 		if err != nil {
 			return fmt.Errorf("when splitting command pane: %w", err)
@@ -211,5 +233,5 @@ func (p *Project) createTempSession() (*tmuxv2.Session, error) {
 }
 
 func (p *Project) tmuxSessionName() string {
-	return strings.ReplaceAll(p.Config.Name, ".", "_")
+	return strings.ReplaceAll(p.name, ".", "_")
 }

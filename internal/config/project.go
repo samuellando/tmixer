@@ -16,7 +16,6 @@ type Config struct {
 }
 
 type ProjectConfig struct {
-	Name string
 	Directory      string         `yaml:"directory"`
 	SubDirectories bool           `yaml:"subDirectories"`
 	StartupWindows []WindowConfig `yaml:"startupWindows"`
