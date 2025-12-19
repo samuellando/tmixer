@@ -19,3 +19,7 @@ func (w *Window) Panes() ([]*Pane, error) {
 	}
 	return panes, err
 }
+
+func (w *Window) Link(s *Session) error {
+
+}

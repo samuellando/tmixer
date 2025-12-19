@@ -5,6 +5,9 @@ func (srv *Server) Switch(s *Session) error {
 	return err
 }
 
+func (srv *Server) ClientSession() (*Session, error) {
+}
+
 func (srv *Server) DisplayMessage(m string) error {
 	_, err := srv.command("suspend-client").withArgument(m).run()
 	return err

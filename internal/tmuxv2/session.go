@@ -2,14 +2,11 @@ package tmuxv2
 
 import (
 	"fmt"
-
-	"samuellando.com/tmixer/internal/project"
 )
 
 type Session struct {
 	Id      string
 	server *Server
-	Project *project.Project
 }
 
 func (srv *Server) New(name string) (*Session, error) {
@@ -18,6 +15,10 @@ func (srv *Server) New(name string) (*Session, error) {
 		return nil, fmt.Errorf("Got no session id %w", err)
 	}
 	return &Session{Id: lines[0], server: srv}, err
+}
+
+func (s *Session) Name() (string, error) {
+
 }
 
 func (srv *Server) ListSessions() ([]*Session, error) {
