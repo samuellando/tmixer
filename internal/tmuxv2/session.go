@@ -1,6 +1,7 @@
 package tmuxv2
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -18,7 +19,11 @@ func (srv *Server) New(name string) (*Session, error) {
 }
 
 func (s *Session) Name() (string, error) {
-
+	lines, err := s.server.command("display").withFlag("-p").withTargetSession(s).withFormat("#{session_name}").run()
+	if len(lines) == 0 {
+		return "", errors.Join(fmt.Errorf("Got no name"), err)
+	}
+	return lines[0], err
 }
 
 func (srv *Server) ListSessions() ([]*Session, error) {

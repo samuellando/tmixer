@@ -21,5 +21,6 @@ func (w *Window) Panes() ([]*Pane, error) {
 }
 
 func (w *Window) Link(s *Session) error {
-
+	_, err := w.server.command("link-window").withWindow(w).withTargetSession(s).run()
+	return err
 }

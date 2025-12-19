@@ -128,8 +128,10 @@ func (client *controlModeClient) readMessage() ([]string, error) {
 	}
 	if readState == "done" {
 		return out, nil
+	} else if readState == "error" {
+		return out, fmt.Errorf("command returned error output \"%s\"", strings.Join(out, "\n"))
 	} else {
-		return out, fmt.Errorf("Command returned an error")
+		return out, fmt.Errorf("Critical read error")
 	}
 }
 
@@ -146,5 +148,8 @@ func (srv *Server) runCommandInControlModeIfStarted(c cmd) ([]string, error) {
 			lines = append(lines, l)
 		}
 	}
-	return lines, err
+	if err != nil {
+		return lines, fmt.Errorf("command returned error: %w with output \"%s\"", err, strings.Join(lines, "\n"))
+	}
+	return lines, nil
 }

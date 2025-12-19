@@ -1,6 +1,7 @@
 package tmuxv2
 
 import (
+	"fmt"
 	"os/exec"
 	"strings"
 )
@@ -22,8 +23,8 @@ func (srv *Server) command(c string) cmd {
 		arguments: make([]string, 0),
 		server: srv,
 	}
-	if srv.socketPath != "" {
-		return cmd.withTmuxFlag("-S", srv.socketPath)
+	if srv.SocketPath != "" {
+		return cmd.withTmuxFlag("-S", srv.SocketPath)
 	} else {
 		return cmd
 	}
@@ -68,6 +69,10 @@ func (c cmd) withSession(name string) cmd {
 	return c.withFlag("-s", name)
 }
 
+func (c cmd) withWindow(t *Window) cmd {
+	return c.withFlag("-s", t.Id)
+}
+
 func (c cmd) withName(n string) cmd {
 	return c.withFlag("-n", n)
 }
@@ -77,7 +82,7 @@ func (c cmd) withWorkingDirectory(path string) cmd {
 }
 
 func (c cmd) withFormat(format string) cmd {
-	return c.withFlag("-F", format)
+	return c.withFlag("-F", fmt.Sprintf("%s", format))
 }
 
 func (c cmd) withFilter(filter string) cmd {
@@ -105,14 +110,22 @@ func (c cmd) tmuxArguments() []string {
 	for _, flag := range c.tmuxFlags {
 		args = append(args, flag...)
 	}
-	return append(args, c.internalArguments()...)
+	args = append(args, c.command)
+	for _, flag := range c.flags {
+		args = append(args, flag...)
+	}
+	args = append(args, c.arguments...)
+	return args
 }
 
 func (c cmd) internalArguments() []string {
 	args := make([]string, 0)
 	args = append(args, c.command)
 	for _, flag := range c.flags {
-		args = append(args, flag...)
+		args = append(args, flag[0])
+		if len(flag) > 1 {
+			args = append(args, fmt.Sprintf("\"%s\"", flag[1]))
+		}
 	}
 	args = append(args, c.arguments...)
 	return args

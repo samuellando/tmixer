@@ -1,14 +1,15 @@
-package tmuxv2
+package tmuxv2_test
 
 import (
 	"strings"
 	"testing"
 	"time"
+	"samuellando.com/tmixer/internal/testutil"
 )
 
 func TestSplit(t *testing.T) {
-	tmux := setupTestServer(t)
-	defer teardownTestServer(tmux)
+	tmux := testutil.SetupTestServer(t)
+	defer testutil.TeardownTestServer(tmux)
 	sessions, _ := tmux.ListSessions()
 	s := sessions[0]
 	windows, _ := s.Windows()
@@ -39,8 +40,8 @@ func TestSplit(t *testing.T) {
 }
 
 func TestSplitHorizontally(t *testing.T) {
-	tmux := setupTestServer(t)
-	defer teardownTestServer(tmux)
+	tmux := testutil.SetupTestServer(t)
+	defer testutil.TeardownTestServer(tmux)
 	sessions, _ := tmux.ListSessions()
 	s := sessions[0]
 	windows, _ := s.Windows()
@@ -71,8 +72,8 @@ func TestSplitHorizontally(t *testing.T) {
 }
 
 func TestSendKeysAndCapture(t *testing.T) {
-	tmux := setupTestServer(t)
-	defer teardownTestServer(tmux)
+	tmux := testutil.SetupTestServer(t)
+	defer testutil.TeardownTestServer(tmux)
 	sessions, _ := tmux.ListSessions()
 	s := sessions[0]
 	windows, _ := s.Windows()

@@ -1,13 +1,13 @@
 package tmuxv2
 
 type Server struct {
-	socketPath        string
+	SocketPath        string
 	controlModeClient *controlModeClient
 }
 
 func Tmux(socketPaths ...string) *Server {
 	if len(socketPaths) > 0 {
-		return &Server{socketPath: socketPaths[0]}
+		return &Server{SocketPath: socketPaths[0]}
 	} else {
 		return &Server{}
 	}

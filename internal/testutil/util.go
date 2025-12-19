@@ -1,11 +1,14 @@
-package tmuxv2
+package testutil
 
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"testing"
 
+	"github.com/creack/pty"
 	"github.com/google/uuid"
+	"samuellando.com/tmixer/internal/tmuxv2"
 )
 
 const TEST_SOCKET_DIR = "/tmp/tmixer-test"
@@ -18,18 +21,29 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func setupTestServer(t testing.TB) *Server {
+func SetupTestClient(tmux *tmuxv2.Server, session *tmuxv2.Session) *os.File {
+	cmd := exec.Command("tmux", "-S", tmux.SocketPath, "-u", "attach", "-t", session.Id)
+	f, err := pty.Start(cmd)
+	if err != nil {
+		panic(err)
+	}
+	// Read a single byte, waiting for the proccess to actually start
+	f.Read([]byte{0})
+	return f
+}
+
+func SetupTestServer(t testing.TB) *tmuxv2.Server {
 	uuid := uuid.NewString()
-	tmux := Tmux(fmt.Sprintf("%s/%s.sock", TEST_SOCKET_DIR, uuid))
+	tmux := tmuxv2.Tmux(fmt.Sprintf("%s/%s.sock", TEST_SOCKET_DIR, uuid))
 	// Start one extra session so the server starts
-	_, err := tmux.command("new").detached().withSession("default_test_session").run()
+	_, err := tmux.New("default_test_session")
 	if err != nil {
 		t.Fatal(fmt.Errorf("Error while starting server %w", err))
 	}
 	return tmux
 }
 
-func teardownTestServer(s *Server) {
+func TeardownTestServer(s *tmuxv2.Server) {
 	err := s.Kill()
 	if err != nil {
 		fmt.Println("Problem killing test server")

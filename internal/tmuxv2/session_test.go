@@ -1,13 +1,16 @@
-package tmuxv2
+package tmuxv2_test
 
 import (
 	"fmt"
 	"testing"
+
+	"samuellando.com/tmixer/internal/testutil"
+	"samuellando.com/tmixer/internal/tmuxv2"
 )
 
 func TestCreateAndKill(t *testing.T) {
-	tmux := setupTestServer(t)
-	defer teardownTestServer(tmux)
+	tmux := testutil.SetupTestServer(t)
+	defer testutil.TeardownTestServer(tmux)
 	s, err := tmux.New("test_session")
 	if err != nil {
 		t.Fatal(err)
@@ -22,12 +25,12 @@ func TestCreateAndKill(t *testing.T) {
 }
 
 func TestListSessions(t *testing.T) {
-	tmux := setupTestServer(t)
-	defer teardownTestServer(tmux)
+	tmux := testutil.SetupTestServer(t)
+	defer testutil.TeardownTestServer(tmux)
 	n := 10
 	res, _ := tmux.ListSessions()
 	initialCount := len(res)
-	sessions := make([]*Session, n)
+	sessions := make([]*tmuxv2.Session, n)
 	var err error
 	for i := range n {
 		sessions[i], err = tmux.New(fmt.Sprintf("test_session_%d", i))
@@ -57,8 +60,8 @@ func TestListSessions(t *testing.T) {
 }
 
 func TestKillSessionWithName(t *testing.T) {
-	tmux := setupTestServer(t)
-	defer teardownTestServer(tmux)
+	tmux := testutil.SetupTestServer(t)
+	defer testutil.TeardownTestServer(tmux)
 	name := "abcd123"
 	s, _ := tmux.New(name)
 	list, _ := tmux.ListSessions()
@@ -90,12 +93,12 @@ func TestKillSessionWithName(t *testing.T) {
 }
 
 func TestWindows(t *testing.T) {
-	tmux := setupTestServer(t)
-	defer teardownTestServer(tmux)
+	tmux := testutil.SetupTestServer(t)
+	defer testutil.TeardownTestServer(tmux)
 	n := 10
 	sessions, _ := tmux.ListSessions()
 	s := sessions[0]
-	windows := make([]*Window, n)
+	windows := make([]*tmuxv2.Window, n)
 	var err error
 	for i := range n {
 		windows[i], err = s.NewWindow("~", "test", "sh")
@@ -121,5 +124,19 @@ func TestWindows(t *testing.T) {
 	}
 	if len(res) != n + 1 {
 		t.Fatalf("Expected %d windows got %d", n + 1, len(res))
+	}
+}
+
+func TestName(t *testing.T) {
+	tmux := testutil.SetupTestServer(t)
+	defer testutil.TeardownTestServer(tmux)
+	name := "test_sess_name"
+	s, _ := tmux.New(name)
+	res, err := s.Name()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res != name {
+		t.Fatal("Names dont match")
 	}
 }

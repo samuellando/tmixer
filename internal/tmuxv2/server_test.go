@@ -1,12 +1,13 @@
-package tmuxv2
+package tmuxv2_test
 
 import (
 	"testing"
+	"samuellando.com/tmixer/internal/testutil"
 )
 
 func TestHasSession(t *testing.T) {
-	tmux := setupTestServer(t)
-	defer teardownTestServer(tmux)
+	tmux := testutil.SetupTestServer(t)
+	defer testutil.TeardownTestServer(tmux)
 	s, err := tmux.New("test_session")
 	if err != nil {
 		t.Fatal(err)
@@ -21,8 +22,8 @@ func TestHasSession(t *testing.T) {
 }
 
 func TestHasSessionWithName(t *testing.T) {
-	tmux := setupTestServer(t)
-	defer teardownTestServer(tmux)
+	tmux := testutil.SetupTestServer(t)
+	defer testutil.TeardownTestServer(tmux)
 	name := "test_session"
 	s, err := tmux.New(name)
 	if err != nil {

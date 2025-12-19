@@ -1,14 +1,15 @@
-package tmuxv2
+package tmuxv2_test
 
 import (
-	"strings"
 	"testing"
 	"time"
+	"samuellando.com/tmixer/internal/testutil"
+	"samuellando.com/tmixer/internal/tmuxv2"
 )
 
 func TestStartStopControlMode(t *testing.T) {
-	tmux := setupTestServer(t)
-	defer teardownTestServer(tmux)
+	tmux := testutil.SetupTestServer(t)
+	defer testutil.TeardownTestServer(tmux)
 	for range 10 {
 		err := tmux.StartControlMode()
 		if err != nil {
@@ -19,24 +20,19 @@ func TestStartStopControlMode(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	c := tmux.command("list-sessions")
-	out, err := c.run()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(strings.Join(out, "\n"), CONTROL_SESSION_NAME) {
+	if tmux.HasSessionWithName(tmuxv2.CONTROL_SESSION_NAME) {
 		t.Fatal("CONTROL_SESSION_NAME detected")
 	}
 }
 
 func TestStartStopControlModeSimul(t *testing.T) {
-	tmux := setupTestServer(t)
-	defer teardownTestServer(tmux)
+	tmux := testutil.SetupTestServer(t)
+	defer testutil.TeardownTestServer(tmux)
 	n := 10
-	servers := make([]*Server, n)
+	servers := make([]*tmuxv2.Server, n)
 	var err error
 	for i := range n {
-		servers[i] = Tmux(tmux.socketPath)
+		servers[i] = tmuxv2.Tmux(tmux.SocketPath)
 		servers[i].StartControlMode()
 		if err != nil {
 			t.Fatal(err)
@@ -48,46 +44,33 @@ func TestStartStopControlModeSimul(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	c := tmux.command("list-sessions")
-	out, err := c.run()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(strings.Join(out, "\n"), CONTROL_SESSION_NAME) {
+	if tmux.HasSessionWithName(tmuxv2.CONTROL_SESSION_NAME) {
 		t.Fatal("CONTROL_SESSION_NAME detected")
 	}
 }
 
 func TestRunCommand(t *testing.T) {
-	tmux := setupTestServer(t)
-	defer teardownTestServer(tmux)
+	tmux := testutil.SetupTestServer(t)
+	defer testutil.TeardownTestServer(tmux)
 	tmux.StartControlMode()
 	defer tmux.StopControlMode()
-	c := tmux.command("list-sessions")
-	lines, err := c.run()
+	_, err := tmux.ListSessions()
 	if err != nil {
 		t.Fatal(err)
 	}
-	found := false
-	for _, line := range lines {
-		if strings.Contains(line, CONTROL_SESSION_NAME) {
-			found = true
-		}
-	}
-	if !found {
-		t.Fatal("Control session should be listed")
+	if !tmux.HasSessionWithName(tmuxv2.CONTROL_SESSION_NAME) {
+		t.Fatal("CONTROL_SESSION_NAME not detected")
 	}
 }
 
 func TestUsesControlMode(t *testing.T) {
-	tmux := setupTestServer(t)
-	defer teardownTestServer(tmux)
+	tmux := testutil.SetupTestServer(t)
+	defer testutil.TeardownTestServer(tmux)
 	// Since control mode is so much fater (~7000x) this is a reliable test
-	c := tmux.command("list-sessions")
 	n := 100
 	start := time.Now()
 	for range n {
-		_, err := c.run()
+		_, err := tmux.ListSessions()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -97,7 +80,7 @@ func TestUsesControlMode(t *testing.T) {
 	defer tmux.StopControlMode()
 	start = time.Now()
 	for range n {
-		_, err := c.run()
+		_, err := tmux.ListSessions()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -109,33 +92,25 @@ func TestUsesControlMode(t *testing.T) {
 }
 
 func BenchmarkRun(b *testing.B) {
-	tmux := setupTestServer(b)
-	defer teardownTestServer(tmux)
-	c := tmux.command("list-sessions")
+	tmux := testutil.SetupTestServer(b)
+	defer testutil.TeardownTestServer(tmux)
 	for b.Loop() {
-		out, err := c.run()
+		_, err := tmux.ListSessions()
 		if err != nil {
 			b.Fatal(err)
-		}
-		if strings.Contains(strings.Join(out, " "), CONTROL_SESSION_NAME) {
-			b.Fail()
 		}
 	}
 }
 
 func BenchmarkControlModeRun(b *testing.B) {
-	tmux := setupTestServer(b)
-	defer teardownTestServer(tmux)
+	tmux := testutil.SetupTestServer(b)
+	defer testutil.TeardownTestServer(tmux)
 	tmux.StartControlMode()
 	defer tmux.StopControlMode()
-	c := tmux.command("list-sessions")
 	for b.Loop() {
-		out, err := c.run()
+		_, err := tmux.ListSessions()
 		if err != nil {
 			b.Fatal(err)
-		}
-		if !strings.Contains(strings.Join(out, " "), CONTROL_SESSION_NAME) {
-			b.Fail()
 		}
 	}
 }
