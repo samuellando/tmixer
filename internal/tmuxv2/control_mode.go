@@ -12,9 +12,10 @@ import (
 )
 
 type controlModeClient struct {
-	controlModeCmd       *exec.Cmd
-	controlModeStdIn     io.WriteCloser
-	controlModeStdOut    *bufio.Reader
+	controlModeCmd    *exec.Cmd
+	controlModeStdIn  io.WriteCloser
+	controlModeStdOut *bufio.Reader
+	log               []string
 }
 
 const CONTROL_SESSION_NAME = "__tmixer_control__"
@@ -58,17 +59,21 @@ func (srv *Server) StopControlMode() error {
 	}
 	err := srv.controlModeClient.controlModeStdIn.Close()
 	if err != nil {
-		return fmt.Errorf("error when closing stdin %w", err)
+		return fmt.Errorf("when closing stdin %w", err)
 	}
+	srv.controlModeClient.readMessage()
 	err = srv.controlModeClient.controlModeCmd.Wait()
 	if err != nil {
-		return fmt.Errorf("error when waiting for command to exit %w", err)
+		for _, line := range srv.controlModeClient.log {
+			fmt.Println(line)
+		}
+		return fmt.Errorf("when waiting for command to exit: %w", err)
 	}
 	srv.controlModeClient = nil
 	// Finally clean up the session if we can
 	err = srv.cleanUpControlSession()
 	if err != nil {
-		return fmt.Errorf("error when cleaning up session %w", err)
+		return fmt.Errorf("when cleaning up session %w", err)
 	}
 	return nil
 }
@@ -92,6 +97,7 @@ func (srv *Server) cleanUpControlSession() error {
 }
 
 func (client *controlModeClient) sendCommand(c cmd) ([]string, error) {
+	client.log = append(client.log, fmt.Sprintf("COMMAND> %s", c.String()))
 	_, err := client.controlModeStdIn.Write([]byte(c.String() + "\n"))
 	if err != nil {
 		return nil, fmt.Errorf("Failed to write to stdin: %w", err)
@@ -104,6 +110,7 @@ func (client *controlModeClient) readMessage() ([]string, error) {
 	out := make([]string, 0)
 	for {
 		outLine, err := client.controlModeStdOut.ReadString('\n')
+		client.log = append(client.log, outLine)
 		if err == io.EOF {
 			return nil, nil
 		}
@@ -115,6 +122,10 @@ func (client *controlModeClient) readMessage() ([]string, error) {
 			continue
 		}
 		if strings.HasPrefix(outLine, "%end") {
+			readState = "done"
+			break
+		}
+		if strings.HasPrefix(outLine, "%exit") {
 			readState = "done"
 			break
 		}

@@ -19,11 +19,33 @@ func (srv *Server) Kill() error {
 }
 
 func (srv *Server) HasSession(s *Session) bool {
-	_, err := srv.command("has-session").withTargetSession(s).run()
-	return err == nil
+	// Using tmux has-session causes problems for control mode, so it's better to list sessions
+	sessions, err := srv.ListSessions()
+	if err != nil {
+		return false
+	}
+	for _, session := range sessions {
+		if s.Id == session.Id {
+			return true
+		}
+	}
+	return false
 }
 
 func (srv *Server) HasSessionWithName(s string) bool {
-	_, err := srv.command("has-session").withTargetSessionName(s).run()
-	return err == nil
+	// Using tmux has-session causes problems for control mode, so it's better to list sessions
+	sessions, err := srv.ListSessions()
+	if err != nil {
+		return false
+	}
+	for _, session := range sessions {
+		name, err := session.Name()
+		if err != nil {
+			return false
+		}
+		if name == s {
+			return true
+		}
+	}
+	return false
 }

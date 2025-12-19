@@ -50,15 +50,15 @@ func (c cmd) withArgument(arg string) cmd {
 }
 
 func (c cmd) withTargetSession(t *Session) cmd {
-	return c.withFlag("-t", t.Id)
+	return c.withFlag("-t", string(t.Id))
 }
 
 func (c cmd) withTargetWindow(t *Window) cmd {
-	return c.withFlag("-t", t.Id)
+	return c.withFlag("-t", string(t.Id))
 }
 
 func (c cmd) withTargetPane(t *Pane) cmd {
-	return c.withFlag("-t", t.Id)
+	return c.withFlag("-t", string(t.Id))
 }
 
 func (c cmd) withTargetSessionName(name string) cmd {
@@ -70,7 +70,7 @@ func (c cmd) withSession(name string) cmd {
 }
 
 func (c cmd) withWindow(t *Window) cmd {
-	return c.withFlag("-s", t.Id)
+	return c.withFlag("-s", string(t.Id))
 }
 
 func (c cmd) withName(n string) cmd {

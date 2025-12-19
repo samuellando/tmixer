@@ -22,7 +22,7 @@ func TestMain(m *testing.M) {
 }
 
 func SetupTestClient(tmux *tmuxv2.Server, session *tmuxv2.Session) *os.File {
-	cmd := exec.Command("tmux", "-S", tmux.SocketPath, "-u", "attach", "-t", session.Id)
+	cmd := exec.Command("tmux", "-S", tmux.SocketPath, "-u", "attach", "-t", string(session.Id))
 	f, err := pty.Start(cmd)
 	if err != nil {
 		panic(err)
