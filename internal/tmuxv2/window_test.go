@@ -3,6 +3,7 @@ package tmuxv2_test
 import (
 	"testing"
 
+	"samuellando.com/tmixer/internal/testutil"
 	"samuellando.com/tmixer/internal/tmuxv2"
 )
 
@@ -41,7 +42,7 @@ func TestKill(t *testing.T) {
 			t.Fatal("Window was not killed")
 		}
 	}
-	runWithAndWithoutControlMode(f, t)
+	testutil.RunWithAndWithoutControlMode(f, t)
 }
 
 func TestPanes(t *testing.T) {
@@ -59,7 +60,7 @@ func TestPanes(t *testing.T) {
 			t.Fatal("Window should have two panes")
 		}
 	}
-	runWithAndWithoutControlMode(f, t)
+	testutil.RunWithAndWithoutControlMode(f, t)
 }
 
 func TestLink(t *testing.T) {
@@ -77,5 +78,5 @@ func TestLink(t *testing.T) {
 			t.Fatal("Should have 2 windows")
 		}
 	}
-	runWithAndWithoutControlMode(f, t)
+	testutil.RunWithAndWithoutControlMode(f, t)
 }

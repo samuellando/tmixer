@@ -34,5 +34,5 @@ func TestSwitchAndClientSession(t *testing.T) {
 			t.Fatalf("Expected third session %v [%v]", res, s3)
 		}
 	}
-	runWithAndWithoutControlMode(f, t)
+	testutil.RunWithAndWithoutControlMode(f, t)
 }

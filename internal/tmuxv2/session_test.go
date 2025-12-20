@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"samuellando.com/tmixer/internal/tmuxv2"
+	"samuellando.com/tmixer/internal/testutil"
 )
 
 func TestCreateAndKill(t *testing.T) {
@@ -24,7 +25,7 @@ func TestCreateAndKill(t *testing.T) {
 			t.Fatal("Should have session anymore")
 		}
 	}
-	runWithAndWithoutControlMode(f, t)
+	testutil.RunWithAndWithoutControlMode(f, t)
 }
 
 func TestListSessions(t *testing.T) {
@@ -60,7 +61,7 @@ func TestListSessions(t *testing.T) {
 			t.Fatalf("Expected %d sessions got %d", n, len(res)-initialCount)
 		}
 	}
-	runWithAndWithoutControlMode(f, t)
+	testutil.RunWithAndWithoutControlMode(f, t)
 }
 
 func TestWindows(t *testing.T) {
@@ -96,7 +97,7 @@ func TestWindows(t *testing.T) {
 			t.Fatalf("Expected %d windows got %d", n+1, len(res))
 		}
 	}
-	runWithAndWithoutControlMode(f, t)
+	testutil.RunWithAndWithoutControlMode(f, t)
 }
 
 func TestName(t *testing.T) {
@@ -111,5 +112,5 @@ func TestName(t *testing.T) {
 			t.Fatal("Names dont match")
 		}
 	}
-	runWithAndWithoutControlMode(f, t)
+	testutil.RunWithAndWithoutControlMode(f, t)
 }

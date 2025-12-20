@@ -1,10 +1,12 @@
 package tmuxv2_test
 
 import (
-	"samuellando.com/tmixer/internal/tmuxv2"
 	"strings"
 	"testing"
 	"time"
+
+	"samuellando.com/tmixer/internal/testutil"
+	"samuellando.com/tmixer/internal/tmuxv2"
 )
 
 func TestSplit(t *testing.T) {
@@ -37,7 +39,7 @@ func TestSplit(t *testing.T) {
 			t.Fatal("Pane not listed!")
 		}
 	}
-	runWithAndWithoutControlMode(f, t)
+	testutil.RunWithAndWithoutControlMode(f, t)
 }
 
 func TestSplitHorizontally(t *testing.T) {
@@ -70,7 +72,7 @@ func TestSplitHorizontally(t *testing.T) {
 			t.Fatal("Pane not listed!")
 		}
 	}
-	runWithAndWithoutControlMode(f, t)
+	testutil.RunWithAndWithoutControlMode(f, t)
 }
 
 func TestSendKeysAndCapture(t *testing.T) {
@@ -95,5 +97,5 @@ func TestSendKeysAndCapture(t *testing.T) {
 			t.Fatal("Command did not run!")
 		}
 	}
-	runWithAndWithoutControlMode(f, t)
+	testutil.RunWithAndWithoutControlMode(f, t)
 }

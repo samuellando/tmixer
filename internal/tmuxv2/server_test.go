@@ -1,8 +1,10 @@
 package tmuxv2_test
 
 import (
-	"samuellando.com/tmixer/internal/tmuxv2"
 	"testing"
+	
+	"samuellando.com/tmixer/internal/tmuxv2"
+	"samuellando.com/tmixer/internal/testutil"
 )
 
 func TestHasSession(t *testing.T) {
@@ -19,7 +21,7 @@ func TestHasSession(t *testing.T) {
 			t.Fatal("Should have session anymore")
 		}
 	}
-	runWithAndWithoutControlMode(f, t)
+	testutil.RunWithAndWithoutControlMode(f, t)
 }
 
 func TestHasSessionWithName(t *testing.T) {
@@ -37,5 +39,5 @@ func TestHasSessionWithName(t *testing.T) {
 			t.Fatal("Should have session anymore")
 		}
 	}
-	runWithAndWithoutControlMode(f, t)
+	testutil.RunWithAndWithoutControlMode(f, t)
 }
