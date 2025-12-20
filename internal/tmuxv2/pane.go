@@ -6,7 +6,7 @@ import (
 
 type paneId string
 
-func parsePaneId(s string) (paneId, error)  {
+func parsePaneId(s string) (paneId, error) {
 	if len(s) == 0 || s[0] != '%' {
 		return "", fmt.Errorf("invalid pane id: %q", s)
 	}
@@ -14,7 +14,7 @@ func parsePaneId(s string) (paneId, error)  {
 }
 
 type Pane struct {
-	Id paneId
+	Id     paneId
 	server *Server
 }
 
