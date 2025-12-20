@@ -197,3 +197,79 @@ func TestListNoProjects(t *testing.T) {
 	testutil.RunWithAndWithoutControlMode(f, t)
 
 }
+
+func BenchmarkList(b *testing.B) {
+	dir, err := os.MkdirTemp(os.TempDir(), "tmixer-test-projects")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	n := 100
+	for i := range n {
+		os.Mkdir(filepath.Join(dir, strconv.Itoa(i)), 0o700)
+	}
+	config := &config.Config{
+		Projects: map[string]*config.ProjectConfig{
+			"bin": {
+				Directory: "/home/test/bin",
+			},
+			"projects": {
+				Directory:      dir,
+				SubDirectories: true,
+			},
+		},
+	}
+	tmux := testutil.SetupTestServer(b)
+	defer testutil.TeardownTestServer(tmux)
+	for i := range 10 {
+		tmux.New("test-" + strconv.Itoa(i))
+	}
+	for b.Loop() {
+		projects, err := List(tmux, config)
+		if err != nil {
+			b.Fatal(err)
+		}
+		if len(projects) < 110 {
+			b.Fatal("Missing projects")
+		}
+	}
+}
+
+func BenchmarkListControlMode(b *testing.B) {
+	dir, err := os.MkdirTemp(os.TempDir(), "tmixer-test-projects")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	n := 100
+	for i := range n {
+		os.Mkdir(filepath.Join(dir, strconv.Itoa(i)), 0o700)
+	}
+	config := &config.Config{
+		Projects: map[string]*config.ProjectConfig{
+			"bin": {
+				Directory: "/home/test/bin",
+			},
+			"projects": {
+				Directory:      dir,
+				SubDirectories: true,
+			},
+		},
+	}
+	tmux := testutil.SetupTestServer(b)
+	defer testutil.TeardownTestServer(tmux)
+	tmux.StartControlMode()
+	defer tmux.StopControlMode()
+	for i := range 10 {
+		tmux.New("test-" + strconv.Itoa(i))
+	}
+	for b.Loop() {
+		projects, err := List(tmux, config)
+		if err != nil {
+			b.Fatal(err)
+		}
+		if len(projects) < 110 {
+			b.Fatal("Missing projects")
+		}
+	}
+}
