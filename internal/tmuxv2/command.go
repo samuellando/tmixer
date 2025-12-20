@@ -53,6 +53,11 @@ func (c cmd) withTargetSession(t *Session) cmd {
 	return c.withFlag("-t", string(t.Id))
 }
 
+func (c cmd) withTargetClient(t *Client) cmd {
+	return c.withFlag("-c", string(t.Id))
+}
+
+
 func (c cmd) withTargetWindow(t *Window) cmd {
 	return c.withFlag("-t", string(t.Id))
 }

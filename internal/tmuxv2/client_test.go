@@ -3,8 +3,8 @@ package tmuxv2_test
 import (
 	"testing"
 
-	"samuellando.com/tmixer/internal/tmuxv2"
 	"samuellando.com/tmixer/internal/testutil"
+	"samuellando.com/tmixer/internal/tmuxv2"
 )
 
 func TestSwitchAndClientSession(t *testing.T) {
@@ -14,18 +14,19 @@ func TestSwitchAndClientSession(t *testing.T) {
 		s3, _ := tmux.New("client_session3")
 		f := testutil.SetupTestClient(tmux, s)
 		defer f.Close()
-		res, err := tmux.ClientSession()
+		client, err := tmux.ActiveClient()
+		res, err := client.Session()
 		if err != nil {
 			t.Fatal(err)
 		}
 		if res.Id != s.Id {
 			t.Fatalf("Expected first session %v [%v]", res, s)
 		}
-		err = tmux.Switch(s3)
+		err = client.Switch(s3)
 		if err != nil {
 			t.Fatal(err)
 		}
-		res, err = tmux.ClientSession()
+		res, err = client.Session()
 		if err != nil {
 			t.Fatal(err)
 		}
