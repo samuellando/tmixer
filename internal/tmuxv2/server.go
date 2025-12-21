@@ -1,5 +1,12 @@
 package tmuxv2
 
+import (
+	"fmt"
+	"errors"
+)
+
+var ErrSessionNotFound = errors.New("session not found")
+
 type Server struct {
 	SocketPath        string
 	controlModeClient *controlModeClient
@@ -32,20 +39,22 @@ func (srv *Server) HasSession(s *Session) bool {
 	return false
 }
 
-func (srv *Server) HasSessionWithName(s string) bool {
-	// Using tmux has-session causes problems for control mode, so it's better to list sessions
-	sessions, err := srv.ListSessions()
+func (srv *Server) GetSessionWithName(name string) (*Session, error) {
+	lines, err := srv.command("list-sessions").withFilter(fmt.Sprintf("#{==:#{session_name},%s}", name)).withFormat("#{session_id}").run()
+	if len(lines) == 0 {
+		return nil, ErrSessionNotFound
+	}
+	if len(lines) > 1 {
+		return nil, fmt.Errorf("Multiple matches")
+	}
+	id, err := parseSessionId(lines[0])
 	if err != nil {
-		return false
+		return nil, err
 	}
-	for _, session := range sessions {
-		name, err := session.Name()
-		if err != nil {
-			return false
-		}
-		if name == s {
-			return true
-		}
-	}
-	return false
+	return &Session{Id: id, server: srv}, nil
+}
+
+func (srv *Server) HasSessionWithName(name string) bool {
+	s, err := srv.GetSessionWithName(name)
+	return s != nil && err == nil
 }

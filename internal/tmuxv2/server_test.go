@@ -41,3 +41,32 @@ func TestHasSessionWithName(t *testing.T) {
 	}
 	testutil.RunWithAndWithoutControlMode(f, t)
 }
+
+func TestGetSessionWithNameFound(t *testing.T) {
+	f := func(tmux *tmuxv2.Server) {
+		name := "test_session"
+		s, err := tmux.New(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res, err := tmux.GetSessionWithName(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if s.Id != res.Id {
+			t.Fatal("Session id does not match")
+		}
+	}
+	testutil.RunWithAndWithoutControlMode(f, t)
+}
+
+func TestGetSessionWithNameNotFound(t *testing.T) {
+	f := func(tmux *tmuxv2.Server) {
+		name := "test_session"
+		_, err := tmux.GetSessionWithName(name)
+		if err != tmuxv2.ErrSessionNotFound {
+			t.Fatal(err)
+		}
+	}
+	testutil.RunWithAndWithoutControlMode(f, t)
+}
