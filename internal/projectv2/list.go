@@ -43,7 +43,7 @@ func listSubDirProjects(config *config.Config) ([]*Project, error) {
 		if projectConfig.SubDirectories {
 			dirEntries, err := os.ReadDir(projectConfig.Directory)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("when checking for sub dirs for project list: %w", err)
 			}
 			for _, f := range dirEntries {
 				if f.IsDir() {

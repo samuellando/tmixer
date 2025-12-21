@@ -11,6 +11,46 @@ import (
 	"samuellando.com/tmixer/internal/tmuxv2"
 )
 
+func TestListAddsFields(t *testing.T) {
+	config := &config.Config{
+		Projects: map[string]*config.ProjectConfig{
+			"bin": {
+				Directory: "/home/test/bin",
+			},
+		},
+	}
+	f := func(tmux *tmuxv2.Server) {
+		tmux.New("test-session")
+		projects, err := List(tmux, config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		matched_session := false
+		matched_bin := false
+		for _, p := range projects {
+			switch p.Name {
+			case "test-session":
+				if p.Config != nil {
+					t.Fatal("Should hgave nil config")
+				}
+				matched_session = true
+			case "bin":
+				if p.Config == nil {
+					t.Fatal("Should have config")
+				}
+				if p.Config.Directory != "/home/test/bin" {
+					t.Fatal("Should have correct directory")
+				}
+				matched_bin = true
+			}
+		}
+		if !matched_bin || !matched_session {
+			t.Fatal("Missing projects")
+		}
+	}
+	testutil.RunWithAndWithoutControlMode(f, t)
+}
+
 func TestListIncludesAllProjects(t *testing.T) {
 	config := &config.Config{
 		Projects: map[string]*config.ProjectConfig{
