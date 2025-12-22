@@ -23,6 +23,10 @@ func List(tmux *tmuxv2.Server, config *config.Config) ([]*Project, error) {
 		}
 		projects = append(projects, sessionProjects...)
 	}
+	// Add the server to all projects
+	for _, p := range projects {
+		p.server = tmux
+	}
 	return projects, nil
 }
 

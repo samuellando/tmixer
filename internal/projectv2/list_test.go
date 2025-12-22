@@ -28,6 +28,9 @@ func TestListAddsFields(t *testing.T) {
 		matched_session := false
 		matched_bin := false
 		for _, p := range projects {
+			if p.server != tmux {
+				t.Fatal("Should always attach server")
+			}
 			switch p.Name {
 			case "test-session":
 				if p.Config != nil {
@@ -108,6 +111,9 @@ func TestListIncludesAllSubDirProjects(t *testing.T) {
 		}
 		projectNames := map[string]bool{}
 		for _, p := range projects {
+			if p.server != tmux {
+				t.Fatal("Should always attach server")
+			}
 			projectNames[p.Name] = true
 		}
 		if !projectNames["bin"] {
@@ -141,6 +147,9 @@ func TestListIncludesAllSessions(t *testing.T) {
 		}
 		projectNames := map[string]bool{}
 		for _, p := range projects {
+			if p.server != tmux {
+				t.Fatal("Should always attach server")
+			}
 			if projectNames[p.Name] {
 				t.Fatalf("duplicate project name %s", p.Name)
 			}
