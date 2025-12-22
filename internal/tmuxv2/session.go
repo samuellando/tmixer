@@ -15,12 +15,16 @@ func parseSessionId(s string) (sessionId, error) {
 }
 
 type Session struct {
-	Id     sessionId
-	server *Server
+	Id        sessionId
+	server    *Server
 }
 
-func (srv *Server) New(name string) (*Session, error) {
-	lines, err := srv.command("new-session").withSession(name).print().detached().withFormat("#{session_id}").run()
+func (srv *Server) New(name string, dir ...string) (*Session, error) {
+	c := srv.command("new-session").withSession(name).print().detached().withFormat("#{session_id}")
+	if len(dir) > 0 {
+		c = c.withWorkingDirectory(dir[0])
+	}
+	lines, err := c.run()
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +35,24 @@ func (srv *Server) New(name string) (*Session, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Session{Id: id, server: srv}, err
+    s := &Session{Id: id, server: srv}
+	if len(dir) > 0 {
+		return s, s.SetOption("@working_dir", dir[0])
+	}
+	return s, nil
+}
+
+func (s *Session) SetOption(key, value string) error {
+	_, err := s.server.command("set-option").withTargetSession(s).withArgument(key).withArgument(value).run()
+	return err
+}
+
+func (s *Session) GetOption(key string) (string, error) {
+	lines, err := s.server.command("show-options").withTargetSession(s).withArgument(key).withFlag("-v").withFlag("-q").run()
+	if len(lines) == 0 {
+		return "", fmt.Errorf("Got no output: %w", err)
+	}
+	return lines[0], err
 }
 
 func (s *Session) Name() (string, error) {
@@ -60,8 +81,12 @@ func (s *Session) Kill() error {
 	return err
 }
 
-func (s *Session) NewWindow(dir, name, command string) (*Window, error) {
-	lines, err := s.server.command("new-window").withTargetSession(s).withWorkingDirectory(dir).withName(name).withArgument(command).print().withFormat("#{window_id}").run()
+func (s *Session) NewWindow(name, command string) (*Window, error) {
+	c := s.server.command("new-window").withTargetSession(s).withName(name).withArgument(command).print().withFormat("#{window_id}")
+	if dir, err := s.GetOption("@working_dir"); err == nil {
+		c = c.withWorkingDirectory(dir)
+	}
+	lines, err := c.run()
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +97,8 @@ func (s *Session) NewWindow(dir, name, command string) (*Window, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Window{Id: id, server: s.server}, err
+	w :=  &Window{Id: id, server: s.server}
+	return w, nil
 }
 
 func (s *Session) Windows() ([]*Window, error) {

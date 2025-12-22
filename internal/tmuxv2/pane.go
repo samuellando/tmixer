@@ -18,8 +18,20 @@ type Pane struct {
 	server *Server
 }
 
+func (p *Pane) GetOption(key string) (string, error) {
+	lines, err := p.server.command("show-options").withTargetPane(p).withArgument(key).withFlag("-v").withFlag("-q").run()
+	if len(lines) == 0 {
+		return "", fmt.Errorf("Got no output: %w", err)
+	}
+	return lines[0], err
+}
+
 func (p *Pane) Split() (*Pane, error) {
-	lines, err := p.server.command("split-window").withTargetPane(p).withFlag("-v").print().withFormat("#{pane_id}").run()
+	c := p.server.command("split-window").withTargetPane(p).withFlag("-v").print().withFormat("#{pane_id}")
+	if dir, err := p.GetOption("@working_dir"); err == nil {
+		c = c.withWorkingDirectory(dir)
+	}
+	lines, err := c.run()
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +46,11 @@ func (p *Pane) Split() (*Pane, error) {
 }
 
 func (p *Pane) SplitHorizontally() (*Pane, error) {
-	lines, err := p.server.command("split-window").withTargetPane(p).withFlag("-h").print().withFormat("#{pane_id}").run()
+	c := p.server.command("split-window").withTargetPane(p).withFlag("-h").print().withFormat("#{pane_id}")
+	if dir, err := p.GetOption("@working_dir"); err == nil {
+		c = c.withWorkingDirectory(dir)
+	}
+	lines, err := c.run()
 	if err != nil {
 		return nil, err
 	}

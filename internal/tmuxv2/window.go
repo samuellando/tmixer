@@ -1,10 +1,13 @@
 package tmuxv2
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 type windowId string
 
-func parseWindowId(s string) (windowId,error) {
+func parseWindowId(s string) (windowId, error) {
 	if len(s) == 0 || s[0] != '@' {
 		return "", fmt.Errorf("invalid window id: %q", s)
 	}
@@ -12,14 +15,29 @@ func parseWindowId(s string) (windowId,error) {
 }
 
 type Window struct {
-	Id windowId
-
+	Id     windowId
 	server *Server
+}
+
+func (w *Window) GetOption(key string) (string, error) {
+	lines, err := w.server.command("show-options").withTargetWindow(w).withArgument(key).withFlag("-v").withFlag("-q").run()
+	if len(lines) == 0 {
+		return "", fmt.Errorf("Got no output: %w", err)
+	}
+	return lines[0], err
 }
 
 func (w *Window) Kill() error {
 	_, err := w.server.command("kill-window").withTargetWindow(w).run()
 	return err
+}
+
+func (w *Window) Name() (string, error) {
+	lines, err := w.server.command("display").withFlag("-p").withTargetWindow(w).withFormat("#{window_name}").run()
+	if len(lines) == 0 {
+		return "", errors.Join(fmt.Errorf("Got no name"), err)
+	}
+	return lines[0], err
 }
 
 func (w *Window) Panes() ([]*Pane, error) {

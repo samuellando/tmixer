@@ -2,7 +2,9 @@ package tmuxv2_test
 
 import (
 	"strings"
+	"fmt"
 	"testing"
+	"os"
 	"time"
 
 	"samuellando.com/tmixer/internal/testutil"
@@ -95,6 +97,86 @@ func TestSendKeysAndCapture(t *testing.T) {
 		}
 		if !found {
 			t.Fatal("Command did not run!")
+		}
+	}
+	testutil.RunWithAndWithoutControlMode(f, t)
+}
+
+func TestPaneOptions(t *testing.T) {
+	f := func(tmux *tmuxv2.Server) {
+		name := "test_sess_name"
+		s, _ := tmux.New(name)
+		err := s.SetOption("@hello", "world")
+		if err != nil {
+			t.Fatal(err)
+		}
+		windows, _ := s.Windows()
+		panes, _ := windows[0].Panes()
+		res, err := panes[0].GetOption("@hello")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if res != "world" {
+			t.Fatal("values dont match")
+		}
+	}
+	testutil.RunWithAndWithoutControlMode(f, t)
+}
+
+func TestPaneOptionsNotSet(t *testing.T) {
+	f := func(tmux *tmuxv2.Server) {
+		name := "test_sess_name"
+		s, _ := tmux.New(name)
+		windows, _ := s.Windows()
+		panes, _ := windows[0].Panes()
+		_, err := panes[0].GetOption("@hello")
+		if err == nil {
+			t.Fatal("Should return an error")
+		}
+	}
+	testutil.RunWithAndWithoutControlMode(f, t)
+}
+
+func TestWorkingDirectory(t *testing.T) {
+	dir, err := os.MkdirTemp(os.TempDir(), "tmixer-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	f := func(tmux *tmuxv2.Server) {
+		name := "test_sess_name"
+		s, _ := tmux.New(name, dir)
+		s.NewWindow("a", "pwd; sleep 100")
+		s.NewWindow("b", "pwd; sleep 100")
+		s.NewWindow("c", "sh")
+		windows, _ := s.Windows()
+		windows[0].Kill()
+		windows, _ = s.Windows()
+		if len(windows) != 3 {
+			t.Fatal("Should have 3 windows")
+		}
+		for _, w := range windows {
+			panes, _ := w.Panes()
+			panes[0].Split()
+			panes[0].SplitHorizontally()
+			panes[0].Split()
+			panes, _ = w.Panes()
+			for _, p := range panes {
+				p.SendKeys("pwd; sleep 100")
+			}
+		}
+		time.Sleep(1*time.Second)
+		for _, w := range windows {
+			panes, _ := w.Panes()
+			for _, p := range panes {
+				out, _ := p.Capture()
+				for _, l := range out {
+					fmt.Println(l)
+				}
+				if ! strings.Contains(strings.Join(out, " "), dir) {
+					t.Fatal("not temp dir")
+				}
+			}
 		}
 	}
 	testutil.RunWithAndWithoutControlMode(f, t)

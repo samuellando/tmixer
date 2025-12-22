@@ -13,7 +13,7 @@ func TestKill(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		w, err := s.NewWindow("~", "test-window", "sh")
+		w, err := s.NewWindow("test-window", "sh")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -40,6 +40,21 @@ func TestKill(t *testing.T) {
 		}
 		if found {
 			t.Fatal("Window was not killed")
+		}
+	}
+	testutil.RunWithAndWithoutControlMode(f, t)
+}
+
+func TestWindowName(t *testing.T) {
+	f := func(tmux *tmuxv2.Server) {
+		s, _ := tmux.New("test_ses")
+		w, _ := s.NewWindow("test_window", "sh")
+		res, err := w.Name()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if res != "test_window" {
+			t.Fatal("Names dont match")
 		}
 	}
 	testutil.RunWithAndWithoutControlMode(f, t)
@@ -76,6 +91,39 @@ func TestLink(t *testing.T) {
 		windows, _ = s2.Windows()
 		if len(windows) != 2 {
 			t.Fatal("Should have 2 windows")
+		}
+	}
+	testutil.RunWithAndWithoutControlMode(f, t)
+}
+
+func TestWindowOptions(t *testing.T) {
+	f := func(tmux *tmuxv2.Server) {
+		name := "test_sess_name"
+		s, _ := tmux.New(name)
+		err := s.SetOption("@hello", "world")
+		if err != nil {
+			t.Fatal(err)
+		}
+		windows, _ := s.Windows()
+		res, err := windows[0].GetOption("@hello")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if res != "world" {
+			t.Fatal("values dont match")
+		}
+	}
+	testutil.RunWithAndWithoutControlMode(f, t)
+}
+
+func TestWindowOptionsNotSet(t *testing.T) {
+	f := func(tmux *tmuxv2.Server) {
+		name := "test_sess_name"
+		s, _ := tmux.New(name)
+		windows, _ := s.Windows()
+		_, err := windows[0].GetOption("@hello")
+		if err == nil {
+			t.Fatal("Should return an error")
 		}
 	}
 	testutil.RunWithAndWithoutControlMode(f, t)

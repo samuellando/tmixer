@@ -10,6 +10,8 @@ import (
 
 type clientId string
 
+var ErrNoActiveClient = errors.New("no active client")
+
 func parseClientId(s string) (clientId, error) {
 	if strings.HasPrefix(s, "/dev/") {
 		return clientId(s), nil
@@ -28,7 +30,7 @@ func (srv *Server) ActiveClient() (*Client, error) {
 		return nil, err
 	}
 	if len(lines) == 0 {
-		return nil, fmt.Errorf("No active client found")
+		return nil, ErrNoActiveClient
 	}
 	type clientInfo struct {
 		id       string
