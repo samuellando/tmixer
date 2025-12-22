@@ -26,38 +26,38 @@ type Project struct {
 	server *tmuxv2.Server
 }
 
+func (p *Project) tmuxSessionName() string {
+	return strings.ReplaceAll(p.Name, ".", "_")
+}
+
 func (p *Project) Session() (*tmuxv2.Session, error) {
-	sessions, err := p.server.ListSessions()
+	s, err := p.server.GetSessionWithName(p.tmuxSessionName())
+	if err == tmuxv2.ErrSessionNotFound {
+		return nil, ErrSessionNotFound
+	}
 	if err != nil {
-		return nil, fmt.Errorf("when listing sessions: %w", err)
+		return nil, fmt.Errorf("when getting project session: %w", err)
 	}
-	for _, session := range sessions {
-		name, err := session.Name()
-		if err != nil {
-			return nil, fmt.Errorf("when getting session name: %w", err)
-		}
-		if name == p.tmuxSessionName() {
-			return session, nil
-		}
-	}
-	return nil, ErrSessionNotFound
+	return s, nil
 }
 
 func (p *Project) Status() (ProjectState, error) {
+	var activeSessionName string
 	status := PROJECT_STATUS_INACTIVE
 	client, err := p.server.ActiveClient()
-	if err != nil {
+	if err != nil && err != tmuxv2.ErrNoActiveClient {
 		return status, fmt.Errorf("when geting active client for status: %w", err)
+	} else if err == nil {
+		session, err := client.Session()
+		if err != nil {
+			return status, fmt.Errorf("when geting active session for status: %w", err)
+		}
+		activeSessionName, err = session.Name()
+		if err != nil {
+			return status, fmt.Errorf("when geting active session name status: %w", err)
+		}
 	}
-	session, err := client.Session()
-	if err != nil {
-		return status, fmt.Errorf("when geting active session for status: %w", err)
-	}
-	name, err := session.Name()
-	if err != nil {
-		return status, fmt.Errorf("when geting active session name status: %w", err)
-	}
-	if name == p.tmuxSessionName() {
+	if activeSessionName == p.tmuxSessionName() {
 		status = PROJECT_STATUS_ATTACHED
 	} else if p.server.HasSessionWithName(p.tmuxSessionName()) {
 		status = PROJECT_STATUS_ACTIVE
@@ -65,42 +65,44 @@ func (p *Project) Status() (ProjectState, error) {
 	return status, nil
 }
 
-func (p *Project) Start() error {
+func (p *Project) Start() (*tmuxv2.Session, error) {
 	status, err := p.Status()
 	if err != nil {
-		return fmt.Errorf("when getting project status: %w", err)
+		return nil, fmt.Errorf("when getting project status: %w", err)
 	}
-	if status == PROJECT_STATUS_INACTIVE {
-		return nil
+	if status >= PROJECT_STATUS_ACTIVE {
+		return p.Session()
 	}
-	s, err := p.server.New(p.tmuxSessionName())
+	s, err := p.server.New(p.tmuxSessionName(), p.Config.Directory)
 	if err != nil {
-		return fmt.Errorf("when starting project: %w", err)
+		return nil, fmt.Errorf("when starting project: %w", err)
 	}
 	err = p.createStartupWindows(s)
 	if err != nil {
-		return fmt.Errorf("when starting project: %w", err)
+		return nil, fmt.Errorf("when starting project: %w", err)
 	}
-	return nil
+	return s, nil
 }
 
 func (p *Project) createStartupWindows(s *tmuxv2.Session) error {
-	if p.Config != nil {
+	if p.Config == nil {
 		return nil
 	}
-	for _, windowConfig := range p.Config.StartupWindows {
-		_, err := s.NewWindow(p.Config.Directory, windowConfig.Name, windowConfig.Command)
-		if err != nil {
-			return fmt.Errorf("when creating window: %w", err)
+	if len(p.Config.StartupWindows) > 0 {
+		for _, windowConfig := range p.Config.StartupWindows {
+			_, err := s.NewWindow(windowConfig.Name, windowConfig.Command)
+			if err != nil {
+				return fmt.Errorf("when creating window: %w", err)
+			}
 		}
-	}
-	windows, err := s.Windows()
-	if err != nil {
-		return fmt.Errorf("when listing windows: %w", err)
-	}
-	err = windows[0].Kill()
-	if err != nil {
-		return fmt.Errorf("when killing default window: %w", err)
+		windows, err := s.Windows()
+		if err != nil {
+			return fmt.Errorf("when listing windows: %w", err)
+		}
+		err = windows[0].Kill()
+		if err != nil {
+			return fmt.Errorf("when killing default window: %w", err)
+		}
 	}
 	return nil
 }
@@ -118,16 +120,9 @@ func (p *Project) Stop() error {
 }
 
 func (p *Project) Switch() error {
-	err := p.Start()
-	if err == ErrSessionNotFound {
-		return nil
-	}
+	session, err := p.Start()
 	if err != nil {
 		return fmt.Errorf("when starting the project for switching: %w", err)
-	}
-	session, err := p.Session()
-	if err != nil {
-		return fmt.Errorf("when getting the session for switching: %w", err)
 	}
 	client, err := p.server.ActiveClient()
 	if err != nil {
@@ -155,7 +150,7 @@ func (p *Project) runSwitchCommands(session *tmuxv2.Session) error {
 		if err != nil {
 			return fmt.Errorf("when splitting command pane: %w", err)
 		}
-		err = cmdPane.SendKeys(cmd)
+		err = cmdPane.SendKeys(cmd+" && exit")
 		if err != nil {
 			return fmt.Errorf("when sending command to pane: %w", err)
 		}
@@ -163,62 +158,55 @@ func (p *Project) runSwitchCommands(session *tmuxv2.Session) error {
 	return nil
 }
 
-func (p *Project) Reset() error {
+func (p *Project) Reset() (*tmuxv2.Session, error) {
 	temp, err := p.createTempSession()
 	if err != nil {
-		return fmt.Errorf("when creating temp session: %w", err)
+		return nil, fmt.Errorf("when creating temp session: %w", err)
 	}
+	defer temp.Kill()
 	session, err := p.Session()
 	if err != nil {
-		return fmt.Errorf("when getting session to reset: %w", err)
+		return nil, fmt.Errorf("when getting session to reset: %w", err)
 	}
 	windows, err := session.Windows()
 	for _, window := range windows {
 		err := window.Link(temp)
 		if err != nil {
-			return fmt.Errorf("when linking window to temp session: %w", err)
+			return nil, fmt.Errorf("when linking window to temp session: %w", err)
 		}
 	}
 	status, err := p.Status()
 	if err != nil {
-		return fmt.Errorf("when checking status for reset: %w", err)
+		return nil, fmt.Errorf("when checking status for reset: %w", err)
 	}
 	if status == PROJECT_STATUS_ATTACHED {
 		client, err := p.server.ActiveClient()
 		if err != nil {
-			return fmt.Errorf("when geting active client for reset: %w", err)
+			return nil, fmt.Errorf("when geting active client for reset: %w", err)
 		}
 		err = client.Switch(temp)
 		if err != nil {
-			return fmt.Errorf("when switching to temp session: %w", err)
+			return nil, fmt.Errorf("when switching to temp session: %w", err)
 		}
 	}
 	err = p.Stop()
 	if err != nil {
-		return fmt.Errorf("when stopping for reset: %w", err)
+		return nil, fmt.Errorf("when stopping for reset: %w", err)
 	}
-	err = p.Start()
+	s, err := p.Start()
 	if err != nil {
-		return fmt.Errorf("when starting for reset: %w", err)
+		return nil, fmt.Errorf("when starting for reset: %w", err)
 	}
 	if status == PROJECT_STATUS_ATTACHED {
 		err = p.Switch()
 		if err != nil {
-			return fmt.Errorf("when switching back after reset: %w", err)
+			return nil, fmt.Errorf("when switching back after reset: %w", err)
 		}
 	}
-	err = temp.Kill()
-	if err != nil {
-		return fmt.Errorf("when killing temp session: %w", err)
-	}
-	return nil
+	return s, nil
 }
 
 func (p *Project) createTempSession() (*tmuxv2.Session, error) {
 	uuid := uuid.NewString()
 	return p.server.New(uuid)
-}
-
-func (p *Project) tmuxSessionName() string {
-	return strings.ReplaceAll(p.Name, ".", "_")
 }
