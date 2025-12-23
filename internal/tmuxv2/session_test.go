@@ -115,6 +115,25 @@ func TestSessionName(t *testing.T) {
 	testutil.RunWithAndWithoutControlMode(f, t)
 }
 
+func TestSessionLastActivity(t *testing.T) {
+	f := func(tmux *tmuxv2.Server) {
+		s1, _ := tmux.New("s1")
+		s2, _ := tmux.New("s2")
+		t1, err := s1.LastActivity()
+		if err != nil {
+			t.Fatal(err)
+		}
+		t2, err := s2.LastActivity()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if t1.After(*t2) {
+			t.Fatal("Shoul be before")
+		}
+	}
+	testutil.RunWithAndWithoutControlMode(f, t)
+}
+
 func TestOptions(t *testing.T) {
 	f := func(tmux *tmuxv2.Server) {
 		name := "test_sess_name"

@@ -3,6 +3,8 @@ package tmuxv2
 import (
 	"errors"
 	"fmt"
+	"strconv"
+	"time"
 )
 
 type sessionId string
@@ -61,6 +63,19 @@ func (s *Session) Name() (string, error) {
 		return "", errors.Join(fmt.Errorf("Got no name"), err)
 	}
 	return lines[0], err
+}
+
+func (s *Session) LastActivity() (*time.Time, error) {
+	lines, err := s.server.command("display").withFlag("-p").withTargetSession(s).withFormat("#{session_activity}").run()
+	if len(lines) == 0 {
+		return nil, errors.Join(fmt.Errorf("Got no time"), err)
+	}
+	unix, err := strconv.ParseInt(lines[0], 10, 64)
+	if err != nil {
+		return nil, err
+	}
+	t := time.Unix(unix, 0)
+	return &t, nil
 }
 
 func (srv *Server) ListSessions() ([]*Session, error) {

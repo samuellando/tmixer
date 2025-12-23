@@ -116,6 +116,60 @@ func TestProjectSession(t *testing.T) {
 	testutil.RunWithAndWithoutControlMode(f, t)
 }
 
+func TestProjectLastActivity(t *testing.T) {
+	config := &config.Config{
+		Projects: map[string]*config.ProjectConfig{
+			"bin": {
+				Directory: "/home/test/bin",
+			},
+			"bin2": {
+				Directory: "/home/test/bin",
+			},
+			"bin3": {
+				Directory: "/home/test/bin",
+			},
+		},
+	}
+	f := func(tmux *tmuxv2.Server) {
+		projects, err := List(tmux, config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var bin *Project
+		var bin2 *Project
+		var bin3 *Project
+		for _, p := range projects {
+			if p.Name == "bin" {
+				bin = p
+			}
+			if p.Name == "bin2" {
+				bin2 = p
+			}
+			if p.Name == "bin3" {
+				bin3 = p
+			}
+		}
+		bin.Start()
+		bin2.Start()
+		a1, err := bin.LastActivity()
+		if err != nil {
+			t.Fatal(err)
+		}
+		a2, err := bin2.LastActivity()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if a1.After(*a2) {
+			t.Fatal("Should be before")
+		}
+		_, err = bin3.LastActivity()
+		if err != ErrSessionNotFound {
+			t.Fatal(err)
+		}
+	}
+	testutil.RunWithAndWithoutControlMode(f, t)
+}
+
 func TestProjectSessionNotFound(t *testing.T) {
 	config := &config.Config{
 		Projects: map[string]*config.ProjectConfig{

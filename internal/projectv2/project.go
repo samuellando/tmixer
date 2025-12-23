@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"samuellando.com/tmixer/internal/configv2"
@@ -40,6 +41,15 @@ func (p *Project) Session() (*tmuxv2.Session, error) {
 	}
 	return s, nil
 }
+
+func (p *Project) LastActivity() (*time.Time, error) {
+	session, err := p.Session()
+	if err != nil {
+		return nil, err
+	}
+	return session.LastActivity()
+}
+
 
 func (p *Project) Status() (ProjectState, error) {
 	var activeSessionName string
