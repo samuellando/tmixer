@@ -1,17 +1,22 @@
 package config
 
 import (
+	"errors"
 	"fmt"
-	"github.com/goccy/go-yaml"
 	"maps"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/goccy/go-yaml"
 )
 
 type Config struct {
-	DefaultProject *string                   `yaml:"defaultProject"`
-	Projects       map[string]*ProjectConfig `yaml:"projects"`
+	DefaultProject  *string                   `yaml:"defaultProject"`
+	LogFile         *string                   `yaml:"logFile"`
+	ConfigFiles     []string                  `yaml:"configFiles"`
+	CombineProjects bool                      `yaml:"combineProjects"`
+	Projects        map[string]*ProjectConfig `yaml:"projects"`
 }
 
 type ProjectConfig struct {
@@ -26,32 +31,49 @@ type WindowConfig struct {
 	Command string
 }
 
-func LoadCofig(files ...string) (*Config, error) {
-	config := &Config{}
-	projects := make(map[string]*ProjectConfig)
-	for _, f := range files {
-		if f != "" {
-			path, err := absPath(f)
-			if err != nil {
-				return nil, fmt.Errorf("while getting abs path of config file: %w", err)
-			}
-			bytes, err := os.ReadFile(path)
-			if err != nil {
-				return nil, fmt.Errorf("while reading config file: %w", err)
-			}
-			err = yaml.Unmarshal(bytes, &config)
-			if err != nil {
-				return nil, fmt.Errorf("while unmarshaling yaml: %w", err)
-			}
-			maps.Copy(projects, config.Projects)
-		}
+func New() *Config {
+	return &Config{
+		DefaultProject:  nil,
+		LogFile:         nil,
+		ConfigFiles:     []string{"~/.config/tmixer/config.yml", "~/.tmixer.yml"},
+		CombineProjects: true,
+		Projects:        make(map[string]*ProjectConfig),
 	}
-	config.Projects = projects
+}
+
+func (config *Config) LoadFiles() error {
+	allProjects := make([]map[string]*ProjectConfig, 0)
+	var errs error
+	for _, f := range config.ConfigFiles {
+		path, err := absPath(f)
+		if err != nil {
+			errs = errors.Join(errs, err)
+			continue
+		}
+		bytes, err := os.ReadFile(path)
+		if err != nil {
+			errs = errors.Join(errs, err)
+			continue
+		}
+		err = yaml.Unmarshal(bytes, config)
+		if err != nil {
+			errs = errors.Join(errs, err)
+			continue
+		}
+		allProjects = append(allProjects, config.Projects)
+	}
+	if config.CombineProjects {
+		resultProjects := make(map[string]*ProjectConfig)
+		for _, projects := range allProjects {
+			maps.Copy(resultProjects, projects)
+		}
+		config.Projects = resultProjects
+	}
 	err := convertToAbsolutePaths(config.Projects)
 	if err != nil {
-		return nil, err
+		errs = errors.Join(errs, err)
 	}
-	return config, nil
+	return errs
 }
 
 func convertToAbsolutePaths(projects map[string]*ProjectConfig) error {
@@ -64,7 +86,6 @@ func convertToAbsolutePaths(projects map[string]*ProjectConfig) error {
 	}
 	return nil
 }
-
 
 func absPath(path string) (string, error) {
 	homeDir, err := os.UserHomeDir()
