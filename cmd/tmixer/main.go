@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"os/exec"
 	"strings"
 
 	"samuellando.com/tmixer/internal/configv2"
@@ -57,13 +58,13 @@ func main() {
 
 func run(args []string, config *config.Config) error {
 	command := "switch"
-	if len(args) > 1 {
+	if len(args) >= 1 {
 		command = args[0]
 	}
 	if command == "notify-switch" {
 		if len(args) < 2 || args[1] == tmuxv2.CONTROL_SESSION_NAME {
 			return nil
-		} 
+		}
 	}
 	tmux := tmuxv2.Tmux()
 	tmux.StartControlMode()
@@ -73,13 +74,33 @@ func run(args []string, config *config.Config) error {
 		return err
 	}
 	var selection *projectv2.Project
-	if len(args) < 2 || command == "start" {
-		selection, _ = fzf.PickProject(projects)
+	if command == "start" {
+		if len(args) < 2 {
+			if config.DefaultProject != nil {
+				for _, p := range projects {
+					if strings.HasPrefix(p.Name, *config.DefaultProject) {
+						selection = p
+						break
+					}
+				}
+			}
+		} else {
+			for _, p := range projects {
+				if strings.HasPrefix(p.Name, args[1]) {
+					selection = p
+					break
+				}
+			}
+		}
 	} else {
-		for _, p := range projects {
-			if strings.HasPrefix(p.Name, args[1]) {
-				selection = p
-				break
+		if len(args) < 2 {
+			selection, _ = fzf.PickProject(projects)
+		} else {
+			for _, p := range projects {
+				if strings.HasPrefix(p.Name, args[1]) {
+					selection = p
+					break
+				}
 			}
 		}
 	}
@@ -92,7 +113,7 @@ func run(args []string, config *config.Config) error {
 	}
 	switch command {
 	case "start":
-		_, err = selection.Start()
+		err = startClient(selection)
 	case "switch":
 		err = selection.Switch()
 	case "stop":
@@ -110,8 +131,29 @@ func run(args []string, config *config.Config) error {
 	return setupHooks(tmux)
 }
 
+func startClient(p *projectv2.Project) error {
+	if _, is_set := os.LookupEnv("TMUX"); is_set {
+		return fmt.Errorf("Already in TMUX")
+	}
+	p.Start()
+	cmd := exec.Command("tmux", "-u", "attach", "-t", p.TmuxSessionName())
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err := cmd.Start()
+	if err != nil {
+		return err
+	}
+	p.RunSwitchCommands()
+	err = cmd.Wait()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func setupHooks(tmux *tmuxv2.Server) error {
-	cmd :=`run-shell 'tmixer notify-switch #{session_name}'`
+	cmd := `run-shell 'tmixer notify-switch #{session_name}'`
 	err := tmux.SetHook("client-session-changed[2000]", cmd)
 	if err != nil {
 		return err
@@ -124,7 +166,7 @@ func setupHooks(tmux *tmuxv2.Server) error {
 }
 
 func disableHooks(tmux *tmuxv2.Server) error {
-	cmd :=``
+	cmd := ``
 	err := tmux.SetHook("client-session-changed[2000]", cmd)
 	if err != nil {
 		return err
