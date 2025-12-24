@@ -96,8 +96,8 @@ func (s *Session) Kill() error {
 	return err
 }
 
-func (s *Session) NewWindow(name, command string) (*Window, error) {
-	c := s.server.command("new-window").withTargetSession(s).withName(name).withArgument(command).print().withFormat("#{window_id}")
+func (s *Session) NewWindow(name string) (*Window, error) {
+	c := s.server.command("new-window").withTargetSession(s).withFlag("-d").withName(name).print().withFormat("#{window_id}")
 	if dir, err := s.GetOption("@working_dir"); err == nil {
 		c = c.withWorkingDirectory(dir)
 	}

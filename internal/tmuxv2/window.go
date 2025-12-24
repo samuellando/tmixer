@@ -32,6 +32,11 @@ func (w *Window) Kill() error {
 	return err
 }
 
+func (w *Window) Select() (error) {
+	_, err := w.server.command("select-window").withTargetWindow(w).run()
+	return err
+}
+
 func (w *Window) Name() (string, error) {
 	lines, err := w.server.command("display").withFlag("-p").withTargetWindow(w).withFormat("#{window_name}").run()
 	if len(lines) == 0 {

@@ -50,7 +50,6 @@ func (p *Project) LastActivity() (*time.Time, error) {
 	return session.LastActivity()
 }
 
-
 func (p *Project) Status() (ProjectState, error) {
 	var activeSessionName string
 	status := PROJECT_STATUS_INACTIVE
@@ -100,9 +99,19 @@ func (p *Project) createStartupWindows(s *tmuxv2.Session) error {
 	}
 	if len(p.Config.StartupWindows) > 0 {
 		for _, windowConfig := range p.Config.StartupWindows {
-			_, err := s.NewWindow(windowConfig.Name, windowConfig.Command)
+			w, err := s.NewWindow(windowConfig.Name)
 			if err != nil {
 				return fmt.Errorf("when creating window: %w", err)
+			}
+			if windowConfig.Command != "" {
+				panes, err := w.Panes()
+				if err != nil {
+					return fmt.Errorf("when creating window, getting window pane: %w", err)
+				}
+				err = panes[0].SendKeys(windowConfig.Command)
+				if err != nil {
+					return fmt.Errorf("when creating window, sending command: %w", err)
+				}
 			}
 		}
 		windows, err := s.Windows()
@@ -112,6 +121,10 @@ func (p *Project) createStartupWindows(s *tmuxv2.Session) error {
 		err = windows[0].Kill()
 		if err != nil {
 			return fmt.Errorf("when killing default window: %w", err)
+		}
+		err = windows[1].Select()
+		if err != nil {
+			return fmt.Errorf("when switching to the first window: %w", err)
 		}
 	}
 	return nil
@@ -167,7 +180,7 @@ func (p *Project) RunSwitchCommands() error {
 		if err != nil {
 			return fmt.Errorf("when splitting command pane: %w", err)
 		}
-		err = cmdPane.SendKeys(cmd+" && exit")
+		err = cmdPane.SendKeys(cmd + " && exit")
 		if err != nil {
 			return fmt.Errorf("when sending command to pane: %w", err)
 		}
