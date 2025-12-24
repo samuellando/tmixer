@@ -3,11 +3,9 @@ package tmuxv2
 import (
 	"bufio"
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"os/exec"
-	"slices"
 	"strings"
 )
 
@@ -23,14 +21,13 @@ const CONTROL_SESSION_NAME = "__tmixer_control__"
 func (srv *Server) StartControlMode() error {
 	client := controlModeClient{}
 	cmd := srv.command("new-session")
-	cmd = cmd.withTmuxFlag("-C").withFlag("-A").withSession(CONTROL_SESSION_NAME)
+	cmd = cmd.withTmuxFlag("-C").withFlag("-A").withFlag("-D").withSession(CONTROL_SESSION_NAME)
 	// Escape and setup stdin and stdout
 	client.controlModeCmd = cmd.getExecCmd()
 	srv.controlModeClient = &client
 	rollback := func(err error) error {
-		err2 := srv.cleanUpControlSession()
 		srv.controlModeClient = nil
-		return errors.Join(err, err2)
+		return err
 	}
 	var err error
 	client.controlModeStdIn, err = client.controlModeCmd.StdinPipe()
@@ -71,28 +68,6 @@ func (srv *Server) StopControlMode() error {
 	}
 	srv.controlModeClient = nil
 	// Finally clean up the session if we can
-	err = srv.cleanUpControlSession()
-	if err != nil {
-		return fmt.Errorf("when cleaning up session %w", err)
-	}
-	return nil
-}
-
-func (srv *Server) cleanUpControlSession() error {
-	cmd := srv.command("list-clients").withFilter(fmt.Sprintf("#{?client_control_mode,#{?#{==:#{client_session},%s},1,},}", CONTROL_SESSION_NAME))
-	lines, err := cmd.run()
-	if err != nil {
-		return fmt.Errorf("Error when requesting session info %w", err)
-	}
-	// Remove empty lines
-	lines = slices.DeleteFunc(lines, func(s string) bool { return len(s) == 0 })
-	if len(lines) == 0 {
-		cmd := srv.command("kill-session").withTargetSessionName(CONTROL_SESSION_NAME)
-		_, err = cmd.run()
-		if err != nil {
-			return fmt.Errorf("Error while killing session %w", err)
-		}
-	}
 	return nil
 }
 

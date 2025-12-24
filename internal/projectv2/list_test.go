@@ -158,6 +158,9 @@ func TestListIncludesAllSessions(t *testing.T) {
 		if !projectNames["bin"] {
 			t.Fatal("bin should be there")
 		}
+		if projectNames[tmuxv2.CONTROL_SESSION_NAME] {
+			t.Fatal("Should not list the control session")
+		}
 		for i := range n {
 			if !projectNames["test-"+strconv.Itoa(i)] {
 				t.Fatalf("missing session project %d", i)

@@ -20,6 +20,11 @@ func Tmux(socketPaths ...string) *Server {
 	}
 }
 
+func (srv *Server) SetHook(name, cmd string) error {
+	_, err := srv.command("set-hook").withFlag("-g").withArgument(name).withArgument(cmd).run()
+	return err
+}
+
 func (srv *Server) Kill() error {
 	_, err := srv.command("kill-server").run()
 	return err

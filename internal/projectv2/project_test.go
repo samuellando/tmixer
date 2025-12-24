@@ -475,6 +475,51 @@ func TestProjectSwitchCommands(t *testing.T) {
 	testutil.RunWithAndWithoutControlMode(f, t)
 }
 
+func TestProjectRunSwitchCommands(t *testing.T) {
+	dir, err := os.MkdirTemp(os.TempDir(), "tmixer-test-projects")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	config := &config.Config{
+		Projects: map[string]*config.ProjectConfig{
+			"bin": {
+				Directory: dir,
+				SwitchCommands: []string{"touch file1", "touch file2"},
+			},
+		},
+	}
+	f := func(tmux *tmuxv2.Server) {
+		s, _ := tmux.New("ses-1")
+		f := testutil.SetupTestClient(tmux, s)
+		defer f.Close()
+		projects, err := List(tmux, config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var project *Project
+		for _, p := range projects {
+			if p.Name == "bin" {
+				project = p
+			}
+		}
+		if project == nil {
+			t.Fatal("bin project not listed")
+		}
+		project.Start()
+		err = project.RunSwitchCommands()
+		if err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(time.Second)
+		entries, _ := os.ReadDir(dir)
+		if len(entries) != 2 {
+			t.Fatal("Should have created 2 files")
+		}
+	}
+	testutil.RunWithAndWithoutControlMode(f, t)
+}
+
 
 func TestProjectReset(t *testing.T) {
 	config := &config.Config{

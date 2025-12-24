@@ -65,7 +65,7 @@ func listSessionsWithoutProject(tmux *tmuxv2.Server, configProjects []*Project) 
 	projects := make([]*Project, 0)
 	sessionsMatched := make(map[string]bool)
 	for _, project := range configProjects {
-		sessionsMatched[project.tmuxSessionName()] = true
+		sessionsMatched[project.TmuxSessionName()] = true
 	}
 	sessions, err := tmux.ListSessions()
 	if err != nil {
@@ -75,6 +75,9 @@ func listSessionsWithoutProject(tmux *tmuxv2.Server, configProjects []*Project) 
 		name, err := session.Name()
 		if err != nil {
 			return configProjects, fmt.Errorf("when getting session name for project list: %w", err)
+		}
+		if name == tmuxv2.CONTROL_SESSION_NAME {
+			continue
 		}
 		if _, ok := sessionsMatched[name]; !ok {
 			project := &Project{Name: name, server: tmux}

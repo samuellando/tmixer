@@ -27,12 +27,12 @@ type Project struct {
 	server *tmuxv2.Server
 }
 
-func (p *Project) tmuxSessionName() string {
+func (p *Project) TmuxSessionName() string {
 	return strings.ReplaceAll(p.Name, ".", "_")
 }
 
 func (p *Project) Session() (*tmuxv2.Session, error) {
-	s, err := p.server.GetSessionWithName(p.tmuxSessionName())
+	s, err := p.server.GetSessionWithName(p.TmuxSessionName())
 	if err == tmuxv2.ErrSessionNotFound {
 		return nil, ErrSessionNotFound
 	}
@@ -67,9 +67,9 @@ func (p *Project) Status() (ProjectState, error) {
 			return status, fmt.Errorf("when geting active session name status: %w", err)
 		}
 	}
-	if activeSessionName == p.tmuxSessionName() {
+	if activeSessionName == p.TmuxSessionName() {
 		status = PROJECT_STATUS_ATTACHED
-	} else if p.server.HasSessionWithName(p.tmuxSessionName()) {
+	} else if p.server.HasSessionWithName(p.TmuxSessionName()) {
 		status = PROJECT_STATUS_ACTIVE
 	}
 	return status, nil
@@ -83,7 +83,7 @@ func (p *Project) Start() (*tmuxv2.Session, error) {
 	if status >= PROJECT_STATUS_ACTIVE {
 		return p.Session()
 	}
-	s, err := p.server.New(p.tmuxSessionName(), p.Config.Directory)
+	s, err := p.server.New(p.TmuxSessionName(), p.Config.Directory)
 	if err != nil {
 		return nil, fmt.Errorf("when starting project: %w", err)
 	}
@@ -142,10 +142,17 @@ func (p *Project) Switch() error {
 	if err != nil {
 		return fmt.Errorf("when swtiching to the session: %w", err)
 	}
-	return p.runSwitchCommands(session)
+	return p.RunSwitchCommands()
 }
 
-func (p *Project) runSwitchCommands(session *tmuxv2.Session) error {
+func (p *Project) RunSwitchCommands() error {
+	if p.Config == nil {
+		return nil
+	}
+	session, err := p.Session()
+	if err != nil {
+		return err
+	}
 	windows, err := session.Windows()
 	if err != nil {
 		return fmt.Errorf("when getting windows for switch commands: %w", err)

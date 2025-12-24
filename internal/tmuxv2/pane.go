@@ -27,7 +27,7 @@ func (p *Pane) GetOption(key string) (string, error) {
 }
 
 func (p *Pane) Split() (*Pane, error) {
-	c := p.server.command("split-window").withTargetPane(p).withFlag("-v").print().withFormat("#{pane_id}")
+	c := p.server.command("split-window").withTargetPane(p).withFlag("-h").print().withFormat("#{pane_id}")
 	if dir, err := p.GetOption("@working_dir"); err == nil {
 		c = c.withWorkingDirectory(dir)
 	}
@@ -46,7 +46,7 @@ func (p *Pane) Split() (*Pane, error) {
 }
 
 func (p *Pane) SplitHorizontally() (*Pane, error) {
-	c := p.server.command("split-window").withTargetPane(p).withFlag("-h").print().withFormat("#{pane_id}")
+	c := p.server.command("split-window").withTargetPane(p).withFlag("-v").print().withFormat("#{pane_id}")
 	if dir, err := p.GetOption("@working_dir"); err == nil {
 		c = c.withWorkingDirectory(dir)
 	}
