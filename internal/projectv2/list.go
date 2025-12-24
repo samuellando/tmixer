@@ -3,6 +3,7 @@ package projectv2
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"samuellando.com/tmixer/internal/configv2"
 	"samuellando.com/tmixer/internal/tmuxv2"
@@ -41,9 +42,9 @@ func listBareProjects(config *config.Config) []*Project {
 	return projects
 }
 
-func listSubDirProjects(config *config.Config) ([]*Project, error) {
+func listSubDirProjects(c *config.Config) ([]*Project, error) {
 	projects := make([]*Project, 0)
-	for name, projectConfig := range config.Projects {
+	for name, projectConfig := range c.Projects {
 		if projectConfig.SubDirectories {
 			dirEntries, err := os.ReadDir(projectConfig.Directory)
 			if err != nil {
@@ -52,7 +53,12 @@ func listSubDirProjects(config *config.Config) ([]*Project, error) {
 			for _, f := range dirEntries {
 				if f.IsDir() {
 					subName := fmt.Sprintf("%s--%s", name, f.Name())
-					project := &Project{Name: subName, Config: projectConfig}
+					project := &Project{Name: subName, Config: &config.ProjectConfig{
+						Directory: filepath.Join(projectConfig.Directory, f.Name()),
+						SubDirectories: false,
+						StartupWindows: projectConfig.StartupWindows,
+						SwitchCommands: projectConfig.SwitchCommands,
+					}}
 					projects = append(projects, project)
 				}
 			}

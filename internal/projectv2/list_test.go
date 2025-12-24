@@ -101,6 +101,8 @@ func TestListIncludesAllSubDirProjects(t *testing.T) {
 			"projects": {
 				Directory:      dir,
 				SubDirectories: true,
+				StartupWindows: []config.WindowConfig{{}, {}},
+				SwitchCommands: []string{"", ""},
 			},
 		},
 	}
@@ -109,19 +111,33 @@ func TestListIncludesAllSubDirProjects(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		projectNames := map[string]bool{}
+		projectNames := map[string]*Project{}
 		for _, p := range projects {
 			if p.server != tmux {
 				t.Fatal("Should always attach server")
 			}
-			projectNames[p.Name] = true
+			projectNames[p.Name] = p
 		}
-		if !projectNames["bin"] {
+		if _, ok := projectNames["bin"]; !ok {
 			t.Fatal("bin should be there")
 		}
 		for i := range n {
-			if !projectNames["projects--"+strconv.Itoa(i)] {
+			if p, ok := projectNames["projects--"+strconv.Itoa(i)]; !ok {
 				t.Fatalf("missing ub project %d", i)
+			} else {
+				// For all others change that the values are correct in the config
+				if p.Config.SubDirectories {
+					t.Fatal("Should set sub dirs of sub dir to false")
+				}
+				if p.Config.Directory != filepath.Join(dir, strconv.Itoa(i)) {
+					t.Fatal("Directory should be the project dir itself")
+				}
+				if len(p.Config.StartupWindows) != 2 {
+					t.Fatal("Should share startup windows")
+				}
+				if len(p.Config.SwitchCommands) != 2 {
+					t.Fatal("Should share switch commands")
+				}
 			}
 		}
 	}
