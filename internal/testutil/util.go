@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/creack/pty"
 	"samuellando.com/tmixer/internal/tmux"
@@ -18,7 +19,13 @@ func SetupTestClient(tmux *tmux.Server, session *tmux.Session) *os.File {
 		panic(err)
 	}
 	// Read a single byte, waiting for the proccess to actually start
-	f.Read([]byte{0})
+	time.Sleep(time.Second)
+	buff := make([]byte, 100)
+	n, err := f.Read(buff)
+	fmt.Println(string(buff[:n]))
+	if err != nil {
+		panic(err)
+	}
 	return f
 }
 
