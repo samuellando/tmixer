@@ -15,7 +15,7 @@ type testWriter struct {
 
 func (w *testWriter) Write(p []byte) (int, error) {
 	return w.b.Write(p)
-} 
+}
 
 func (w *testWriter) Close() error {
 	return nil
@@ -59,7 +59,6 @@ func TestDisplayProjects(t *testing.T) {
  bin
  cat
  dog`
-
 
 	projects, _ := project.List(tmux, config)
 	for _, p := range projects {

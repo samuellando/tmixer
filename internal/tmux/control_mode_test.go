@@ -1,10 +1,10 @@
 package tmux_test
 
 import (
-	"testing"
-	"time"
 	"samuellando.com/tmixer/internal/testutil"
 	"samuellando.com/tmixer/internal/tmux"
+	"testing"
+	"time"
 )
 
 func TestStartStopControlMode(t *testing.T) {

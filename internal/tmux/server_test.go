@@ -2,9 +2,9 @@ package tmux_test
 
 import (
 	"testing"
-	
-	"samuellando.com/tmixer/internal/tmux"
+
 	"samuellando.com/tmixer/internal/testutil"
+	"samuellando.com/tmixer/internal/tmux"
 )
 
 func TestHasSession(t *testing.T) {

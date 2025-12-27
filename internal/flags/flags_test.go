@@ -42,7 +42,7 @@ func TestParseArgs(t *testing.T) {
 			},
 		},
 		{
-			Name: "four",
+			Name:    "four",
 			Default: "ddd",
 			ParseInput: func(s string, c *config.Config) error {
 				if s != "ddd" {
@@ -73,18 +73,17 @@ func TestHelpMessage(t *testing.T) {
 			ShortName: "o",
 		},
 		{
-			Name:      "two",
-			ShortName: "t",
+			Name:        "two",
+			ShortName:   "t",
 			Description: "what it is",
-			Usage: "How to use it",
-			Default: "aaa",
-
+			Usage:       "How to use it",
+			Default:     "aaa",
 		},
 		{
 			Name: "three",
 		},
 		{
-			Name: "four",
+			Name:    "four",
 			Default: "ddd",
 		},
 	}

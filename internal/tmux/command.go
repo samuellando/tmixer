@@ -11,9 +11,8 @@ type cmd struct {
 	command   string
 	flags     [][]string
 	arguments []string
-	server *Server
+	server    *Server
 }
-
 
 func (srv *Server) command(c string) cmd {
 	cmd := cmd{
@@ -21,7 +20,7 @@ func (srv *Server) command(c string) cmd {
 		command:   c,
 		flags:     make([][]string, 0),
 		arguments: make([]string, 0),
-		server: srv,
+		server:    srv,
 	}
 	if srv.SocketPath != "" {
 		return cmd.withTmuxFlag("-S", srv.SocketPath)
@@ -56,7 +55,6 @@ func (c cmd) withTargetSession(t *Session) cmd {
 func (c cmd) withTargetClient(t *Client) cmd {
 	return c.withFlag("-c", string(t.Id))
 }
-
 
 func (c cmd) withTargetWindow(t *Window) cmd {
 	return c.withFlag("-t", string(t.Id))

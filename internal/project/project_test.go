@@ -192,7 +192,7 @@ func TestProjectSessionNotFound(t *testing.T) {
 		if project == nil {
 			t.Fatal("bin project not listed")
 		}
-		s, err := project.Session() 
+		s, err := project.Session()
 		if err != ErrSessionNotFound {
 			t.Fatal("Should get a session not found error")
 		}
@@ -221,7 +221,7 @@ func TestProjectStart(t *testing.T) {
 			if p.Name == "bin" {
 				project = p
 			}
-	}
+		}
 		if project == nil {
 			t.Fatal("bin project not listed")
 		}
@@ -291,11 +291,11 @@ func TestProjectStartStartupWindows(t *testing.T) {
 				Directory: "/home/test/bin",
 				StartupWindows: []config.WindowConfig{
 					{
-						Name: "test1",
+						Name:    "test1",
 						Command: "expr 5 \\* 5; sleep 100",
 					},
 					{
-						Name: "test2",
+						Name:    "test2",
 						Command: "expr 7 \\* 7; sleep 100",
 					},
 				},
@@ -440,7 +440,7 @@ func TestProjectSwitchCommands(t *testing.T) {
 	config := &config.Config{
 		Projects: map[string]*config.ProjectConfig{
 			"bin": {
-				Directory: dir,
+				Directory:      dir,
 				SwitchCommands: []string{"touch file1", "touch file2"},
 			},
 		},
@@ -484,7 +484,7 @@ func TestProjectRunSwitchCommands(t *testing.T) {
 	config := &config.Config{
 		Projects: map[string]*config.ProjectConfig{
 			"bin": {
-				Directory: dir,
+				Directory:      dir,
 				SwitchCommands: []string{"touch file1", "touch file2"},
 			},
 		},
@@ -519,7 +519,6 @@ func TestProjectRunSwitchCommands(t *testing.T) {
 	}
 	testutil.RunWithAndWithoutControlMode(f, t)
 }
-
 
 func TestProjectReset(t *testing.T) {
 	config := &config.Config{
@@ -566,11 +565,11 @@ func TestProjectResetStartupWindows(t *testing.T) {
 				Directory: "/home/test/bin",
 				StartupWindows: []config.WindowConfig{
 					{
-						Name: "test1",
+						Name:    "test1",
 						Command: "expr 5 \\* 5; sleep 100",
 					},
 					{
-						Name: "test2",
+						Name:    "test2",
 						Command: "expr 7 \\* 7; sleep 100",
 					},
 				},
@@ -679,7 +678,7 @@ func TestProjectResetAttachedSwitchCommands(t *testing.T) {
 	config := &config.Config{
 		Projects: map[string]*config.ProjectConfig{
 			"bin": {
-				Directory: dir,
+				Directory:      dir,
 				SwitchCommands: []string{"touch test"},
 			},
 		},
@@ -720,7 +719,7 @@ func TestProjectResetAttachedSwitchCommands(t *testing.T) {
 		if len(entries) != 1 {
 			t.Fatal("Should have created 1 files")
 		}
-		
+
 	}
 	testutil.RunWithAndWithoutControlMode(f, t)
 }

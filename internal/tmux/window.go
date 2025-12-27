@@ -32,7 +32,7 @@ func (w *Window) Kill() error {
 	return err
 }
 
-func (w *Window) Select() (error) {
+func (w *Window) Select() error {
 	_, err := w.server.command("select-window").withTargetWindow(w).run()
 	return err
 }

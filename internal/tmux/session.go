@@ -17,8 +17,8 @@ func parseSessionId(s string) (sessionId, error) {
 }
 
 type Session struct {
-	Id        sessionId
-	server    *Server
+	Id     sessionId
+	server *Server
 }
 
 func (srv *Server) New(name string, dir ...string) (*Session, error) {
@@ -37,7 +37,7 @@ func (srv *Server) New(name string, dir ...string) (*Session, error) {
 	if err != nil {
 		return nil, err
 	}
-    s := &Session{Id: id, server: srv}
+	s := &Session{Id: id, server: srv}
 	if len(dir) > 0 {
 		return s, s.SetOption("@working_dir", dir[0])
 	}
@@ -112,7 +112,7 @@ func (s *Session) NewWindow(name string) (*Window, error) {
 	if err != nil {
 		return nil, err
 	}
-	w :=  &Window{Id: id, server: s.server}
+	w := &Window{Id: id, server: s.server}
 	return w, nil
 }
 

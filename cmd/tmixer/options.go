@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"samuellando.com/tmixer/internal/flags"
 	"samuellando.com/tmixer/internal/config"
+	"samuellando.com/tmixer/internal/flags"
 )
 
 var (
@@ -76,5 +76,3 @@ var FLAGS = []flags.Flag{
 		},
 	},
 }
-
-

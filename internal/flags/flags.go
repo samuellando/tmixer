@@ -56,11 +56,11 @@ func ParseArgs(args []string, flags []Flag, config *config.Config) ([]string, er
 					return nil, fmt.Errorf("While parsing flag %s: %w", flag.Name, err)
 				}
 				break
-			} 
+			}
 		}
 		if !matched {
 			remaining = append(remaining, args[i])
-		} 
+		}
 	}
 	return remaining, nil
 }

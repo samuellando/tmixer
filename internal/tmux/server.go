@@ -1,8 +1,8 @@
 package tmux
 
 import (
-	"fmt"
 	"errors"
+	"fmt"
 )
 
 var ErrSessionNotFound = errors.New("session not found")

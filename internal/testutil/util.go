@@ -51,7 +51,7 @@ func TeardownTestServer(s *tmux.Server) {
 	}
 }
 
-func RunWithAndWithoutControlMode(f func (tmux *tmux.Server), t *testing.T) {
+func RunWithAndWithoutControlMode(f func(tmux *tmux.Server), t *testing.T) {
 	tmux := SetupTestServer(t)
 	f(tmux)
 	TeardownTestServer(tmux)
@@ -62,7 +62,7 @@ func RunWithAndWithoutControlMode(f func (tmux *tmux.Server), t *testing.T) {
 		t.Fatal(err)
 	}
 	f(tmux)
-	err = tmux.StopControlMode() 
+	err = tmux.StopControlMode()
 	if err != nil {
 		t.Fatal(err)
 	}

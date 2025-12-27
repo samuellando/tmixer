@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	"samuellando.com/tmixer/internal/tmux"
 	"samuellando.com/tmixer/internal/testutil"
+	"samuellando.com/tmixer/internal/tmux"
 )
 
 func TestCreateAndKill(t *testing.T) {

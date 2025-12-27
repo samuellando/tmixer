@@ -9,7 +9,6 @@ import (
 	"samuellando.com/tmixer/internal/tmux"
 )
 
-
 func List(tmux *tmux.Server, config *config.Config) ([]*Project, error) {
 	projects := listBareProjects(config)
 	subDirProjects, err := listSubDirProjects(config)
@@ -54,7 +53,7 @@ func listSubDirProjects(c *config.Config) ([]*Project, error) {
 				if f.IsDir() {
 					subName := fmt.Sprintf("%s--%s", name, f.Name())
 					project := &Project{Name: subName, Config: &config.ProjectConfig{
-						Directory: filepath.Join(projectConfig.Directory, f.Name()),
+						Directory:      filepath.Join(projectConfig.Directory, f.Name()),
 						SubDirectories: false,
 						StartupWindows: projectConfig.StartupWindows,
 						SwitchCommands: projectConfig.SwitchCommands,
