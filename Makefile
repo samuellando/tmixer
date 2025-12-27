@@ -3,6 +3,8 @@
 
 all: build
 
+check: check-fmt test-all
+
 build:
 	go build ./cmd/tmixer
 
@@ -16,6 +18,9 @@ check-fmt:
 	test -z "$$(gofmt -l .)"
 
 test:
+	go test ./...
+
+test-all:
 	go test -count=1 ./...
 
 clean:
