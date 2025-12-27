@@ -19,8 +19,12 @@ import (
 var ERR_NO_SELECTION = errors.New("No selection made")
 
 func main() {
+	run(os.Args)
+}
+
+func run(args []string) {
 	config := config.New()
-	args, err := flags.ParseArgs(os.Args, FLAGS, config)
+	args, err := flags.ParseArgs(args, FLAGS, config)
 	if err != nil {
 		fmt.Println(err)
 		fmt.Println()
@@ -43,7 +47,7 @@ func main() {
 	if err != nil {
 		slog.Debug(err.Error())
 	}
-	err = run(args, config)
+	err = runTmixer(args, config)
 	if err == ERR_NO_SELECTION {
 		fmt.Println(err)
 		slog.Debug(err.Error())
@@ -56,7 +60,7 @@ func main() {
 	}
 }
 
-func run(args []string, config *config.Config) error {
+func runTmixer(args []string, config *config.Config) error {
 	command := "switch"
 	if len(args) >= 1 {
 		command = args[0]
@@ -74,8 +78,16 @@ func run(args []string, config *config.Config) error {
 		return err
 	}
 	var selection *project.Project
-	if command == "start" {
-		if len(args) < 2 {
+	if len(args) >= 2 {
+		for _, p := range projects {
+			if strings.HasPrefix(p.Name, args[1]) {
+				selection = p
+				break
+			}
+		}
+	} else {
+		switch command {
+		case "start":
 			if config.DefaultProject != nil {
 				for _, p := range projects {
 					if strings.HasPrefix(p.Name, *config.DefaultProject) {
@@ -84,25 +96,21 @@ func run(args []string, config *config.Config) error {
 					}
 				}
 			}
-		} else {
+		case "reset":
 			for _, p := range projects {
-				if strings.HasPrefix(p.Name, args[1]) {
+				status, err := p.Status()
+				if err != nil {
+					return fmt.Errorf("while getting project status for reset: %w", err)
+				}
+				if status == project.PROJECT_STATUS_ATTACHED {
 					selection = p
 					break
 				}
 			}
-		}
-	} else {
-		if len(args) < 2 {
+		default:
 			selection, _ = fzf.PickProject(projects)
-		} else {
-			for _, p := range projects {
-				if strings.HasPrefix(p.Name, args[1]) {
-					selection = p
-					break
-				}
-			}
 		}
+
 	}
 	if selection == nil {
 		return ERR_NO_SELECTION

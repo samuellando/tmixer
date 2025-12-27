@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log/slog"
 	"os/exec"
 	"strings"
 )
@@ -13,7 +14,6 @@ type controlModeClient struct {
 	controlModeCmd    *exec.Cmd
 	controlModeStdIn  io.WriteCloser
 	controlModeStdOut *bufio.Reader
-	log               []string
 }
 
 const CONTROL_SESSION_NAME = "__tmixer_control__"
@@ -61,9 +61,6 @@ func (srv *Server) StopControlMode() error {
 	srv.controlModeClient.readMessage()
 	err = srv.controlModeClient.controlModeCmd.Wait()
 	if err != nil {
-		for _, line := range srv.controlModeClient.log {
-			fmt.Println(line)
-		}
 		return fmt.Errorf("when waiting for command to exit: %w", err)
 	}
 	srv.controlModeClient = nil
@@ -72,7 +69,7 @@ func (srv *Server) StopControlMode() error {
 }
 
 func (client *controlModeClient) sendCommand(c cmd) ([]string, error) {
-	client.log = append(client.log, fmt.Sprintf("COMMAND> %s", c.String()))
+	slog.Debug(fmt.Sprintf("COMMAND> %s", c.String()))
 	_, err := client.controlModeStdIn.Write([]byte(c.String() + "\n"))
 	if err != nil {
 		return nil, fmt.Errorf("Failed to write to stdin: %w", err)
@@ -82,12 +79,13 @@ func (client *controlModeClient) sendCommand(c cmd) ([]string, error) {
 
 func (client *controlModeClient) readMessage() ([]string, error) {
 	readState := "before"
+	slog.Debug("READING")
 	out := make([]string, 0)
 	for {
 		outLine, err := client.controlModeStdOut.ReadString('\n')
-		client.log = append(client.log, outLine)
+		slog.Debug(outLine)
 		if err == io.EOF {
-			return nil, nil
+			break
 		}
 		if err != nil {
 			return nil, err

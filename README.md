@@ -21,6 +21,7 @@ tmixer is a feature rich and very fast [tmux](https://github.com/tmux/tmux) sess
 After installing tmixer just add the following to you tmux.config:
 ```
 bind s display-popup -E "tmixer"
+bind r run-shell "tmixer reset"
 ```
 
 Now hitting `leader - s` will open a fzf window listing all your projects, both with active 
