@@ -153,17 +153,17 @@ func TestListIncludesAllSessions(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmux.Server) {
+	f := func(srv *tmux.Server) {
 		for i := range n {
-			tmux.New("test-" + strconv.Itoa(i))
+			srv.New("test-" + strconv.Itoa(i))
 		}
-		projects, err := List(tmux, config)
+		projects, err := List(srv, config)
 		if err != nil {
 			t.Fatal(err)
 		}
 		projectNames := map[string]bool{}
 		for _, p := range projects {
-			if p.server != tmux {
+			if p.server != srv {
 				t.Fatal("Should always attach server")
 			}
 			if projectNames[p.Name] {

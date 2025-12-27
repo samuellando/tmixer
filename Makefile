@@ -16,7 +16,7 @@ check-fmt:
 	test -z "$$(gofmt -l .)"
 
 test:
-	go test ./...
+	go test -count=1 ./...
 
 clean:
 	go clean

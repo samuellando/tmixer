@@ -13,7 +13,7 @@ func TestKill(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		w, err := s.NewWindow("test-window", "sh")
+		w, err := s.NewWindow("test-window")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -48,7 +48,7 @@ func TestKill(t *testing.T) {
 func TestWindowName(t *testing.T) {
 	f := func(tmux *tmux.Server) {
 		s, _ := tmux.New("test_ses")
-		w, _ := s.NewWindow("test_window", "sh")
+		w, _ := s.NewWindow("test_window")
 		res, err := w.Name()
 		if err != nil {
 			t.Fatal(err)

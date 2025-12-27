@@ -61,9 +61,9 @@ func TestGetSessionWithNameFound(t *testing.T) {
 }
 
 func TestGetSessionWithNameNotFound(t *testing.T) {
-	f := func(tmux *tmux.Server) {
+	f := func(s *tmux.Server) {
 		name := "test_session"
-		_, err := tmux.GetSessionWithName(name)
+		_, err := s.GetSessionWithName(name)
 		if err != tmux.ErrSessionNotFound {
 			t.Fatal(err)
 		}

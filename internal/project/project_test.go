@@ -1,6 +1,7 @@
 package project
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -292,11 +293,11 @@ func TestProjectStartStartupWindows(t *testing.T) {
 				StartupWindows: []config.WindowConfig{
 					{
 						Name:    "test1",
-						Command: "expr 5 \\* 5; sleep 100",
+						Command: "expr 5 \\* 5",
 					},
 					{
 						Name:    "test2",
-						Command: "expr 7 \\* 7; sleep 100",
+						Command: "expr 7 \\* 7",
 					},
 				},
 			},
@@ -340,11 +341,12 @@ func TestProjectStartStartupWindows(t *testing.T) {
 			t.Fatal("should have 1 pane")
 		}
 		out1, _ := panes1[0].Capture()
-		if !strings.Contains(out1[0], "25") {
+		fmt.Println(out1)
+		if !strings.Contains(strings.Join(out1, ""), "25") {
 			t.Fatal("Command1 did not run!")
 		}
 		out2, _ := panes2[0].Capture()
-		if !strings.Contains(out2[0], "49") {
+		if !strings.Contains(strings.Join(out2, ""), "49") {
 			t.Fatal("Command2 did not run!")
 		}
 	}
@@ -616,11 +618,11 @@ func TestProjectResetStartupWindows(t *testing.T) {
 			t.Fatal("should have 1 pane")
 		}
 		out1, _ := panes1[0].Capture()
-		if !strings.Contains(out1[0], "25") {
+		if !strings.Contains(strings.Join(out1, ""), "25") {
 			t.Fatal("Command1 did not run!")
 		}
 		out2, _ := panes2[0].Capture()
-		if !strings.Contains(out2[0], "49") {
+		if !strings.Contains(strings.Join(out2, ""), "49") {
 			t.Fatal("Command2 did not run!")
 		}
 	}

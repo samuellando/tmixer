@@ -1,7 +1,6 @@
 package tmux_test
 
 import (
-	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -146,9 +145,9 @@ func TestWorkingDirectory(t *testing.T) {
 	f := func(tmux *tmux.Server) {
 		name := "test_sess_name"
 		s, _ := tmux.New(name, dir)
-		s.NewWindow("a", "pwd; sleep 100")
-		s.NewWindow("b", "pwd; sleep 100")
-		s.NewWindow("c", "sh")
+		s.NewWindow("a")
+		s.NewWindow("b")
+		s.NewWindow("c")
 		windows, _ := s.Windows()
 		windows[0].Kill()
 		windows, _ = s.Windows()
@@ -162,7 +161,7 @@ func TestWorkingDirectory(t *testing.T) {
 			panes[0].Split()
 			panes, _ = w.Panes()
 			for _, p := range panes {
-				p.SendKeys("pwd; sleep 100")
+				p.SendKeys("pwd")
 			}
 		}
 		time.Sleep(1 * time.Second)
@@ -170,10 +169,7 @@ func TestWorkingDirectory(t *testing.T) {
 			panes, _ := w.Panes()
 			for _, p := range panes {
 				out, _ := p.Capture()
-				for _, l := range out {
-					fmt.Println(l)
-				}
-				if !strings.Contains(strings.Join(out, " "), dir) {
+				if !strings.Contains(strings.Join(out, ""), dir) {
 					t.Fatal("not temp dir")
 				}
 			}

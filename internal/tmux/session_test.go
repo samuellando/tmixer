@@ -29,19 +29,19 @@ func TestCreateAndKill(t *testing.T) {
 }
 
 func TestListSessions(t *testing.T) {
-	f := func(tmux *tmux.Server) {
+	f := func(s *tmux.Server) {
 		n := 10
-		res, _ := tmux.ListSessions()
+		res, _ := s.ListSessions()
 		initialCount := len(res)
 		sessions := make([]*tmux.Session, n)
 		var err error
 		for i := range n {
-			sessions[i], err = tmux.New(fmt.Sprintf("test_session_%d", i))
+			sessions[i], err = s.New(fmt.Sprintf("test_session_%d", i))
 			if err != nil {
 				t.Fatal(err)
 			}
 		}
-		res, err = tmux.ListSessions()
+		res, err = s.ListSessions()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -65,14 +65,14 @@ func TestListSessions(t *testing.T) {
 }
 
 func TestWindows(t *testing.T) {
-	f := func(tmux *tmux.Server) {
+	f := func(srv *tmux.Server) {
 		n := 10
-		sessions, _ := tmux.ListSessions()
+		sessions, _ := srv.ListSessions()
 		s := sessions[0]
 		windows := make([]*tmux.Window, n)
 		var err error
 		for i := range n {
-			windows[i], err = s.NewWindow("test", "sh")
+			windows[i], err = s.NewWindow("test")
 			if err != nil {
 				t.Fatal(err)
 			}
