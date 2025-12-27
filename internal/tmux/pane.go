@@ -1,4 +1,4 @@
-package tmuxv2
+package tmux
 
 import (
 	"fmt"

@@ -1,14 +1,14 @@
-package tmuxv2_test
+package tmux_test
 
 import (
 	"testing"
 
 	"samuellando.com/tmixer/internal/testutil"
-	"samuellando.com/tmixer/internal/tmuxv2"
+	"samuellando.com/tmixer/internal/tmux"
 )
 
 func TestSwitchAndClientSession(t *testing.T) {
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		s, _ := tmux.New("client_session")
 		tmux.New("client_session2")
 		s3, _ := tmux.New("client_session3")

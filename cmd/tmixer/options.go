@@ -5,7 +5,7 @@ import (
 	"strconv"
 
 	"samuellando.com/tmixer/internal/flags"
-	"samuellando.com/tmixer/internal/configv2"
+	"samuellando.com/tmixer/internal/config"
 )
 
 var (

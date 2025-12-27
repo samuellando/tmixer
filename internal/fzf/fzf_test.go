@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"samuellando.com/tmixer/internal/configv2"
-	"samuellando.com/tmixer/internal/projectv2"
+	"samuellando.com/tmixer/internal/config"
+	"samuellando.com/tmixer/internal/project"
 	"samuellando.com/tmixer/internal/testutil"
 )
 
@@ -61,7 +61,7 @@ func TestDisplayProjects(t *testing.T) {
  dog`
 
 
-	projects, _ := projectv2.List(tmux, config)
+	projects, _ := project.List(tmux, config)
 	for _, p := range projects {
 		switch p.Name {
 		case "cats":

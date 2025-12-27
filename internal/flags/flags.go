@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"samuellando.com/tmixer/internal/configv2"
+	"samuellando.com/tmixer/internal/config"
 )
 
 type Flag struct {

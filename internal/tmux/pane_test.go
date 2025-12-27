@@ -1,4 +1,4 @@
-package tmuxv2_test
+package tmux_test
 
 import (
 	"strings"
@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"samuellando.com/tmixer/internal/testutil"
-	"samuellando.com/tmixer/internal/tmuxv2"
+	"samuellando.com/tmixer/internal/tmux"
 )
 
 func TestSplit(t *testing.T) {
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		sessions, _ := tmux.ListSessions()
 		s := sessions[0]
 		windows, _ := s.Windows()
@@ -45,7 +45,7 @@ func TestSplit(t *testing.T) {
 }
 
 func TestSplitHorizontally(t *testing.T) {
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		sessions, _ := tmux.ListSessions()
 		s := sessions[0]
 		windows, _ := s.Windows()
@@ -78,7 +78,7 @@ func TestSplitHorizontally(t *testing.T) {
 }
 
 func TestSendKeysAndCapture(t *testing.T) {
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		sessions, _ := tmux.ListSessions()
 		s := sessions[0]
 		windows, _ := s.Windows()
@@ -103,7 +103,7 @@ func TestSendKeysAndCapture(t *testing.T) {
 }
 
 func TestPaneOptions(t *testing.T) {
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		name := "test_sess_name"
 		s, _ := tmux.New(name)
 		err := s.SetOption("@hello", "world")
@@ -124,7 +124,7 @@ func TestPaneOptions(t *testing.T) {
 }
 
 func TestPaneOptionsNotSet(t *testing.T) {
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		name := "test_sess_name"
 		s, _ := tmux.New(name)
 		windows, _ := s.Windows()
@@ -143,7 +143,7 @@ func TestWorkingDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(dir)
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		name := "test_sess_name"
 		s, _ := tmux.New(name, dir)
 		s.NewWindow("a", "pwd; sleep 100")

@@ -9,11 +9,11 @@ import (
 	"os/exec"
 	"strings"
 
-	"samuellando.com/tmixer/internal/configv2"
+	"samuellando.com/tmixer/internal/config"
 	"samuellando.com/tmixer/internal/flags"
 	"samuellando.com/tmixer/internal/fzf"
-	"samuellando.com/tmixer/internal/projectv2"
-	"samuellando.com/tmixer/internal/tmuxv2"
+	"samuellando.com/tmixer/internal/project"
+	"samuellando.com/tmixer/internal/tmux"
 )
 
 var ERR_NO_SELECTION = errors.New("No selection made")
@@ -62,18 +62,18 @@ func run(args []string, config *config.Config) error {
 		command = args[0]
 	}
 	if command == "notify-switch" {
-		if len(args) < 2 || args[1] == tmuxv2.CONTROL_SESSION_NAME {
+		if len(args) < 2 || args[1] == tmux.CONTROL_SESSION_NAME {
 			return nil
 		}
 	}
-	tmux := tmuxv2.Tmux()
+	tmux := tmux.Tmux()
 	tmux.StartControlMode()
 	defer tmux.StopControlMode()
-	projects, err := projectv2.List(tmux, config)
+	projects, err := project.List(tmux, config)
 	if err != nil {
 		return err
 	}
-	var selection *projectv2.Project
+	var selection *project.Project
 	if command == "start" {
 		if len(args) < 2 {
 			if config.DefaultProject != nil {
@@ -131,7 +131,7 @@ func run(args []string, config *config.Config) error {
 	return setupHooks(tmux)
 }
 
-func startClient(p *projectv2.Project) error {
+func startClient(p *project.Project) error {
 	if _, is_set := os.LookupEnv("TMUX"); is_set {
 		return fmt.Errorf("Already in TMUX")
 	}
@@ -152,7 +152,7 @@ func startClient(p *projectv2.Project) error {
 	return nil
 }
 
-func setupHooks(tmux *tmuxv2.Server) error {
+func setupHooks(tmux *tmux.Server) error {
 	cmd := `run-shell 'tmixer notify-switch #{session_name}'`
 	err := tmux.SetHook("client-session-changed[2000]", cmd)
 	if err != nil {
@@ -165,7 +165,7 @@ func setupHooks(tmux *tmuxv2.Server) error {
 	return nil
 }
 
-func disableHooks(tmux *tmuxv2.Server) error {
+func disableHooks(tmux *tmux.Server) error {
 	cmd := ``
 	err := tmux.SetHook("client-session-changed[2000]", cmd)
 	if err != nil {

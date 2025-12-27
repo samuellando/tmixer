@@ -1,4 +1,4 @@
-package projectv2
+package project
 
 import (
 	"os"
@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"samuellando.com/tmixer/internal/configv2"
+	"samuellando.com/tmixer/internal/config"
 	"samuellando.com/tmixer/internal/testutil"
-	"samuellando.com/tmixer/internal/tmuxv2"
+	"samuellando.com/tmixer/internal/tmux"
 )
 
 func TestProjectStatus(t *testing.T) {
@@ -19,7 +19,7 @@ func TestProjectStatus(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		projects, err := List(tmux, config)
 		if err != nil {
 			t.Fatal(err)
@@ -87,7 +87,7 @@ func TestProjectSession(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		projects, err := List(tmux, config)
 		if err != nil {
 			t.Fatal(err)
@@ -130,7 +130,7 @@ func TestProjectLastActivity(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		projects, err := List(tmux, config)
 		if err != nil {
 			t.Fatal(err)
@@ -178,7 +178,7 @@ func TestProjectSessionNotFound(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		projects, err := List(tmux, config)
 		if err != nil {
 			t.Fatal(err)
@@ -211,7 +211,7 @@ func TestProjectStart(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		projects, err := List(tmux, config)
 		if err != nil {
 			t.Fatal(err)
@@ -255,7 +255,7 @@ func TestProjectAlreadyStarted(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		projects, err := List(tmux, config)
 		if err != nil {
 			t.Fatal(err)
@@ -302,7 +302,7 @@ func TestProjectStartStartupWindows(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		projects, err := List(tmux, config)
 		if err != nil {
 			t.Fatal(err)
@@ -360,7 +360,7 @@ func TestProjectStop(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		projects, err := List(tmux, config)
 		if err != nil {
 			t.Fatal(err)
@@ -402,7 +402,7 @@ func TestProjectSwitch(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		s, _ := tmux.New("ses-1")
 		f := testutil.SetupTestClient(tmux, s)
 		defer f.Close()
@@ -445,7 +445,7 @@ func TestProjectSwitchCommands(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		s, _ := tmux.New("ses-1")
 		f := testutil.SetupTestClient(tmux, s)
 		defer f.Close()
@@ -489,7 +489,7 @@ func TestProjectRunSwitchCommands(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		s, _ := tmux.New("ses-1")
 		f := testutil.SetupTestClient(tmux, s)
 		defer f.Close()
@@ -529,7 +529,7 @@ func TestProjectReset(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		projects, err := List(tmux, config)
 		if err != nil {
 			t.Fatal(err)
@@ -577,7 +577,7 @@ func TestProjectResetStartupWindows(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		projects, err := List(tmux, config)
 		if err != nil {
 			t.Fatal(err)
@@ -636,7 +636,7 @@ func TestProjectResetAttached(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		projects, err := List(tmux, config)
 		if err != nil {
 			t.Fatal(err)
@@ -684,7 +684,7 @@ func TestProjectResetAttachedSwitchCommands(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		projects, err := List(tmux, config)
 		if err != nil {
 			t.Fatal(err)

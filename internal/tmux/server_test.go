@@ -1,14 +1,14 @@
-package tmuxv2_test
+package tmux_test
 
 import (
 	"testing"
 	
-	"samuellando.com/tmixer/internal/tmuxv2"
+	"samuellando.com/tmixer/internal/tmux"
 	"samuellando.com/tmixer/internal/testutil"
 )
 
 func TestHasSession(t *testing.T) {
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		s, err := tmux.New("test_session")
 		if err != nil {
 			t.Fatal(err)
@@ -25,7 +25,7 @@ func TestHasSession(t *testing.T) {
 }
 
 func TestHasSessionWithName(t *testing.T) {
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		name := "test_session"
 		s, err := tmux.New(name)
 		if err != nil {
@@ -43,7 +43,7 @@ func TestHasSessionWithName(t *testing.T) {
 }
 
 func TestGetSessionWithNameFound(t *testing.T) {
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		name := "test_session"
 		s, err := tmux.New(name)
 		if err != nil {
@@ -61,10 +61,10 @@ func TestGetSessionWithNameFound(t *testing.T) {
 }
 
 func TestGetSessionWithNameNotFound(t *testing.T) {
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		name := "test_session"
 		_, err := tmux.GetSessionWithName(name)
-		if err != tmuxv2.ErrSessionNotFound {
+		if err != tmux.ErrSessionNotFound {
 			t.Fatal(err)
 		}
 	}

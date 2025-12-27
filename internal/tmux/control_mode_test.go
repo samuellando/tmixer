@@ -1,10 +1,10 @@
-package tmuxv2_test
+package tmux_test
 
 import (
 	"testing"
 	"time"
 	"samuellando.com/tmixer/internal/testutil"
-	"samuellando.com/tmixer/internal/tmuxv2"
+	"samuellando.com/tmixer/internal/tmux"
 )
 
 func TestStartStopControlMode(t *testing.T) {
@@ -20,7 +20,7 @@ func TestStartStopControlMode(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if tmux.HasSessionWithName(tmuxv2.CONTROL_SESSION_NAME) {
+	if tmux.HasSessionWithName(tmux.CONTROL_SESSION_NAME) {
 		t.Fatal("CONTROL_SESSION_NAME detected")
 	}
 }
@@ -29,10 +29,10 @@ func TestStartStopControlModeSimul(t *testing.T) {
 	tmux := testutil.SetupTestServer(t)
 	defer testutil.TeardownTestServer(tmux)
 	n := 10
-	servers := make([]*tmuxv2.Server, n)
+	servers := make([]*tmux.Server, n)
 	var err error
 	for i := range n {
-		servers[i] = tmuxv2.Tmux(tmux.SocketPath)
+		servers[i] = tmux.Tmux(tmux.SocketPath)
 		servers[i].StartControlMode()
 		if err != nil {
 			t.Fatal(err)
@@ -44,7 +44,7 @@ func TestStartStopControlModeSimul(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if tmux.HasSessionWithName(tmuxv2.CONTROL_SESSION_NAME) {
+	if tmux.HasSessionWithName(tmux.CONTROL_SESSION_NAME) {
 		t.Fatal("CONTROL_SESSION_NAME detected")
 	}
 }
@@ -58,7 +58,7 @@ func TestRunCommand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !tmux.HasSessionWithName(tmuxv2.CONTROL_SESSION_NAME) {
+	if !tmux.HasSessionWithName(tmux.CONTROL_SESSION_NAME) {
 		t.Fatal("CONTROL_SESSION_NAME not detected")
 	}
 }

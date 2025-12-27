@@ -1,4 +1,4 @@
-package projectv2
+package project
 
 import (
 	"os"
@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"testing"
 
-	"samuellando.com/tmixer/internal/configv2"
+	"samuellando.com/tmixer/internal/config"
 	"samuellando.com/tmixer/internal/testutil"
-	"samuellando.com/tmixer/internal/tmuxv2"
+	"samuellando.com/tmixer/internal/tmux"
 )
 
 func TestListAddsFields(t *testing.T) {
@@ -19,7 +19,7 @@ func TestListAddsFields(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		tmux.New("test-session")
 		projects, err := List(tmux, config)
 		if err != nil {
@@ -65,7 +65,7 @@ func TestListIncludesAllProjects(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		projects, err := List(tmux, config)
 		if err != nil {
 			t.Fatal(err)
@@ -106,7 +106,7 @@ func TestListIncludesAllSubDirProjects(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		projects, err := List(tmux, config)
 		if err != nil {
 			t.Fatal(err)
@@ -153,7 +153,7 @@ func TestListIncludesAllSessions(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		for i := range n {
 			tmux.New("test-" + strconv.Itoa(i))
 		}
@@ -174,7 +174,7 @@ func TestListIncludesAllSessions(t *testing.T) {
 		if !projectNames["bin"] {
 			t.Fatal("bin should be there")
 		}
-		if projectNames[tmuxv2.CONTROL_SESSION_NAME] {
+		if projectNames[tmux.CONTROL_SESSION_NAME] {
 			t.Fatal("Should not list the control session")
 		}
 		for i := range n {
@@ -198,7 +198,7 @@ func TestListMatchesExistingSessions(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		for i := range n {
 			tmux.New("test-" + strconv.Itoa(i))
 		}
@@ -253,7 +253,7 @@ func TestListNoProjects(t *testing.T) {
 	config := &config.Config{
 		Projects: nil,
 	}
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		projects, err := List(tmux, config)
 		if err != nil {
 			t.Fatal(err)

@@ -1,16 +1,16 @@
-package projectv2
+package project
 
 import (
 	"fmt"
 	"os"
 	"path/filepath"
 
-	"samuellando.com/tmixer/internal/configv2"
-	"samuellando.com/tmixer/internal/tmuxv2"
+	"samuellando.com/tmixer/internal/config"
+	"samuellando.com/tmixer/internal/tmux"
 )
 
 
-func List(tmux *tmuxv2.Server, config *config.Config) ([]*Project, error) {
+func List(tmux *tmux.Server, config *config.Config) ([]*Project, error) {
 	projects := listBareProjects(config)
 	subDirProjects, err := listSubDirProjects(config)
 	if err != nil {
@@ -67,13 +67,13 @@ func listSubDirProjects(c *config.Config) ([]*Project, error) {
 	return projects, nil
 }
 
-func listSessionsWithoutProject(tmux *tmuxv2.Server, configProjects []*Project) ([]*Project, error) {
+func listSessionsWithoutProject(s *tmux.Server, configProjects []*Project) ([]*Project, error) {
 	projects := make([]*Project, 0)
 	sessionsMatched := make(map[string]bool)
 	for _, project := range configProjects {
 		sessionsMatched[project.TmuxSessionName()] = true
 	}
-	sessions, err := tmux.ListSessions()
+	sessions, err := s.ListSessions()
 	if err != nil {
 		return configProjects, fmt.Errorf("when listing sessions for project list: %w", err)
 	}
@@ -82,11 +82,11 @@ func listSessionsWithoutProject(tmux *tmuxv2.Server, configProjects []*Project) 
 		if err != nil {
 			return configProjects, fmt.Errorf("when getting session name for project list: %w", err)
 		}
-		if name == tmuxv2.CONTROL_SESSION_NAME {
+		if name == tmux.CONTROL_SESSION_NAME {
 			continue
 		}
 		if _, ok := sessionsMatched[name]; !ok {
-			project := &Project{Name: name, server: tmux}
+			project := &Project{Name: name, server: s}
 			projects = append(projects, project)
 		}
 	}

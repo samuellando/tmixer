@@ -1,15 +1,15 @@
-package tmuxv2_test
+package tmux_test
 
 import (
 	"fmt"
 	"testing"
 
-	"samuellando.com/tmixer/internal/tmuxv2"
+	"samuellando.com/tmixer/internal/tmux"
 	"samuellando.com/tmixer/internal/testutil"
 )
 
 func TestCreateAndKill(t *testing.T) {
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		s, err := tmux.New("test_session")
 		if err != nil {
 			t.Fatal(err)
@@ -29,11 +29,11 @@ func TestCreateAndKill(t *testing.T) {
 }
 
 func TestListSessions(t *testing.T) {
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		n := 10
 		res, _ := tmux.ListSessions()
 		initialCount := len(res)
-		sessions := make([]*tmuxv2.Session, n)
+		sessions := make([]*tmux.Session, n)
 		var err error
 		for i := range n {
 			sessions[i], err = tmux.New(fmt.Sprintf("test_session_%d", i))
@@ -65,11 +65,11 @@ func TestListSessions(t *testing.T) {
 }
 
 func TestWindows(t *testing.T) {
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		n := 10
 		sessions, _ := tmux.ListSessions()
 		s := sessions[0]
-		windows := make([]*tmuxv2.Window, n)
+		windows := make([]*tmux.Window, n)
 		var err error
 		for i := range n {
 			windows[i], err = s.NewWindow("test", "sh")
@@ -101,7 +101,7 @@ func TestWindows(t *testing.T) {
 }
 
 func TestSessionName(t *testing.T) {
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		name := "test_sess_name"
 		s, _ := tmux.New(name)
 		res, err := s.Name()
@@ -116,7 +116,7 @@ func TestSessionName(t *testing.T) {
 }
 
 func TestSessionLastActivity(t *testing.T) {
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		s1, _ := tmux.New("s1")
 		s2, _ := tmux.New("s2")
 		t1, err := s1.LastActivity()
@@ -135,7 +135,7 @@ func TestSessionLastActivity(t *testing.T) {
 }
 
 func TestOptions(t *testing.T) {
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		name := "test_sess_name"
 		s, _ := tmux.New(name)
 		err := s.SetOption("@hello", "world")
@@ -154,7 +154,7 @@ func TestOptions(t *testing.T) {
 }
 
 func TestOptionsNotSet(t *testing.T) {
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		name := "test_sess_name"
 		s, _ := tmux.New(name)
 		_, err := s.GetOption("@hello")

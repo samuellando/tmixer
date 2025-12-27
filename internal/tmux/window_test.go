@@ -1,14 +1,14 @@
-package tmuxv2_test
+package tmux_test
 
 import (
 	"testing"
 
 	"samuellando.com/tmixer/internal/testutil"
-	"samuellando.com/tmixer/internal/tmuxv2"
+	"samuellando.com/tmixer/internal/tmux"
 )
 
 func TestKill(t *testing.T) {
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		s, err := tmux.New("test_session")
 		if err != nil {
 			t.Fatal(err)
@@ -46,7 +46,7 @@ func TestKill(t *testing.T) {
 }
 
 func TestWindowName(t *testing.T) {
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		s, _ := tmux.New("test_ses")
 		w, _ := s.NewWindow("test_window", "sh")
 		res, err := w.Name()
@@ -61,7 +61,7 @@ func TestWindowName(t *testing.T) {
 }
 
 func TestPanes(t *testing.T) {
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		s, _ := tmux.New("test_session")
 		windows, _ := s.Windows()
 		w := windows[0]
@@ -79,7 +79,7 @@ func TestPanes(t *testing.T) {
 }
 
 func TestLink(t *testing.T) {
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		s1, _ := tmux.New("test_session")
 		s2, _ := tmux.New("test_session2")
 		windows, _ := s1.Windows()
@@ -97,7 +97,7 @@ func TestLink(t *testing.T) {
 }
 
 func TestWindowOptions(t *testing.T) {
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		name := "test_sess_name"
 		s, _ := tmux.New(name)
 		err := s.SetOption("@hello", "world")
@@ -117,7 +117,7 @@ func TestWindowOptions(t *testing.T) {
 }
 
 func TestWindowOptionsNotSet(t *testing.T) {
-	f := func(tmux *tmuxv2.Server) {
+	f := func(tmux *tmux.Server) {
 		name := "test_sess_name"
 		s, _ := tmux.New(name)
 		windows, _ := s.Windows()

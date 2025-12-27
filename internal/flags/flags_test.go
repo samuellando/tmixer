@@ -3,7 +3,7 @@ package flags
 import (
 	"testing"
 
-	"samuellando.com/tmixer/internal/configv2"
+	"samuellando.com/tmixer/internal/config"
 )
 
 func TestParseArgs(t *testing.T) {

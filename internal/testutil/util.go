@@ -8,10 +8,10 @@ import (
 	"testing"
 
 	"github.com/creack/pty"
-	"samuellando.com/tmixer/internal/tmuxv2"
+	"samuellando.com/tmixer/internal/tmux"
 )
 
-func SetupTestClient(tmux *tmuxv2.Server, session *tmuxv2.Session) *os.File {
+func SetupTestClient(tmux *tmux.Server, session *tmux.Session) *os.File {
 	cmd := exec.Command("tmux", "-S", tmux.SocketPath, "-u", "attach", "-t", string(session.Id))
 	f, err := pty.Start(cmd)
 	if err != nil {
@@ -22,12 +22,12 @@ func SetupTestClient(tmux *tmuxv2.Server, session *tmuxv2.Session) *os.File {
 	return f
 }
 
-func SetupTestServer(t testing.TB) *tmuxv2.Server {
+func SetupTestServer(t testing.TB) *tmux.Server {
 	dir, err := os.MkdirTemp(os.TempDir(), "tmixer")
 	if err != nil {
 		t.Fatal(err)
 	}
-	tmux := tmuxv2.Tmux(fmt.Sprintf("%s/test.sock", dir))
+	tmux := tmux.Tmux(fmt.Sprintf("%s/test.sock", dir))
 	// Start one extra session so the server starts
 	_, err = tmux.New("default_test_session")
 	if err != nil {
@@ -36,7 +36,7 @@ func SetupTestServer(t testing.TB) *tmuxv2.Server {
 	return tmux
 }
 
-func TeardownTestServer(s *tmuxv2.Server) {
+func TeardownTestServer(s *tmux.Server) {
 	path := s.SocketPath
 	dir := filepath.Dir(path)
 	err := s.Kill()
@@ -51,7 +51,7 @@ func TeardownTestServer(s *tmuxv2.Server) {
 	}
 }
 
-func RunWithAndWithoutControlMode(f func (tmux *tmuxv2.Server), t *testing.T) {
+func RunWithAndWithoutControlMode(f func (tmux *tmux.Server), t *testing.T) {
 	tmux := SetupTestServer(t)
 	f(tmux)
 	TeardownTestServer(tmux)
