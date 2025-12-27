@@ -12,6 +12,9 @@ install:
 fmt:
 	go fmt ./...
 
+check-fmt:
+	test -z "$$(gofmt -l .)"
+
 test:
 	go test ./...
 
