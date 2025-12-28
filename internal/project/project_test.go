@@ -1,7 +1,6 @@
 package project
 
 import (
-	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -286,6 +285,8 @@ func TestProjectAlreadyStarted(t *testing.T) {
 }
 
 func TestProjectStartStartupWindows(t *testing.T) {
+	c1 := "expr 5 \\* 5"
+	c2 := "expr 7 \\* 7"
 	config := &config.Config{
 		Projects: map[string]*config.ProjectConfig{
 			"bin": {
@@ -293,11 +294,11 @@ func TestProjectStartStartupWindows(t *testing.T) {
 				StartupWindows: []config.WindowConfig{
 					{
 						Name:    "test1",
-						Command: "expr 5 \\* 5",
+						Command: &c1,
 					},
 					{
 						Name:    "test2",
-						Command: "expr 7 \\* 7",
+						Command: &c2,
 					},
 				},
 			},
@@ -341,7 +342,6 @@ func TestProjectStartStartupWindows(t *testing.T) {
 			t.Fatal("should have 1 pane")
 		}
 		out1, _ := panes1[0].Capture()
-		fmt.Println(out1)
 		if !strings.Contains(strings.Join(out1, ""), "25") {
 			t.Fatal("Command1 did not run!")
 		}
@@ -351,7 +351,134 @@ func TestProjectStartStartupWindows(t *testing.T) {
 		}
 	}
 	testutil.RunWithAndWithoutControlMode(f, t)
+}
 
+func TestProjectStartStartupPanes(t *testing.T) {
+	c1 := "expr 5 \\* 5"
+	c2 := "expr 7 \\* 7"
+	config := &config.Config{
+		Projects: map[string]*config.ProjectConfig{
+			"bin": {
+				Directory: "/home/test/bin",
+				StartupWindows: []config.WindowConfig{
+					{
+						Name: "test1",
+						Panes: []config.PaneConfig{
+							{Command: &c1},
+							{Command: &c2},
+						},
+					},
+				},
+			},
+		},
+	}
+	f := func(tmux *tmux.Server) {
+		projects, err := List(tmux, config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var project *Project
+		for _, p := range projects {
+			if p.Name == "bin" {
+				project = p
+			}
+		}
+		if project == nil {
+			t.Fatal("bin project not listed")
+		}
+		s, err := project.Start()
+		if err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(time.Second)
+		windows, _ := s.Windows()
+		if len(windows) != 1 {
+			t.Fatal("Should have 1 window")
+		}
+		if name, _ := windows[0].Name(); name != "test1" {
+			t.Fatal("Should have test1 as window name")
+		}
+		panes1, _ := windows[0].Panes()
+		if len(panes1) != 2 {
+			t.Fatal("should have 2 pane2")
+		}
+		out1, _ := panes1[0].Capture()
+		if !strings.Contains(strings.Join(out1, ""), "25") {
+			t.Fatal("Command1 did not run!")
+		}
+		out2, _ := panes1[1].Capture()
+		if !strings.Contains(strings.Join(out2, ""), "49") {
+			t.Fatal("Command2 did not run!")
+		}
+	}
+	testutil.RunWithAndWithoutControlMode(f, t)
+}
+
+func TestProjectStartStartupPanesWithWindowCommand(t *testing.T) {
+	c1 := "expr 5 \\* 5"
+	c2 := "expr 7 \\* 7"
+	cw := "expr 9 \\* 9"
+	config := &config.Config{
+		Projects: map[string]*config.ProjectConfig{
+			"bin": {
+				Directory: "/home/test/bin",
+				StartupWindows: []config.WindowConfig{
+					{
+						Name:    "test1",
+						Command: &cw,
+						Panes: []config.PaneConfig{
+							{Command: &c1},
+							{Command: &c2},
+						},
+					},
+				},
+			},
+		},
+	}
+	f := func(tmux *tmux.Server) {
+		projects, err := List(tmux, config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var project *Project
+		for _, p := range projects {
+			if p.Name == "bin" {
+				project = p
+			}
+		}
+		if project == nil {
+			t.Fatal("bin project not listed")
+		}
+		s, err := project.Start()
+		if err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(time.Second)
+		windows, _ := s.Windows()
+		if len(windows) != 1 {
+			t.Fatal("Should have 1 window")
+		}
+		if name, _ := windows[0].Name(); name != "test1" {
+			t.Fatal("Should have test1 as window name")
+		}
+		panes1, _ := windows[0].Panes()
+		if len(panes1) != 3 {
+			t.Fatal("should have 3 pane2")
+		}
+		out1, _ := panes1[0].Capture()
+		if !strings.Contains(strings.Join(out1, ""), "81") {
+			t.Fatal("Command1 did not run!")
+		}
+		out2, _ := panes1[1].Capture()
+		if !strings.Contains(strings.Join(out2, ""), "25") {
+			t.Fatal("Command2 did not run!")
+		}
+		out3, _ := panes1[2].Capture()
+		if !strings.Contains(strings.Join(out3, ""), "49") {
+			t.Fatal("Command2 did not run!")
+		}
+	}
+	testutil.RunWithAndWithoutControlMode(f, t)
 }
 
 func TestProjectStop(t *testing.T) {
@@ -561,6 +688,8 @@ func TestProjectReset(t *testing.T) {
 }
 
 func TestProjectResetStartupWindows(t *testing.T) {
+	c1 := "expr 5 \\* 5"
+	c2 := "expr 7 \\* 7"
 	config := &config.Config{
 		Projects: map[string]*config.ProjectConfig{
 			"bin": {
@@ -568,11 +697,11 @@ func TestProjectResetStartupWindows(t *testing.T) {
 				StartupWindows: []config.WindowConfig{
 					{
 						Name:    "test1",
-						Command: "expr 5 \\* 5; sleep 100",
+						Command: &c1,
 					},
 					{
 						Name:    "test2",
-						Command: "expr 7 \\* 7; sleep 100",
+						Command: &c2,
 					},
 				},
 			},

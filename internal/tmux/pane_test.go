@@ -76,6 +76,46 @@ func TestSplitHorizontally(t *testing.T) {
 	testutil.RunWithAndWithoutControlMode(f, t)
 }
 
+func TestKillPane(t *testing.T) {
+	f := func(tmux *tmux.Server) {
+		sessions, _ := tmux.ListSessions()
+		s := sessions[0]
+		windows, _ := s.Windows()
+		w := windows[0]
+		panes, _ := w.Panes()
+		if len(panes) != 1 {
+			t.Fatal("Should have one pane")
+		}
+		p := panes[0]
+		p2, err := p.SplitHorizontally()
+		if err != nil {
+			t.Fatal(err)
+		}
+		panes, _ = w.Panes()
+		if len(panes) != 2 {
+			t.Fatal("Should have two panes")
+		}
+		err = p.Kill()
+		if err != nil {
+			t.Fatal(err)
+		}
+		panes, _ = w.Panes()
+		if len(panes) != 1 {
+			t.Fatal("Should have one pane")
+		}
+		found := false
+		for _, pane := range panes {
+			if pane.Id == p2.Id {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatal("Pane not listed!")
+		}
+	}
+	testutil.RunWithAndWithoutControlMode(f, t)
+}
+
 func TestSendKeysAndCapture(t *testing.T) {
 	f := func(tmux *tmux.Server) {
 		sessions, _ := tmux.ListSessions()

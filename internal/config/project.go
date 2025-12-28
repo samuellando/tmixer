@@ -27,8 +27,14 @@ type ProjectConfig struct {
 }
 
 type WindowConfig struct {
-	Name    string
-	Command string
+	Name    string       `yaml:"name"`
+	Command *string      `yaml:"command"`
+	Panes   []PaneConfig `yaml:"panes"`
+}
+
+type PaneConfig struct {
+	Command *string `yaml:"command"`
+	Split   *string `yaml:"split"`
 }
 
 func New() *Config {

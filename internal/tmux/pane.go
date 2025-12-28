@@ -64,6 +64,11 @@ func (p *Pane) SplitHorizontally() (*Pane, error) {
 	return &Pane{Id: id, server: p.server}, err
 }
 
+func (p *Pane) Kill() error {
+	_, err := p.server.command("kill-pane").withTargetPane(p).run()
+	return err
+}
+
 func (p *Pane) SendKeys(keys string) error {
 	_, err := p.server.command("send-keys").withTargetPane(p).withArgument(keys).withArgument("enter").run()
 	return err

@@ -103,15 +103,9 @@ func (p *Project) createStartupWindows(s *tmux.Session) error {
 			if err != nil {
 				return fmt.Errorf("when creating window: %w", err)
 			}
-			if windowConfig.Command != "" {
-				panes, err := w.Panes()
-				if err != nil {
-					return fmt.Errorf("when creating window, getting window pane: %w", err)
-				}
-				err = panes[0].SendKeys(windowConfig.Command)
-				if err != nil {
-					return fmt.Errorf("when creating window, sending command: %w", err)
-				}
+			err = setupWindow(w, windowConfig)
+			if err != nil {
+				return err
 			}
 		}
 		windows, err := s.Windows()
@@ -125,6 +119,54 @@ func (p *Project) createStartupWindows(s *tmux.Session) error {
 		err = windows[1].Select()
 		if err != nil {
 			return fmt.Errorf("when switching to the first window: %w", err)
+		}
+	}
+	return nil
+}
+
+func setupWindow(w *tmux.Window, config config.WindowConfig) error {
+	if config.Command == nil && len(config.Panes) == 0 {
+		return nil
+	}
+	panes, err := w.Panes()
+	if err != nil {
+		return fmt.Errorf("when creating window, getting window pane: %w", err)
+	}
+	firstPane := panes[0]
+	keepalive := false
+	if config.Command != nil {
+		keepalive = true
+		err = firstPane.SendKeys(*config.Command)
+		if err != nil {
+			return fmt.Errorf("when creating window, sending command: %w", err)
+		}
+	}
+	lastPane := firstPane
+	for _, pane := range config.Panes {
+		var p *tmux.Pane
+		if pane.Split == nil || strings.ToLower((*pane.Split)[:1]) == "h" {
+			p, err = lastPane.SplitHorizontally()
+			if err != nil {
+				return fmt.Errorf("when creating pane: %w", err)
+			}
+		} else {
+			p, err = lastPane.Split()
+			if err != nil {
+				return fmt.Errorf("when creating pane: %w", err)
+			}
+		}
+		if pane.Command != nil {
+			err = p.SendKeys(*pane.Command)
+			if err != nil {
+				return fmt.Errorf("when creating pane, sending command: %w", err)
+			}
+		}
+		lastPane = p
+	}
+	if !keepalive {
+		err = firstPane.Kill()
+		if err != nil {
+			return fmt.Errorf("when creating window, killing the initial pane: %w", err)
 		}
 	}
 	return nil

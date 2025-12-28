@@ -21,8 +21,7 @@ func SetupTestClient(tmux *tmux.Server, session *tmux.Session) *os.File {
 	// Read a single byte, waiting for the proccess to actually start
 	time.Sleep(time.Second)
 	buff := make([]byte, 100)
-	n, err := f.Read(buff)
-	fmt.Println(string(buff[:n]))
+	_, err = f.Read(buff)
 	if err != nil {
 		panic(err)
 	}
