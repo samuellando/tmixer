@@ -55,7 +55,7 @@ func listSubDirProjects(c *config.Config) ([]*Project, error) {
 					project := &Project{Name: subName, Config: &config.ProjectConfig{
 						Directory:      filepath.Join(projectConfig.Directory, f.Name()),
 						SubDirectories: false,
-						StartupWindows: projectConfig.StartupWindows,
+						Windows:        projectConfig.Windows,
 						SwitchCommands: projectConfig.SwitchCommands,
 					}}
 					projects = append(projects, project)

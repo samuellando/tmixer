@@ -22,7 +22,7 @@ type Config struct {
 type ProjectConfig struct {
 	Directory      string         `yaml:"directory"`
 	SubDirectories bool           `yaml:"subDirectories"`
-	StartupWindows []WindowConfig `yaml:"startupWindows"`
+	Windows        []WindowConfig `yaml:"windows"`
 	SwitchCommands []string       `yaml:"switchCommands"`
 }
 

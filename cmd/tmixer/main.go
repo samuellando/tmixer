@@ -124,8 +124,8 @@ func runTmixer(args []string, config *config.Config) error {
 		err = startClient(selection)
 	case "switch":
 		err = selection.Switch()
-	case "stop":
-		err = selection.Stop()
+	case "kill":
+		err = selection.Kill()
 	case "reset":
 		_, err = selection.Reset()
 	case "notify-switch":
@@ -231,11 +231,11 @@ switch (default)
 start
 	Equivalent to starting tmux normally, but will open into a project.
 
-stop
+kill
 	kill the session/project.
 
 reset
-	stop and restart the project session.
+	kill and restart the project session.
 
 notify-switch 
 	Internal command used to hook into tmux for when it switches session.

@@ -63,8 +63,8 @@ func TestProjectStatus(t *testing.T) {
 		if status != PROJECT_STATUS_ATTACHED {
 			t.Fatal("Project should have attached status")
 		}
-		// After we stop should be inactive again
-		err = project.Stop()
+		// After we kill should be inactive again
+		err = project.Kill()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -73,7 +73,7 @@ func TestProjectStatus(t *testing.T) {
 			t.Fatal(err)
 		}
 		if status != PROJECT_STATUS_INACTIVE {
-			t.Fatal("Project should have inactive status after stop")
+			t.Fatal("Project should have inactive status after kill")
 		}
 	}
 	testutil.RunWithAndWithoutControlMode(f, t)
@@ -284,14 +284,14 @@ func TestProjectAlreadyStarted(t *testing.T) {
 	testutil.RunWithAndWithoutControlMode(f, t)
 }
 
-func TestProjectStartStartupWindows(t *testing.T) {
+func TestProjectStartWindows(t *testing.T) {
 	c1 := "expr 5 \\* 5"
 	c2 := "expr 7 \\* 7"
 	config := &config.Config{
 		Projects: map[string]*config.ProjectConfig{
 			"bin": {
 				Directory: "/home/test/bin",
-				StartupWindows: []config.WindowConfig{
+				Windows: []config.WindowConfig{
 					{
 						Name:    "test1",
 						Command: &c1,
@@ -353,14 +353,14 @@ func TestProjectStartStartupWindows(t *testing.T) {
 	testutil.RunWithAndWithoutControlMode(f, t)
 }
 
-func TestProjectStartStartupPanes(t *testing.T) {
+func TestProjectStartPanes(t *testing.T) {
 	c1 := "expr 5 \\* 5"
 	c2 := "expr 7 \\* 7"
 	config := &config.Config{
 		Projects: map[string]*config.ProjectConfig{
 			"bin": {
 				Directory: "/home/test/bin",
-				StartupWindows: []config.WindowConfig{
+				Windows: []config.WindowConfig{
 					{
 						Name: "test1",
 						Panes: []config.PaneConfig{
@@ -414,7 +414,7 @@ func TestProjectStartStartupPanes(t *testing.T) {
 	testutil.RunWithAndWithoutControlMode(f, t)
 }
 
-func TestProjectStartStartupPanesWithWindowCommand(t *testing.T) {
+func TestProjectStartPanesWithWindowCommand(t *testing.T) {
 	c1 := "expr 5 \\* 5"
 	c2 := "expr 7 \\* 7"
 	cw := "expr 9 \\* 9"
@@ -422,7 +422,7 @@ func TestProjectStartStartupPanesWithWindowCommand(t *testing.T) {
 		Projects: map[string]*config.ProjectConfig{
 			"bin": {
 				Directory: "/home/test/bin",
-				StartupWindows: []config.WindowConfig{
+				Windows: []config.WindowConfig{
 					{
 						Name:    "test1",
 						Command: &cw,
@@ -481,7 +481,7 @@ func TestProjectStartStartupPanesWithWindowCommand(t *testing.T) {
 	testutil.RunWithAndWithoutControlMode(f, t)
 }
 
-func TestProjectStop(t *testing.T) {
+func TestProjectKill(t *testing.T) {
 	config := &config.Config{
 		Projects: map[string]*config.ProjectConfig{
 			"bin": {
@@ -511,7 +511,7 @@ func TestProjectStop(t *testing.T) {
 		if status != PROJECT_STATUS_ACTIVE {
 			t.Fatal("Project should be active")
 		}
-		err = project.Stop()
+		err = project.Kill()
 		status, err = project.Status()
 		if err != nil {
 			t.Fatal(err)
@@ -687,14 +687,14 @@ func TestProjectReset(t *testing.T) {
 	testutil.RunWithAndWithoutControlMode(f, t)
 }
 
-func TestProjectResetStartupWindows(t *testing.T) {
+func TestProjectResetWindows(t *testing.T) {
 	c1 := "expr 5 \\* 5"
 	c2 := "expr 7 \\* 7"
 	config := &config.Config{
 		Projects: map[string]*config.ProjectConfig{
 			"bin": {
 				Directory: "/home/test/bin",
-				StartupWindows: []config.WindowConfig{
+				Windows: []config.WindowConfig{
 					{
 						Name:    "test1",
 						Command: &c1,

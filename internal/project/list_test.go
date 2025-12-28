@@ -101,7 +101,7 @@ func TestListIncludesAllSubDirProjects(t *testing.T) {
 			"projects": {
 				Directory:      dir,
 				SubDirectories: true,
-				StartupWindows: []config.WindowConfig{{}, {}},
+				Windows:        []config.WindowConfig{{}, {}},
 				SwitchCommands: []string{"", ""},
 			},
 		},
@@ -132,7 +132,7 @@ func TestListIncludesAllSubDirProjects(t *testing.T) {
 				if p.Config.Directory != filepath.Join(dir, strconv.Itoa(i)) {
 					t.Fatal("Directory should be the project dir itself")
 				}
-				if len(p.Config.StartupWindows) != 2 {
+				if len(p.Config.Windows) != 2 {
 					t.Fatal("Should share startup windows")
 				}
 				if len(p.Config.SwitchCommands) != 2 {

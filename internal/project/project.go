@@ -86,19 +86,19 @@ func (p *Project) Start() (*tmux.Session, error) {
 	if err != nil {
 		return nil, fmt.Errorf("when starting project: %w", err)
 	}
-	err = p.createStartupWindows(s)
+	err = p.createWindows(s)
 	if err != nil {
 		return nil, fmt.Errorf("when starting project: %w", err)
 	}
 	return s, nil
 }
 
-func (p *Project) createStartupWindows(s *tmux.Session) error {
+func (p *Project) createWindows(s *tmux.Session) error {
 	if p.Config == nil {
 		return nil
 	}
-	if len(p.Config.StartupWindows) > 0 {
-		for _, windowConfig := range p.Config.StartupWindows {
+	if len(p.Config.Windows) > 0 {
+		for _, windowConfig := range p.Config.Windows {
 			w, err := s.NewWindow(windowConfig.Name)
 			if err != nil {
 				return fmt.Errorf("when creating window: %w", err)
@@ -172,14 +172,14 @@ func setupWindow(w *tmux.Window, config config.WindowConfig) error {
 	return nil
 }
 
-func (p *Project) Stop() error {
+func (p *Project) Kill() error {
 	session, err := p.Session()
 	if err != nil {
-		return fmt.Errorf("when stoping the session: %w", err)
+		return fmt.Errorf("when killing the session: %w", err)
 	}
 	err = session.Kill()
 	if err != nil {
-		return fmt.Errorf("when stoping the session: %w", err)
+		return fmt.Errorf("when killing the session: %w", err)
 	}
 	return nil
 }
@@ -261,9 +261,9 @@ func (p *Project) Reset() (*tmux.Session, error) {
 			return nil, fmt.Errorf("when switching to temp session: %w", err)
 		}
 	}
-	err = p.Stop()
+	err = p.Kill()
 	if err != nil {
-		return nil, fmt.Errorf("when stopping for reset: %w", err)
+		return nil, fmt.Errorf("when killing for reset: %w", err)
 	}
 	s, err := p.Start()
 	if err != nil {

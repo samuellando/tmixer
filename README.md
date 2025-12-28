@@ -51,11 +51,11 @@ switch (default)
 start
         Equivalent to starting tmux normally, but will open into a project.
 
-stop
+kill
         kill the session/project.
 
 reset
-        stop and restart the project session.
+        kill and restart the project session.
 
 notify-switch
         Internal command used to hook into tmux for when it switches session.
@@ -103,7 +103,7 @@ projects:
     directory: "~/Projects"
     subDirectories: true
 
-    startupWindows:
+    windows:
       - name: "nvim"
         command: "nvim ."
 
