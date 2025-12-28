@@ -1,12 +1,15 @@
 package fzf
 
 import (
+	"sort"
 	"strings"
 	"testing"
 
 	"samuellando.com/tmixer/internal/config"
 	"samuellando.com/tmixer/internal/project"
 	"samuellando.com/tmixer/internal/testutil"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 type testWriter struct {
@@ -31,22 +34,22 @@ func TestDisplayProjects(t *testing.T) {
 	config := &config.Config{
 		Projects: map[string]*config.ProjectConfig{
 			"dogs": {
-				Directory: "/home/test/bin",
+				Directory: "/home/test/bin1",
 			},
 			"bin": {
-				Directory: "/home/test/bin",
+				Directory: "/home/test/bin2",
 			},
 			"cats": {
-				Directory: "/home/test/bin",
+				Directory: "/home/test/bin3",
 			},
 			"dog": {
-				Directory: "/home/test/bin",
+				Directory: "/home/test/bin4",
 			},
 			"zzz": {
-				Directory: "/home/test/bin",
+				Directory: "/home/test/bin5",
 			},
 			"cat": {
-				Directory: "/home/test/bin",
+				Directory: "/home/test/bin6",
 			},
 		},
 	}
@@ -60,7 +63,16 @@ func TestDisplayProjects(t *testing.T) {
  cat
  dog`
 
-	projects, _ := project.List(tmux, config)
+	projects, err := project.List(tmux, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Slice(projects, func(i, j int) bool {
+		if projects[i].Config != nil && projects[j].Config != nil {
+			return projects[i].Config.Directory < projects[j].Config.Directory
+		}
+		return false
+	})
 	for _, p := range projects {
 		switch p.Name {
 		case "cats":
@@ -73,11 +85,12 @@ func TestDisplayProjects(t *testing.T) {
 		}
 	}
 	w := &testWriter{}
-	err := displayProjects(projects, w)
+	err = displayProjects(projects, w)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.TrimSpace(w.b.String()) != expected {
-		t.Fatalf("\n%s\n!=\n%s", w.b.String(), expected)
+
+	if diff := cmp.Diff(strings.TrimSpace(w.b.String()), expected); diff != "" {
+		t.Fatal(diff)
 	}
 }
