@@ -7,26 +7,28 @@ import (
 	"sort"
 	"strings"
 
+	"samuellando.com/tmixer/internal/config"
 	"samuellando.com/tmixer/internal/project"
 )
 
-func PickProject(projects []*project.Project) (*project.Project, error) {
+func PickProject(config *config.Config,  projects []*project.Project) (*project.Project, error) {
 	input := projects
 	projects = make([]*project.Project, len(input))
 	copy(projects, input)
-	cmd := exec.Command("fzf", "--ansi")
+	cmd := exec.Command("fzf", config.FzfFlags...)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, fmt.Errorf("while opening stdin pipe to fzf: %w", err)
 	}
 	result := make(chan error)
 	go func() {
-		err := displayProjects(projects, stdin)
+		err := DisplayProjects(projects, stdin)
+		stdin.Close()
 		result <- err
 	}()
-	out, err := cmd.Output()
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fzf command error: %w %s", err, string(out))
 	}
 	if err = <-result; err != nil {
 		return nil, err

@@ -14,6 +14,7 @@ import (
 type Config struct {
 	DefaultProject  *string                   `yaml:"defaultProject"`
 	LogFile         *string                   `yaml:"logFile"`
+	FzfFlags        []string                  `yaml:"fzfFlags"`
 	ConfigFiles     []string                  `yaml:"configFiles"`
 	CombineProjects bool                      `yaml:"combineProjects"`
 	Projects        map[string]*ProjectConfig `yaml:"projects"`
@@ -41,6 +42,9 @@ func New() *Config {
 	return &Config{
 		DefaultProject:  nil,
 		LogFile:         nil,
+		FzfFlags:        []string{
+			"--ansi",
+		},
 		ConfigFiles:     []string{"~/.config/tmixer/config.yml", "~/.tmixer.yml"},
 		CombineProjects: true,
 		Projects:        make(map[string]*ProjectConfig),
