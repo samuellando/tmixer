@@ -30,12 +30,26 @@ func TestStartStopControlModeSimul(t *testing.T) {
 	var err error
 	for i := range n {
 		servers[i] = tmux.Tmux(s.SocketPath)
-		servers[i].StartControlMode()
+		err = servers[i].StartControlMode()
 		if err != nil {
 			t.Fatal(err)
 		}
+		sessions, err := servers[i].ListSessions()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(sessions) == 0 {
+			t.Fatal("expected some sessions")
+		}
 	}
 	for i := range n {
+		sessions, err := servers[i].ListSessions()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(sessions) == 0 {
+			t.Fatal("expected some sessions")
+		}
 		err = servers[i].StopControlMode()
 		if err != nil {
 			t.Fatal(err)

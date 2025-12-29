@@ -21,7 +21,7 @@ const CONTROL_SESSION_NAME = "__tmixer_control__"
 func (srv *Server) StartControlMode() error {
 	client := controlModeClient{}
 	cmd := srv.command("new-session")
-	cmd = cmd.withTmuxFlag("-C").withFlag("-A").withFlag("-D").withSession(CONTROL_SESSION_NAME)
+	cmd = cmd.withTmuxFlag("-C").withFlag("-A").withSession(CONTROL_SESSION_NAME)
 	// Escape and setup stdin and stdout
 	client.controlModeCmd = cmd.getExecCmd()
 	srv.controlModeClient = &client
