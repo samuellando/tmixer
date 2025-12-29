@@ -22,9 +22,10 @@ const (
 var ErrSessionNotFound = errors.New("session not found")
 
 type Project struct {
-	Name   string
-	Config *config.ProjectConfig
-	server *tmux.Server
+	Name       string
+	Config     *config.ProjectConfig
+	server     *tmux.Server
+	fullConfig *config.Config
 }
 
 func (p *Project) TmuxSessionName() string {
@@ -176,6 +177,29 @@ func (p *Project) Kill() error {
 	session, err := p.Session()
 	if err != nil {
 		return fmt.Errorf("when killing the session: %w", err)
+	}
+	status, err := p.Status()
+	if err != nil {
+		return fmt.Errorf("when killing the session: %w", err)
+	}
+	if status == PROJECT_STATUS_ATTACHED {
+		all, err := List(p.server, p.fullConfig)
+		if err != nil {
+			return fmt.Errorf("While listing projects before killing: %w", err)
+		}
+		err = sortProjects(p.fullConfig, all)
+		if err != nil {
+			return fmt.Errorf("While sorting projects before killing: %w", err)
+		}
+		for _, o := range all {
+			if o.Name != p.Name {
+				err = o.Switch()
+				if err != nil {
+					return fmt.Errorf("While switching project before killing: %w", err)
+				}
+				break
+			}
+		}
 	}
 	err = session.Kill()
 	if err != nil {

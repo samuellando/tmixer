@@ -801,6 +801,108 @@ func TestProjectResetAttached(t *testing.T) {
 	testutil.RunWithAndWithoutControlMode(f, t)
 }
 
+func TestProjectKillAttachedLastActive(t *testing.T) {
+	config := &config.Config{
+		Projects: map[string]*config.ProjectConfig{
+			"bin": {
+				Directory: "/home/test/bin",
+			},
+			"dog": {
+				Directory: "/home/test/bin",
+			},
+			"cat": {
+				Directory: "/home/test/bin",
+			},
+		},
+	}
+	f := func(srv *tmux.Server) {
+		projects, err := List(srv, config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var project *Project
+		var s1 *tmux.Session
+		var s2 *tmux.Session
+		for _, p := range projects {
+			if p.Name == "bin" {
+				project = p
+				s1, _ = p.Start()
+			}
+			if p.Name == "cat" {
+				s2, _ = p.Start()
+			}
+		}
+		f := testutil.SetupTestClient(srv, s1)
+		defer f.Close()
+		project.Kill()
+		client, _ := srv.ActiveClient()
+		cs, _ := client.Session()
+		if cs.Id != s2.Id {
+			t.Fatal("Should switch to the last active session")
+		}
+	}
+	testutil.RunWithAndWithoutControlMode(f, t)
+}
+
+func TestProjectKillAttachedDefault(t *testing.T) {
+	def := "cat"
+	config := &config.Config{
+		DefaultProject: &def,
+		Projects: map[string]*config.ProjectConfig{
+			"bin": {
+				Directory: "/home/test/bin",
+			},
+			"dog": {
+				Directory: "/home/test/bin",
+			},
+			"cat": {
+				Directory: "/home/test/bin",
+			},
+		},
+	}
+	f := func(srv *tmux.Server) {
+		projects, err := List(srv, config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var project *Project
+		var s1 *tmux.Session
+		for _, p := range projects {
+			if p.Name == "bin" {
+				project = p
+				s1, _ = p.Start()
+			}
+		}
+		// Kill the default test session
+		sessions, _ := srv.ListSessions()
+		for _, s := range sessions {
+			if s.Id != s1.Id {
+				name, _ := s.Name()
+				if name != tmux.CONTROL_SESSION_NAME {
+					s.Kill()
+				}
+			}
+
+		}
+		f := testutil.SetupTestClient(srv, s1)
+		defer f.Close()
+		project.Kill()
+		client, err := srv.ActiveClient()
+		if err != nil {
+			t.Fatal(err)
+		}
+		cs, err := client.Session()
+		if err != nil {
+			t.Fatal(err)
+		}
+		name, _ := cs.Name()
+		if name != def {
+			t.Fatalf("Should switch to the default project, got %s", name)
+		}
+	}
+	testutil.RunWithAndWithoutControlMode(f, t)
+}
+
 func TestProjectResetAttachedSwitchCommands(t *testing.T) {
 	dir, err := os.MkdirTemp(os.TempDir(), "tmixer-test-projects")
 	if err != nil {
