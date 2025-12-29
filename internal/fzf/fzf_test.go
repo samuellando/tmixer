@@ -12,18 +12,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-type testWriter struct {
-	b strings.Builder
-}
-
-func (w *testWriter) Write(p []byte) (int, error) {
-	return w.b.Write(p)
-}
-
-func (w *testWriter) Close() error {
-	return nil
-}
-
 func TestDisplayProjects(t *testing.T) {
 	// TODO: Sub dirs
 	tmux := testutil.SetupTestServer(t)
@@ -84,13 +72,13 @@ func TestDisplayProjects(t *testing.T) {
 			p.Switch()
 		}
 	}
-	w := &testWriter{}
-	err = displayProjects(projects, w)
+	w := &strings.Builder{}
+	err = DisplayProjects(projects, w)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if diff := cmp.Diff(strings.TrimSpace(w.b.String()), expected); diff != "" {
+	if diff := cmp.Diff(strings.TrimSpace(w.String()), expected); diff != "" {
 		t.Fatal(diff)
 	}
 }

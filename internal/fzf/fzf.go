@@ -11,7 +11,7 @@ import (
 	"samuellando.com/tmixer/internal/project"
 )
 
-func PickProject(config *config.Config,  projects []*project.Project) (*project.Project, error) {
+func PickProject(config *config.Config, projects []*project.Project) (*project.Project, error) {
 	input := projects
 	projects = make([]*project.Project, len(input))
 	copy(projects, input)
@@ -45,8 +45,7 @@ func PickProject(config *config.Config,  projects []*project.Project) (*project.
 	return nil, fmt.Errorf("No project selected")
 }
 
-func displayProjects(projects []*project.Project, stdin io.WriteCloser) error {
-	defer stdin.Close()
+func DisplayProjects(projects []*project.Project, w io.Writer) error {
 	var sortError error
 	sort.Slice(projects, func(i, j int) bool {
 		if sortError == nil {
@@ -67,7 +66,7 @@ func displayProjects(projects []*project.Project, stdin io.WriteCloser) error {
 		if err != nil {
 			return fmt.Errorf("while displaying project: %w", err)
 		}
-		io.WriteString(stdin, info+"\n")
+		io.WriteString(w, info+"\n")
 	}
 	return nil
 }

@@ -87,6 +87,8 @@ func runTmixer(args []string, config *config.Config) error {
 		}
 	} else {
 		switch command {
+		case "list":
+			return fzf.DisplayProjects(projects, os.Stdout)
 		case "start":
 			if config.DefaultProject != nil {
 				for _, p := range projects {
@@ -108,7 +110,7 @@ func runTmixer(args []string, config *config.Config) error {
 				}
 			}
 		default:
-			selection, _ = fzf.PickProject(projects)
+			selection, _ = fzf.PickProject(config, projects)
 		}
 
 	}
@@ -140,15 +142,18 @@ func runTmixer(args []string, config *config.Config) error {
 }
 
 func startClient(p *project.Project) error {
+	_, err := p.Start()
+	if err != nil {
+		return err
+	}
 	if _, is_set := os.LookupEnv("TMUX"); is_set {
 		return fmt.Errorf("Already in TMUX")
 	}
-	p.Start()
 	cmd := exec.Command("tmux", "-u", "attach", "-t", p.TmuxSessionName())
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	err := cmd.Start()
+	err = cmd.Start()
 	if err != nil {
 		return err
 	}

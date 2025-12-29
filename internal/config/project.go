@@ -40,10 +40,13 @@ type PaneConfig struct {
 
 func New() *Config {
 	return &Config{
-		DefaultProject:  nil,
-		LogFile:         nil,
-		FzfFlags:        []string{
+		DefaultProject: nil,
+		LogFile:        nil,
+		FzfFlags: []string{
 			"--ansi",
+			"--bind", "ctrl-k:execute(tmixer kill {2})+reload(tmixer list)",
+			"--bind", "ctrl-r:execute(tmixer reset {2})+reload(tmixer list)",
+			"--bind", "ctrl-s:execute(tmixer start {2})+reload(tmixer list)",
 		},
 		ConfigFiles:     []string{"~/.config/tmixer/config.yml", "~/.tmixer.yml"},
 		CombineProjects: true,
