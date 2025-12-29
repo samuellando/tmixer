@@ -222,29 +222,29 @@ func displayHelp() {
 Commands:
 
 All commands will by default open fzf if no project_name is provided. Except for 
-the start command, which will start the configued default project in a new tmux client.
+the start command, which will start the configued default project in a new tmux client, 
+and the reset command, which will reset the attached session.
 
 switch (default)
 	switch the active tmux client to the project. It will eitehr switch to the 
-	existing session and run it's configured switch comands or it will start
-	a session for the project, open it's configured startup windows and 
-	then switch to it.
+	existing session or start a session for the project, open it's configured 
+	startup windows and then switch to it.
 
-	Note that a projects switch commands are automatically run any time you switch 
+	After switching to a project/session, tmixer will run it's configured 
+	switch commands.
+
+	Note that a project's switch commands are automatically run any time you switch 
 	to the session in tmux, even without this command. For example with leader-b.
 
 start
-	Equivalent to starting tmux normally, but will open into a project.
+	Equivalent to starting tmux normally, but will open into a project. By
+	default it starts the defualt configured project.
 
 kill
 	kill the session/project.
 
 reset
-	kill and restart the project session.
-
-notify-switch 
-	Internal command used to hook into tmux for when it switches session.
-	tmixer automatically sets up the tmux hooks when it is run.
+	kill and restart the project session. By default will reset the attached session.
 
 Flags: `)
 	fmt.Println()

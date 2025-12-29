@@ -1,35 +1,62 @@
 <div align="center">
     <h1>tmixer</h1>
-    <p>v0.1.0-alpha</p>
+    <p>v0.2.0-alpha</p>
 </div>
 
 > [!NOTE]
-> Tmixer is currently in alpha phase. It's still not complete, and still mostly untested. I don't recommend using this just yet.
+> Tmixer is currently in alpha and there are no official releases yet. It's unstable and may change with any future releases.
 
-tmixer is a feature rich and very fast [tmux](https://github.com/tmux/tmux) sessionier written in go.
+## Overview
 
-- tmixer indexes all your projects, and allows you to quickly switch between tmux sessions created for them
-    - In the directory you want
-    - With the windows you want
-    - With any extra setup commands run every time you switch to the session
+tmixer is a feature rich and speedy [tmux](https://github.com/tmux/tmux) sessionier written in go.
+
+- tmixer allows you to configure your projects
+    - With the windows and panes you want to open when starting them in tmux
+    - Any extra setup commands you want to run every time you switch to them
+    - Any many other options...
+- tmixer then indexes all your projects, and allows you to quickly switch between tmux sessions created for them
 - tmixer is fast
-    - It communicates with tmux using control mode, and communicates with it using stream instead
-    of spwning a new process for each command.
+    - It communicates with tmux using control mode, using streams instead of spawning a new process for each command.
+
+## Dependencies
+
+- tmux
+- fzf
+
+## Installation
+
+Clone the repository and run `make install`
 
 ## Usage
 
 After installing tmixer just add the following to you tmux.config:
 ```
 bind s display-popup -E "tmixer"
-bind r run-shell "tmixer reset"
 ```
 
 Now hitting `leader - s` will open a fzf window listing all your projects, both with active 
-sessions and not.
+sessions and without. 
 
 Within this window, you can search for the project you want and press enter to switch to it.
 
+There are also some extra keybindings in this window:
+
+- `ctrl-k` will kill the active highlighted session with `tmixer kill`
+- `crtl-r` will call `tmixer reset` on the highlighted project
+- `crtl-s` will start the highlighted project with `tmixer start` but not switch to it
+
+
+Another useful thing to add your tmux config is the following
+```
+bind r run-shell "tmixer reset"
+````
+
+This will reset the currently attached project when pressing `leader-r`
+
 ### tmixer command
+
+While the primary interface with tmixer will be the popup window configured above,
+there is also a CLI.
 
 ```
 tmixer [flags] [command] [project_name]
@@ -37,68 +64,58 @@ tmixer [flags] [command] [project_name]
 Commands:
 
 All commands will by default open fzf if no project_name is provided. Except for
-the start command, which will start the configured default project in a new tmux client.
+the start command, which will start the configued default project in a new tmux client,
+and the reset command, which will reset the attached session.
 
 switch (default)
         switch the active tmux client to the project. It will eitehr switch to the
-        existing session and run it's configured switch comands or it will start
-        a session for the project, open it's configured startup windows and
-        then switch to it.
+        existing session or start a session for the project, open it's configured
+        startup windows and then switch to it.
 
-        Note that a projects switch commands are automatically run any time you switch
+        After switching to a project/session, tmixer will run it's configured
+        switch commands.
+
+        Note that a project's switch commands are automatically run any time you switch
         to the session in tmux, even without this command. For example with leader-b.
 
 start
-        Equivalent to starting tmux normally, but will open into a project.
+        Equivalent to starting tmux normally, but will open into a project. By
+        default it starts the defualt configured project.
 
 kill
         kill the session/project.
 
 reset
-        kill and restart the project session.
-
-notify-switch
-        Internal command used to hook into tmux for when it switches session.
-        tmixer automatically sets up the tmux hooks when it is run.
+        kill and restart the project session. By default will reset the attached session.
 
 Flags:
-
---log OR -l
-        Output logs to a file, for debug purposes
-        Usage: --log out.log, or -l out.log
-
---help OR -h
-        display a help message to stdout
-        Usage: --help or -h
-
---config OR -c
-        Provide an additional config file overriding global configs from ~/.tmixer.yml and ~/.config/tmixer/config.yml
-        Usage: --config config.yml or -c config.yml
-
---defaultProject
-        Set a default project for the start command, if none is passed
-        Usage: --defaultProject projects--tmixer
-
---combineProjects
-        Wheter projects from all config files should be combined or overridden, --config > ~/.tmixer.yml > ~/.config/tmixer/config.yml
-        Usage: --combineProjects false
-        Default: true
+    See the configuration section bellow
 ```
 
 ## Configuration
 
-Here is an example configuration:
+The tmixer configuration is where you specify all your projects, as well as some 
+other global options.
 
-`~/.tmixeryml` or `~/.config/tmixer/config.yml`
+This can be done in `~/.tmixer.yml`, `~/.config/tmixer/config.yml`  and/or any
+config files passed to the command line.
+
+Projects from all the config files will be combined unless the `combineProjects` 
+is set to `false`. Global options will be overriden in the following order 
+`configs passed to command line` overrides `~/.tmixer.yml` overrides `~/.config/tmixer/config.yml`
+
+Here is an example configuration:
 
 ```yml
 defaultProject: projects--dots
 
 projects:
-  # A standard project
+  home:
+    directory: "~/"
+
   bin:
     directory: "~/bin"
-  # This includes all sub directories as their own projects
+
   projects:
     directory: "~/Projects"
     subDirectories: true
@@ -109,18 +126,13 @@ projects:
 
       - name: "shell"
 
+      - name: logs 
+        command: "echo hello"
+        panes:
+          - command: "tail -f ~/.tmixer.yml"
+          - command: "ls ~/Documents"
+            split: "vert"
+
     switchCommands:
-      - "ln -sf /opy/core/usr $(pwd)"
+      - "ls"
 ```
-
-## Roadmap
-
-- Extra key bindings in the fzf window
-- Different fzfs 
-- Config panes
-- project level configs
-- TTL for sessions after which they are auto reset (based on the creation time)
-- Github projects
-- Github worktress
-- Preview window??
-- Fuzz test session names
