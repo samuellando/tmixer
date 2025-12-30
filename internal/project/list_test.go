@@ -1,6 +1,7 @@
 package project
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -11,252 +12,280 @@ import (
 	"samuellando.com/tmixer/internal/tmux"
 )
 
-func TestListAddsFields(t *testing.T) {
-	config := &config.Config{
-		Projects: map[string]*config.ProjectConfig{
-			"bin": {
-				Directory: "/home/test/bin",
-			},
-		},
-	}
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		srv.New("test-session")
-		projects, err := List(srv, config)
-		if err != nil {
-			t.Fatal(err)
-		}
-		matched_session := false
-		matched_bin := false
-		for _, p := range projects {
-			if p.server != srv {
-				t.Fatal("Should always attach server")
-			}
-			switch p.Name {
-			case "test-session":
-				if p.Config != nil {
-					t.Fatal("Should hgave nil config")
-				}
-				matched_session = true
-			case "bin":
-				if p.Config == nil {
-					t.Fatal("Should have config")
-				}
-				if p.Config.Directory != "/home/test/bin" {
-					t.Fatal("Should have correct directory")
-				}
-				matched_bin = true
-			}
-		}
-		if !matched_bin || !matched_session {
-			t.Fatal("Missing projects")
-		}
-	})
+type listTestCase struct {
+	config   *config.Config
+	projects []string
 }
 
-func TestListIncludesAllProjects(t *testing.T) {
-	config := &config.Config{
-		Projects: map[string]*config.ProjectConfig{
-			"bin": {
-				Directory: "/home/test/bin",
-			},
-			"projects": {
-				Directory: "/home/test/Projects",
-			},
-		},
-	}
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		projects, err := List(srv, config)
-		if err != nil {
-			t.Fatal(err)
-		}
-		projectNames := map[string]bool{}
-		for _, p := range projects {
-			projectNames[p.Name] = true
-		}
-		for cfgName := range config.Projects {
-			if !projectNames[cfgName] {
-				t.Errorf("Project %q missing from list", cfgName)
-			}
-		}
-	})
-}
-
-func TestListIncludesAllSubDirProjects(t *testing.T) {
+func setupListTest(t *testing.T) (string, []listTestCase) {
 	dir, err := os.MkdirTemp(os.TempDir(), "tmixer-test-projects")
-	defer os.RemoveAll(dir)
-	n := 100
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i := range 100 {
+	n := 10
+	for i := range n {
+		os.Mkdir(filepath.Join(dir, strconv.Itoa(i)), 0o700)
+		f, err := os.OpenFile(filepath.Join(dir, "file"+strconv.Itoa(i)), os.O_RDONLY|os.O_CREATE, 0o644)
+		if err != nil {
+			t.Error(err)
+		}
+		f.Close()
+	}
+
+	var testCases = []listTestCase{
+		{
+			config:   &config.Config{},
+			projects: []string{testutil.DEFAULT_TEST_SESSION},
+		},
+		{
+			config: &config.Config{
+				Projects: map[string]*config.ProjectConfig{
+					"bin": {
+						Directory: "/home/test/bin",
+					},
+				},
+			},
+			projects: []string{testutil.DEFAULT_TEST_SESSION, "bin"},
+		},
+		{
+			config: &config.Config{
+				Projects: map[string]*config.ProjectConfig{
+					"projects": {
+						Directory:      dir,
+						SubDirectories: true,
+					},
+				},
+			},
+			projects: []string{
+				testutil.DEFAULT_TEST_SESSION,
+				"projects--0",
+				"projects--1",
+				"projects--2",
+				"projects--3",
+				"projects--4",
+				"projects--5",
+				"projects--6",
+				"projects--7",
+				"projects--8",
+				"projects--9",
+			},
+		},
+		{
+			config: &config.Config{
+				Projects: map[string]*config.ProjectConfig{
+					"bin": {
+						Directory: "/home/test/bin",
+					},
+					"projects": {
+						Directory:      dir,
+						SubDirectories: true,
+					},
+				},
+			},
+			projects: []string{
+				testutil.DEFAULT_TEST_SESSION,
+				"bin",
+				"projects--0",
+				"projects--1",
+				"projects--2",
+				"projects--3",
+				"projects--4",
+				"projects--5",
+				"projects--6",
+				"projects--7",
+				"projects--8",
+				"projects--9",
+			},
+		},
+		{
+			config: &config.Config{
+				Projects: map[string]*config.ProjectConfig{
+					"hello...world": {
+						Directory: "/home/test/bin",
+					},
+				},
+			},
+			projects: []string{
+				testutil.DEFAULT_TEST_SESSION,
+				"hello...world",
+			},
+		},
+	}
+	return dir, testCases
+}
+
+func teardownListTest(t *testing.T, dir string) {
+	err := os.RemoveAll(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestListsAll(t *testing.T) {
+	dir, testCases := setupListTest(t)
+	defer teardownListTest(t, dir)
+	for _, tc := range testCases {
+		testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+			projects, err := List(srv, tc.config)
+			if err != nil {
+				t.Error(err)
+			}
+			if len(projects) != len(tc.projects) {
+				t.Errorf("Project list does not match expected len: %d != %d", len(projects), len(tc.projects))
+			}
+			matched := make(map[string]bool)
+			for _, p := range projects {
+				matched[p.Name] = true
+			}
+			for _, p := range tc.projects {
+				if !matched[p] {
+					t.Errorf("Project %s not listed", p)
+				}
+			}
+		})
+	}
+}
+
+func TestSetsFields(t *testing.T) {
+	dir, testCases := setupListTest(t)
+	defer teardownListTest(t, dir)
+	for _, tc := range testCases {
+		testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+			projects, err := List(srv, tc.config)
+			if err != nil {
+				t.Error(err)
+			}
+			for _, p := range projects {
+				if p.Name == "" {
+					t.Error("Project has empty name")
+				}
+				if p.Name == testutil.DEFAULT_TEST_SESSION {
+					if p.Config != nil {
+						t.Error("session project should not have config")
+					}
+				} else if p.Config == nil {
+					t.Error("Project has empty config")
+				}
+			}
+		})
+	}
+}
+
+func TestListIncludesAllSessions(t *testing.T) {
+	n := 10
+	dir, testCases := setupListTest(t)
+	defer teardownListTest(t, dir)
+	for _, tc := range testCases {
+		testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+			for i := range n {
+				srv.New("test-" + strconv.Itoa(i))
+			}
+			projects, err := List(srv, tc.config)
+			if err != nil {
+				t.Error(err)
+			}
+			if len(projects) != len(tc.projects)+n {
+				t.Errorf("Got incorrect number of projects: %d != %d + %d", len(projects), len(tc.projects), n)
+			}
+			matched := make(map[string]bool)
+			for _, p := range projects {
+				matched[p.Name] = true
+			}
+			for i := range n {
+				if !matched["test-"+strconv.Itoa(i)] {
+					t.Error("missing session project")
+				}
+			}
+		})
+	}
+}
+
+func TestListMatchesExistingSessions(t *testing.T) {
+	dir, testCases := setupListTest(t)
+	defer teardownListTest(t, dir)
+	for _, tc := range testCases {
+		testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+			projects, err := List(srv, tc.config)
+			if err != nil {
+				t.Error(err)
+			}
+			for _, p := range projects {
+				if p.Name != testutil.DEFAULT_TEST_SESSION {
+					_, err := srv.New(p.Name)
+					if err != nil {
+						t.Error(err)
+					}
+				}
+			}
+			projects, err = List(srv, tc.config)
+			if err != nil {
+				t.Error(err)
+			}
+			if len(projects) != len(tc.projects) {
+				t.Errorf("Project list does not match expected len: %d != %d", len(projects), len(tc.projects))
+			}
+			matched := make(map[string]bool)
+			for _, p := range projects {
+				matched[p.Name] = true
+			}
+			for _, p := range tc.projects {
+				if !matched[p] {
+					t.Errorf("Project %s not listed", p)
+				}
+			}
+		})
+	}
+}
+
+func TestAmbiguousNames(t *testing.T) {
+	dir, err := os.MkdirTemp(os.TempDir(), "tmixer-test-projects")
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := 10
+	for i := range n {
 		os.Mkdir(filepath.Join(dir, strconv.Itoa(i)), 0o700)
 	}
 	config := &config.Config{
 		Projects: map[string]*config.ProjectConfig{
-			"bin": {
+			"projects--5": {
 				Directory: "/home/test/bin",
 			},
 			"projects": {
 				Directory:      dir,
 				SubDirectories: true,
-				Windows:        []config.WindowConfig{{}, {}},
-				SwitchCommands: []string{"", ""},
 			},
 		},
 	}
 	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		projects, err := List(srv, config)
-		if err != nil {
-			t.Fatal(err)
-		}
-		projectNames := map[string]*Project{}
-		for _, p := range projects {
-			if p.server != srv {
-				t.Fatal("Should always attach server")
-			}
-			projectNames[p.Name] = p
-		}
-		if _, ok := projectNames["bin"]; !ok {
-			t.Fatal("bin should be there")
-		}
-		for i := range n {
-			if p, ok := projectNames["projects--"+strconv.Itoa(i)]; !ok {
-				t.Fatalf("missing ub project %d", i)
-			} else {
-				// For all others change that the values are correct in the config
-				if p.Config.SubDirectories {
-					t.Fatal("Should set sub dirs of sub dir to false")
-				}
-				if p.Config.Directory != filepath.Join(dir, strconv.Itoa(i)) {
-					t.Fatal("Directory should be the project dir itself")
-				}
-				if len(p.Config.Windows) != 2 {
-					t.Fatal("Should share startup windows")
-				}
-				if len(p.Config.SwitchCommands) != 2 {
-					t.Fatal("Should share switch commands")
-				}
-			}
-		}
-	})
-}
-
-func TestListIncludesAllSessions(t *testing.T) {
-	n := 10
-	config := &config.Config{
-		Projects: map[string]*config.ProjectConfig{
-			"bin": {
-				Directory: "/home/test/bin",
-			},
-		},
-	}
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		for i := range n {
-			srv.New("test-" + strconv.Itoa(i))
-		}
-		projects, err := List(srv, config)
-		if err != nil {
-			t.Fatal(err)
-		}
-		projectNames := map[string]bool{}
-		for _, p := range projects {
-			if p.server != srv {
-				t.Fatal("Should always attach server")
-			}
-			if projectNames[p.Name] {
-				t.Fatalf("duplicate project name %s", p.Name)
-			}
-			projectNames[p.Name] = true
-		}
-		if !projectNames["bin"] {
-			t.Fatal("bin should be there")
-		}
-		if projectNames[tmux.CONTROL_SESSION_NAME] {
-			t.Fatal("Should not list the control session")
-		}
-		for i := range n {
-			if !projectNames["test-"+strconv.Itoa(i)] {
-				t.Fatalf("missing session project %d", i)
-			}
-		}
-	})
-}
-
-func TestListMatchesExistingSessions(t *testing.T) {
-	n := 10
-	config := &config.Config{
-		Projects: map[string]*config.ProjectConfig{
-			"bin": {
-				Directory: "/home/test/bin",
-			},
-			"test-3": {
-				Directory: "/home/test/bin",
-			},
-		},
-	}
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		for i := range n {
-			srv.New("test-" + strconv.Itoa(i))
-		}
-		projects, err := List(srv, config)
-		if err != nil {
-			t.Fatal(err)
-		}
-		projectNames := map[string]bool{}
-		for _, p := range projects {
-			if projectNames[p.Name] {
-				t.Fatalf("duplicate project name %s", p.Name)
-			}
-			projectNames[p.Name] = true
-		}
-		if !projectNames["bin"] {
-			t.Fatal("bin should be there")
-		}
-		for i := range n {
-			if !projectNames["test-"+strconv.Itoa(i)] {
-				t.Fatalf("missing session project %d", i)
-			}
+		_, err := List(srv, config)
+		if !errors.Is(err, ERROR_AMBIGUOUS_NAME) {
+			t.Errorf("wrong error returned %v", err)
 		}
 	})
 }
 
 func TestListNoTmux(t *testing.T) {
-	config := &config.Config{
-		Projects: map[string]*config.ProjectConfig{
-			"bin": {
-				Directory: "/home/test/bin",
-			},
-		},
-	}
-	projects, err := List(nil, config)
-	if err != nil {
-		t.Fatal(err)
-	}
-	projectNames := map[string]bool{}
-	for _, p := range projects {
-		if projectNames[p.Name] {
-			t.Fatalf("duplicate project name %s", p.Name)
-		}
-		projectNames[p.Name] = true
-	}
-	if !projectNames["bin"] {
-		t.Fatal("bin should be there")
-	}
-}
-
-func TestListNoProjects(t *testing.T) {
-	config := &config.Config{
-		Projects: nil,
-	}
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		projects, err := List(srv, config)
+	dir, testCases := setupListTest(t)
+	defer teardownListTest(t, dir)
+	for _, tc := range testCases {
+		projects, err := List(nil, tc.config)
 		if err != nil {
-			t.Fatal(err)
+			t.Error(err)
 		}
-		if len(projects) == 0 {
-			t.Fatal("should still return session projects")
+		if len(projects) != len(tc.projects)-1 {
+			t.Errorf("Project list does not match expected len: %d != %d - 1", len(projects), len(tc.projects))
 		}
-	})
+		matched := make(map[string]bool)
+		for _, p := range projects {
+			matched[p.Name] = true
+		}
+		for _, p := range tc.projects {
+			if !matched[p] && p != testutil.DEFAULT_TEST_SESSION {
+				t.Errorf("Project %s not listed", p)
+			}
+		}
+	}
 }
 
 func BenchmarkList(b *testing.B) {

@@ -1,15 +1,22 @@
 package project
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 
 	"samuellando.com/tmixer/internal/config"
 	"samuellando.com/tmixer/internal/tmux"
 )
 
+var ERROR_AMBIGUOUS_NAME = errors.New("Ambiguous project name detected")
+
+// List all configured projects
+// - Creates a project for each sub directory
+//   - Giving them the name "[project_name]--[subdir_name]"
+//
+// - Creates projects for existing tmux sessions, if they do not match a config project
 func List(tmux *tmux.Server, config *config.Config) ([]*Project, error) {
 	projects := listBareProjects(config)
 	subDirProjects, err := listSubDirProjects(config)
@@ -17,6 +24,9 @@ func List(tmux *tmux.Server, config *config.Config) ([]*Project, error) {
 		return nil, err
 	}
 	projects = append(projects, subDirProjects...)
+	if l := getDuplicateNames(projects); len(l) > 0 {
+		return nil, fmt.Errorf("%w %v", ERROR_AMBIGUOUS_NAME, l)
+	}
 	if tmux != nil {
 		sessionProjects, err := listSessionsWithoutProject(tmux, projects)
 		if err != nil {
@@ -24,7 +34,7 @@ func List(tmux *tmux.Server, config *config.Config) ([]*Project, error) {
 		}
 		projects = append(projects, sessionProjects...)
 	}
-	// Add the server to all projects
+	// Add the internal fileds to all projects
 	for _, p := range projects {
 		p.server = tmux
 		p.fullConfig = config
@@ -32,6 +42,19 @@ func List(tmux *tmux.Server, config *config.Config) ([]*Project, error) {
 	return projects, nil
 }
 
+func getDuplicateNames(projects []*Project) []string {
+	seen := make(map[string]bool)
+	duplicates := make([]string, 0)
+	for _, p := range projects {
+		if seen[p.Name] {
+			duplicates = append(duplicates, p.Name)
+		}
+		seen[p.Name] = true
+	}
+	return duplicates
+}
+
+// List all projects that are bare ie. don't have any sort of recusion like subdirs.
 func listBareProjects(config *config.Config) []*Project {
 	projects := make([]*Project, 0)
 	for name, projectConfig := range config.Projects {
@@ -92,51 +115,4 @@ func listSessionsWithoutProject(s *tmux.Server, configProjects []*Project) ([]*P
 		}
 	}
 	return projects, nil
-}
-
-// Sort the projects by the last activity time. If inactive, make sure the Default
-// Project is the next one.
-func sortProjects(config *config.Config, projects []*Project) error {
-	var sortErr error
-	sort.Slice(projects, func(i, j int) bool {
-		_, err1 := projects[i].Session()
-		_, err2 := projects[j].Session()
-		if err1 != nil && err2 != nil {
-			if config.DefaultProject != nil {
-				if *config.DefaultProject == projects[i].Name {
-					return true
-				}
-				if *config.DefaultProject == projects[j].Name {
-					return false
-				}
-			}
-			return false
-		}
-		if err1 == ErrSessionNotFound {
-			return false
-		}
-		if err1 != nil {
-			sortErr = err1
-			return false
-		}
-		if err2 == ErrSessionNotFound {
-			return true
-		}
-		if err2 != nil {
-			sortErr = err2
-			return false
-		}
-		t1, err := projects[i].LastActivity()
-		if err != nil {
-			sortErr = err
-			return false
-		}
-		t2, err := projects[j].LastActivity()
-		if err != nil {
-			sortErr = err
-			return false
-		}
-		return t1.After(*t2)
-	})
-	return sortErr
 }

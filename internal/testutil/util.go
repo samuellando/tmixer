@@ -12,6 +12,8 @@ import (
 	"samuellando.com/tmixer/internal/tmux"
 )
 
+var DEFAULT_TEST_SESSION = "default_test_session"
+
 func SetupTestClient(tmux *tmux.Server, session *tmux.Session) *os.File {
 	cmd := exec.Command("tmux", "-S", tmux.SocketPath, "-u", "attach", "-t", string(session.Id))
 	f, err := pty.Start(cmd)
@@ -35,7 +37,7 @@ func SetupTestServer(t testing.TB) *tmux.Server {
 	}
 	tmux := tmux.Tmux(fmt.Sprintf("%s/test.sock", dir))
 	// Start one extra session so the server starts
-	_, err = tmux.New("default_test_session")
+	_, err = tmux.New(DEFAULT_TEST_SESSION)
 	if err != nil {
 		t.Fatal(fmt.Errorf("Error while starting server %w", err))
 	}
