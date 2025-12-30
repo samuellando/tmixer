@@ -8,13 +8,13 @@ import (
 )
 
 func TestSwitchAndClientSession(t *testing.T) {
-	f := func(tmux *tmux.Server) {
-		s, _ := tmux.New("client_session")
-		tmux.New("client_session2")
-		s3, _ := tmux.New("client_session3")
-		f := testutil.SetupTestClient(tmux, s)
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		s, _ := srv.New("client_session")
+		srv.New("client_session2")
+		s3, _ := srv.New("client_session3")
+		f := testutil.SetupTestClient(srv, s)
 		defer f.Close()
-		client, err := tmux.ActiveClient()
+		client, err := srv.ActiveClient()
 		res, err := client.Session()
 		if err != nil {
 			t.Fatal(err)
@@ -33,6 +33,5 @@ func TestSwitchAndClientSession(t *testing.T) {
 		if res.Id != s3.Id {
 			t.Fatalf("Expected third session %v [%v]", res, s3)
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }

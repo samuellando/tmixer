@@ -8,8 +8,8 @@ import (
 )
 
 func TestKill(t *testing.T) {
-	f := func(tmux *tmux.Server) {
-		s, err := tmux.New("test_session")
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		s, err := srv.New("test_session")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -41,13 +41,12 @@ func TestKill(t *testing.T) {
 		if found {
 			t.Fatal("Window was not killed")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestWindowName(t *testing.T) {
-	f := func(tmux *tmux.Server) {
-		s, _ := tmux.New("test_ses")
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		s, _ := srv.New("test_ses")
 		w, _ := s.NewWindow("test_window")
 		res, err := w.Name()
 		if err != nil {
@@ -56,13 +55,12 @@ func TestWindowName(t *testing.T) {
 		if res != "test_window" {
 			t.Fatal("Names dont match")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestPanes(t *testing.T) {
-	f := func(tmux *tmux.Server) {
-		s, _ := tmux.New("test_session")
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		s, _ := srv.New("test_session")
 		windows, _ := s.Windows()
 		w := windows[0]
 		panes, _ := w.Panes()
@@ -74,14 +72,13 @@ func TestPanes(t *testing.T) {
 		if len(panes) != 2 {
 			t.Fatal("Window should have two panes")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestLink(t *testing.T) {
-	f := func(tmux *tmux.Server) {
-		s1, _ := tmux.New("test_session")
-		s2, _ := tmux.New("test_session2")
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		s1, _ := srv.New("test_session")
+		s2, _ := srv.New("test_session2")
 		windows, _ := s1.Windows()
 		w := windows[0]
 		err := w.Link(s2)
@@ -92,14 +89,13 @@ func TestLink(t *testing.T) {
 		if len(windows) != 2 {
 			t.Fatal("Should have 2 windows")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestWindowOptions(t *testing.T) {
-	f := func(tmux *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
 		name := "test_sess_name"
-		s, _ := tmux.New(name)
+		s, _ := srv.New(name)
 		err := s.SetOption("@hello", "world")
 		if err != nil {
 			t.Fatal(err)
@@ -112,19 +108,17 @@ func TestWindowOptions(t *testing.T) {
 		if res != "world" {
 			t.Fatal("values dont match")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestWindowOptionsNotSet(t *testing.T) {
-	f := func(tmux *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
 		name := "test_sess_name"
-		s, _ := tmux.New(name)
+		s, _ := srv.New(name)
 		windows, _ := s.Windows()
 		_, err := windows[0].GetOption("@hello")
 		if err == nil {
 			t.Fatal("Should return an error")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }

@@ -19,16 +19,16 @@ func TestListAddsFields(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmux.Server) {
-		tmux.New("test-session")
-		projects, err := List(tmux, config)
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		srv.New("test-session")
+		projects, err := List(srv, config)
 		if err != nil {
 			t.Fatal(err)
 		}
 		matched_session := false
 		matched_bin := false
 		for _, p := range projects {
-			if p.server != tmux {
+			if p.server != srv {
 				t.Fatal("Should always attach server")
 			}
 			switch p.Name {
@@ -50,8 +50,7 @@ func TestListAddsFields(t *testing.T) {
 		if !matched_bin || !matched_session {
 			t.Fatal("Missing projects")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestListIncludesAllProjects(t *testing.T) {
@@ -65,8 +64,8 @@ func TestListIncludesAllProjects(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmux.Server) {
-		projects, err := List(tmux, config)
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		projects, err := List(srv, config)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -79,8 +78,7 @@ func TestListIncludesAllProjects(t *testing.T) {
 				t.Errorf("Project %q missing from list", cfgName)
 			}
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestListIncludesAllSubDirProjects(t *testing.T) {
@@ -106,14 +104,14 @@ func TestListIncludesAllSubDirProjects(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmux.Server) {
-		projects, err := List(tmux, config)
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		projects, err := List(srv, config)
 		if err != nil {
 			t.Fatal(err)
 		}
 		projectNames := map[string]*Project{}
 		for _, p := range projects {
-			if p.server != tmux {
+			if p.server != srv {
 				t.Fatal("Should always attach server")
 			}
 			projectNames[p.Name] = p
@@ -140,8 +138,7 @@ func TestListIncludesAllSubDirProjects(t *testing.T) {
 				}
 			}
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestListIncludesAllSessions(t *testing.T) {
@@ -153,7 +150,7 @@ func TestListIncludesAllSessions(t *testing.T) {
 			},
 		},
 	}
-	f := func(srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
 		for i := range n {
 			srv.New("test-" + strconv.Itoa(i))
 		}
@@ -182,8 +179,7 @@ func TestListIncludesAllSessions(t *testing.T) {
 				t.Fatalf("missing session project %d", i)
 			}
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestListMatchesExistingSessions(t *testing.T) {
@@ -198,11 +194,11 @@ func TestListMatchesExistingSessions(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
 		for i := range n {
-			tmux.New("test-" + strconv.Itoa(i))
+			srv.New("test-" + strconv.Itoa(i))
 		}
-		projects, err := List(tmux, config)
+		projects, err := List(srv, config)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -221,8 +217,7 @@ func TestListMatchesExistingSessions(t *testing.T) {
 				t.Fatalf("missing session project %d", i)
 			}
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestListNoTmux(t *testing.T) {
@@ -253,17 +248,15 @@ func TestListNoProjects(t *testing.T) {
 	config := &config.Config{
 		Projects: nil,
 	}
-	f := func(tmux *tmux.Server) {
-		projects, err := List(tmux, config)
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		projects, err := List(srv, config)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if len(projects) == 0 {
 			t.Fatal("should still return session projects")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
-
+	})
 }
 
 func BenchmarkList(b *testing.B) {

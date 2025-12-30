@@ -57,7 +57,7 @@ func TeardownTestServer(s *tmux.Server) {
 	}
 }
 
-func RunWithAndWithoutControlMode(f func(tmux *tmux.Server), t *testing.T) {
+func RunWithAndWithoutControlMode(t *testing.T, f func(srv *tmux.Server)) {
 	tmux := SetupTestServer(t)
 	f(tmux)
 	TeardownTestServer(tmux)

@@ -19,8 +19,8 @@ func TestProjectStatus(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmux.Server) {
-		projects, err := List(tmux, config)
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		projects, err := List(srv, config)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -54,7 +54,7 @@ func TestProjectStatus(t *testing.T) {
 			t.Fatal("Project should have active status")
 		}
 		// Setup a cleint
-		f := testutil.SetupTestClient(tmux, s)
+		f := testutil.SetupTestClient(srv, s)
 		defer f.Close()
 		status, err = project.Status()
 		if err != nil {
@@ -75,8 +75,7 @@ func TestProjectStatus(t *testing.T) {
 		if status != PROJECT_STATUS_INACTIVE {
 			t.Fatal("Project should have inactive status after kill")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestProjectSession(t *testing.T) {
@@ -87,8 +86,8 @@ func TestProjectSession(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmux.Server) {
-		projects, err := List(tmux, config)
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		projects, err := List(srv, config)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -112,8 +111,7 @@ func TestProjectSession(t *testing.T) {
 		if name != "bin" {
 			t.Fatal("Should get a session")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestProjectLastActivity(t *testing.T) {
@@ -130,8 +128,8 @@ func TestProjectLastActivity(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmux.Server) {
-		projects, err := List(tmux, config)
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		projects, err := List(srv, config)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -166,8 +164,7 @@ func TestProjectLastActivity(t *testing.T) {
 		if err != ErrSessionNotFound {
 			t.Fatal(err)
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestProjectSessionNotFound(t *testing.T) {
@@ -178,8 +175,8 @@ func TestProjectSessionNotFound(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmux.Server) {
-		projects, err := List(tmux, config)
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		projects, err := List(srv, config)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -199,8 +196,7 @@ func TestProjectSessionNotFound(t *testing.T) {
 		if s != nil {
 			t.Fatal("Should get a nil session")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestProjectStart(t *testing.T) {
@@ -211,8 +207,8 @@ func TestProjectStart(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmux.Server) {
-		projects, err := List(tmux, config)
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		projects, err := List(srv, config)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -243,8 +239,7 @@ func TestProjectStart(t *testing.T) {
 		if status != PROJECT_STATUS_ACTIVE {
 			t.Fatal("Project should be active")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestProjectAlreadyStarted(t *testing.T) {
@@ -255,8 +250,8 @@ func TestProjectAlreadyStarted(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmux.Server) {
-		projects, err := List(tmux, config)
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		projects, err := List(srv, config)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -280,8 +275,7 @@ func TestProjectAlreadyStarted(t *testing.T) {
 		if s1.Id != s2.Id {
 			t.Fatal("Should return the already started project")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestProjectStartWindows(t *testing.T) {
@@ -304,8 +298,8 @@ func TestProjectStartWindows(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmux.Server) {
-		projects, err := List(tmux, config)
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		projects, err := List(srv, config)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -349,8 +343,7 @@ func TestProjectStartWindows(t *testing.T) {
 		if !strings.Contains(strings.Join(out2, ""), "49") {
 			t.Fatal("Command2 did not run!")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestProjectStartPanes(t *testing.T) {
@@ -372,8 +365,8 @@ func TestProjectStartPanes(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmux.Server) {
-		projects, err := List(tmux, config)
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		projects, err := List(srv, config)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -410,8 +403,7 @@ func TestProjectStartPanes(t *testing.T) {
 		if !strings.Contains(strings.Join(out2, ""), "49") {
 			t.Fatal("Command2 did not run!")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestProjectStartPanesWithWindowCommand(t *testing.T) {
@@ -435,8 +427,8 @@ func TestProjectStartPanesWithWindowCommand(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmux.Server) {
-		projects, err := List(tmux, config)
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		projects, err := List(srv, config)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -477,8 +469,7 @@ func TestProjectStartPanesWithWindowCommand(t *testing.T) {
 		if !strings.Contains(strings.Join(out3, ""), "49") {
 			t.Fatal("Command2 did not run!")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestProjectKill(t *testing.T) {
@@ -489,8 +480,8 @@ func TestProjectKill(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmux.Server) {
-		projects, err := List(tmux, config)
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		projects, err := List(srv, config)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -519,8 +510,7 @@ func TestProjectKill(t *testing.T) {
 		if status != PROJECT_STATUS_INACTIVE {
 			t.Fatal("Project should be inactive")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestProjectSwitch(t *testing.T) {
@@ -531,11 +521,11 @@ func TestProjectSwitch(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmux.Server) {
-		s, _ := tmux.New("ses-1")
-		f := testutil.SetupTestClient(tmux, s)
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		s, _ := srv.New("ses-1")
+		f := testutil.SetupTestClient(srv, s)
 		defer f.Close()
-		projects, err := List(tmux, config)
+		projects, err := List(srv, config)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -556,8 +546,7 @@ func TestProjectSwitch(t *testing.T) {
 		if status != PROJECT_STATUS_ATTACHED {
 			t.Fatal("Project should be attached")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestProjectSwitchCommands(t *testing.T) {
@@ -574,11 +563,11 @@ func TestProjectSwitchCommands(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmux.Server) {
-		s, _ := tmux.New("ses-1")
-		f := testutil.SetupTestClient(tmux, s)
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		s, _ := srv.New("ses-1")
+		f := testutil.SetupTestClient(srv, s)
 		defer f.Close()
-		projects, err := List(tmux, config)
+		projects, err := List(srv, config)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -600,8 +589,7 @@ func TestProjectSwitchCommands(t *testing.T) {
 		if len(entries) != 2 {
 			t.Fatal("Should have created 2 files")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestProjectRunSwitchCommands(t *testing.T) {
@@ -618,11 +606,11 @@ func TestProjectRunSwitchCommands(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmux.Server) {
-		s, _ := tmux.New("ses-1")
-		f := testutil.SetupTestClient(tmux, s)
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		s, _ := srv.New("ses-1")
+		f := testutil.SetupTestClient(srv, s)
 		defer f.Close()
-		projects, err := List(tmux, config)
+		projects, err := List(srv, config)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -645,8 +633,7 @@ func TestProjectRunSwitchCommands(t *testing.T) {
 		if len(entries) != 2 {
 			t.Fatal("Should have created 2 files")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestProjectReset(t *testing.T) {
@@ -657,8 +644,8 @@ func TestProjectReset(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmux.Server) {
-		projects, err := List(tmux, config)
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		projects, err := List(srv, config)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -683,8 +670,7 @@ func TestProjectReset(t *testing.T) {
 		if res.Id != s2.Id {
 			t.Fatal("Should match new session id")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestProjectResetWindows(t *testing.T) {
@@ -707,8 +693,8 @@ func TestProjectResetWindows(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmux.Server) {
-		projects, err := List(tmux, config)
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		projects, err := List(srv, config)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -754,8 +740,7 @@ func TestProjectResetWindows(t *testing.T) {
 		if !strings.Contains(strings.Join(out2, ""), "49") {
 			t.Fatal("Command2 did not run!")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestProjectResetAttached(t *testing.T) {
@@ -766,8 +751,8 @@ func TestProjectResetAttached(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmux.Server) {
-		projects, err := List(tmux, config)
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		projects, err := List(srv, config)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -781,7 +766,7 @@ func TestProjectResetAttached(t *testing.T) {
 			t.Fatal("bin project not listed")
 		}
 		s1, _ := project.Start()
-		f := testutil.SetupTestClient(tmux, s1)
+		f := testutil.SetupTestClient(srv, s1)
 		defer f.Close()
 		s2, err := project.Reset()
 		if err != nil {
@@ -797,8 +782,7 @@ func TestProjectResetAttached(t *testing.T) {
 		if status, _ := project.Status(); status != PROJECT_STATUS_ATTACHED {
 			t.Fatal("Should attach to new session")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestProjectKillAttachedLastActive(t *testing.T) {
@@ -815,7 +799,7 @@ func TestProjectKillAttachedLastActive(t *testing.T) {
 			},
 		},
 	}
-	f := func(srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
 		projects, err := List(srv, config)
 		if err != nil {
 			t.Fatal(err)
@@ -840,8 +824,7 @@ func TestProjectKillAttachedLastActive(t *testing.T) {
 		if cs.Id != s2.Id {
 			t.Fatal("Should switch to the last active session")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestProjectKillAttachedDefault(t *testing.T) {
@@ -860,7 +843,7 @@ func TestProjectKillAttachedDefault(t *testing.T) {
 			},
 		},
 	}
-	f := func(srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
 		projects, err := List(srv, config)
 		if err != nil {
 			t.Fatal(err)
@@ -899,8 +882,7 @@ func TestProjectKillAttachedDefault(t *testing.T) {
 		if name != def {
 			t.Fatalf("Should switch to the default project, got %s", name)
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestProjectResetAttachedSwitchCommands(t *testing.T) {
@@ -916,8 +898,8 @@ func TestProjectResetAttachedSwitchCommands(t *testing.T) {
 			},
 		},
 	}
-	f := func(tmux *tmux.Server) {
-		projects, err := List(tmux, config)
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		projects, err := List(srv, config)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -931,7 +913,7 @@ func TestProjectResetAttachedSwitchCommands(t *testing.T) {
 			t.Fatal("bin project not listed")
 		}
 		s1, _ := project.Start()
-		f := testutil.SetupTestClient(tmux, s1)
+		f := testutil.SetupTestClient(srv, s1)
 		defer f.Close()
 		s2, err := project.Reset()
 		time.Sleep(time.Second)
@@ -953,6 +935,5 @@ func TestProjectResetAttachedSwitchCommands(t *testing.T) {
 			t.Fatal("Should have created 1 files")
 		}
 
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }

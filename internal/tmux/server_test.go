@@ -8,65 +8,61 @@ import (
 )
 
 func TestHasSession(t *testing.T) {
-	f := func(tmux *tmux.Server) {
-		s, err := tmux.New("test_session")
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		s, err := srv.New("test_session")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !tmux.HasSession(s) {
+		if !srv.HasSession(s) {
 			t.Fatal("Should have session")
 		}
 		s.Kill()
-		if tmux.HasSession(s) {
+		if srv.HasSession(s) {
 			t.Fatal("Should have session anymore")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestHasSessionWithName(t *testing.T) {
-	f := func(tmux *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
 		name := "test_session"
-		s, err := tmux.New(name)
+		s, err := srv.New(name)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !tmux.HasSessionWithName(name) {
+		if !srv.HasSessionWithName(name) {
 			t.Fatal("Should have session")
 		}
 		s.Kill()
-		if tmux.HasSessionWithName(name) {
+		if srv.HasSessionWithName(name) {
 			t.Fatal("Should have session anymore")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestGetSessionWithNameFound(t *testing.T) {
-	f := func(tmux *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
 		name := "test_session"
-		s, err := tmux.New(name)
+		s, err := srv.New(name)
 		if err != nil {
 			t.Fatal(err)
 		}
-		res, err := tmux.GetSessionWithName(name)
+		res, err := srv.GetSessionWithName(name)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if s.Id != res.Id {
 			t.Fatal("Session id does not match")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestGetSessionWithNameNotFound(t *testing.T) {
-	f := func(s *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(s *tmux.Server) {
 		name := "test_session"
 		_, err := s.GetSessionWithName(name)
 		if err != tmux.ErrSessionNotFound {
 			t.Fatal(err)
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }

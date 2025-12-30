@@ -11,8 +11,8 @@ import (
 )
 
 func TestSplit(t *testing.T) {
-	f := func(tmux *tmux.Server) {
-		sessions, _ := tmux.ListSessions()
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		sessions, _ := srv.ListSessions()
 		s := sessions[0]
 		windows, _ := s.Windows()
 		w := windows[0]
@@ -39,13 +39,12 @@ func TestSplit(t *testing.T) {
 		if !found {
 			t.Fatal("Pane not listed!")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestSplitHorizontally(t *testing.T) {
-	f := func(tmux *tmux.Server) {
-		sessions, _ := tmux.ListSessions()
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		sessions, _ := srv.ListSessions()
 		s := sessions[0]
 		windows, _ := s.Windows()
 		w := windows[0]
@@ -72,13 +71,12 @@ func TestSplitHorizontally(t *testing.T) {
 		if !found {
 			t.Fatal("Pane not listed!")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestKillPane(t *testing.T) {
-	f := func(tmux *tmux.Server) {
-		sessions, _ := tmux.ListSessions()
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		sessions, _ := srv.ListSessions()
 		s := sessions[0]
 		windows, _ := s.Windows()
 		w := windows[0]
@@ -112,13 +110,12 @@ func TestKillPane(t *testing.T) {
 		if !found {
 			t.Fatal("Pane not listed!")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestSendKeysAndCapture(t *testing.T) {
-	f := func(tmux *tmux.Server) {
-		sessions, _ := tmux.ListSessions()
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		sessions, _ := srv.ListSessions()
 		s := sessions[0]
 		windows, _ := s.Windows()
 		w := windows[0]
@@ -137,14 +134,13 @@ func TestSendKeysAndCapture(t *testing.T) {
 		if !found {
 			t.Fatal("Command did not run!")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestPaneOptions(t *testing.T) {
-	f := func(tmux *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
 		name := "test_sess_name"
-		s, _ := tmux.New(name)
+		s, _ := srv.New(name)
 		err := s.SetOption("@hello", "world")
 		if err != nil {
 			t.Fatal(err)
@@ -158,22 +154,20 @@ func TestPaneOptions(t *testing.T) {
 		if res != "world" {
 			t.Fatal("values dont match")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestPaneOptionsNotSet(t *testing.T) {
-	f := func(tmux *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
 		name := "test_sess_name"
-		s, _ := tmux.New(name)
+		s, _ := srv.New(name)
 		windows, _ := s.Windows()
 		panes, _ := windows[0].Panes()
 		_, err := panes[0].GetOption("@hello")
 		if err == nil {
 			t.Fatal("Should return an error")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestWorkingDirectory(t *testing.T) {
@@ -182,9 +176,9 @@ func TestWorkingDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(dir)
-	f := func(tmux *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
 		name := "test_sess_name"
-		s, _ := tmux.New(name, dir)
+		s, _ := srv.New(name, dir)
 		s.NewWindow("a")
 		s.NewWindow("b")
 		s.NewWindow("c")
@@ -214,6 +208,5 @@ func TestWorkingDirectory(t *testing.T) {
 				}
 			}
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }

@@ -9,27 +9,26 @@ import (
 )
 
 func TestCreateAndKill(t *testing.T) {
-	f := func(tmux *tmux.Server) {
-		s, err := tmux.New("test_session")
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		s, err := srv.New("test_session")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !tmux.HasSession(s) {
+		if !srv.HasSession(s) {
 			t.Fatal("Should have session")
 		}
 		err = s.Kill()
 		if err != nil {
 			t.Fatal(err)
 		}
-		if tmux.HasSession(s) {
+		if srv.HasSession(s) {
 			t.Fatal("Should have session anymore")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestListSessions(t *testing.T) {
-	f := func(s *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(s *tmux.Server) {
 		n := 10
 		res, _ := s.ListSessions()
 		initialCount := len(res)
@@ -60,12 +59,11 @@ func TestListSessions(t *testing.T) {
 		if len(res)-initialCount != n {
 			t.Fatalf("Expected %d sessions got %d", n, len(res)-initialCount)
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestWindows(t *testing.T) {
-	f := func(srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
 		n := 10
 		sessions, _ := srv.ListSessions()
 		s := sessions[0]
@@ -96,14 +94,13 @@ func TestWindows(t *testing.T) {
 		if len(res) != n+1 {
 			t.Fatalf("Expected %d windows got %d", n+1, len(res))
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestSessionName(t *testing.T) {
-	f := func(tmux *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
 		name := "test_sess_name"
-		s, _ := tmux.New(name)
+		s, _ := srv.New(name)
 		res, err := s.Name()
 		if err != nil {
 			t.Fatal(err)
@@ -111,14 +108,13 @@ func TestSessionName(t *testing.T) {
 		if res != name {
 			t.Fatal("Names dont match")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestSessionLastActivity(t *testing.T) {
-	f := func(tmux *tmux.Server) {
-		s1, _ := tmux.New("s1")
-		s2, _ := tmux.New("s2")
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		s1, _ := srv.New("s1")
+		s2, _ := srv.New("s2")
 		t1, err := s1.LastActivity()
 		if err != nil {
 			t.Fatal(err)
@@ -130,14 +126,13 @@ func TestSessionLastActivity(t *testing.T) {
 		if t1.After(*t2) {
 			t.Fatal("Shoul be before")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestOptions(t *testing.T) {
-	f := func(tmux *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
 		name := "test_sess_name"
-		s, _ := tmux.New(name)
+		s, _ := srv.New(name)
 		err := s.SetOption("@hello", "world")
 		if err != nil {
 			t.Fatal(err)
@@ -149,18 +144,16 @@ func TestOptions(t *testing.T) {
 		if res != "world" {
 			t.Fatal("values dont match")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
 
 func TestOptionsNotSet(t *testing.T) {
-	f := func(tmux *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
 		name := "test_sess_name"
-		s, _ := tmux.New(name)
+		s, _ := srv.New(name)
 		_, err := s.GetOption("@hello")
 		if err == nil {
 			t.Fatal("Should return an error")
 		}
-	}
-	testutil.RunWithAndWithoutControlMode(f, t)
+	})
 }
