@@ -4,6 +4,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"samuellando.com/tmixer/internal/config"
 	"samuellando.com/tmixer/internal/project"
@@ -57,7 +58,7 @@ func TestDisplayProjects(t *testing.T) {
 	}
 	sort.Slice(projects, func(i, j int) bool {
 		if projects[i].Config != nil && projects[j].Config != nil {
-			return projects[i].Config.Directory < projects[j].Config.Directory
+			return projects[i].Config.Directory > projects[j].Config.Directory
 		}
 		return false
 	})
@@ -71,6 +72,7 @@ func TestDisplayProjects(t *testing.T) {
 			p.Start()
 			p.Switch()
 		}
+		time.Sleep(time.Second)
 	}
 	w := &strings.Builder{}
 	err = DisplayProjects(projects, w)
@@ -78,7 +80,7 @@ func TestDisplayProjects(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if diff := cmp.Diff(strings.TrimSpace(w.String()), expected); diff != "" {
+	if diff := cmp.Diff(expected, strings.TrimSpace(w.String())); diff != "" {
 		t.Fatal(diff)
 	}
 }
