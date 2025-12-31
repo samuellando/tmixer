@@ -5,16 +5,17 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"samuellando.com/tmixer/internal/config"
 	"samuellando.com/tmixer/internal/tmux"
 )
 
-type ProjectState int
+type ProjectStatus int
 
 const (
-	PROJECT_STATUS_INACTIVE ProjectState = iota
+	PROJECT_STATUS_INACTIVE ProjectStatus = iota
 	PROJECT_STATUS_ACTIVE
 	PROJECT_STATUS_ATTACHED
 )
@@ -28,10 +29,35 @@ type Project struct {
 	fullConfig *config.Config
 }
 
-func (p *Project) TmuxSessionName() string {
-	return strings.ReplaceAll(p.Name, ".", "_")
+// Returns one of PROJECT_STATUS_INACTIVE, PROJECT_STATUS_ACTIVE, and PROJECT_STATUS_ATTACHED
+// A project is inactive if it has no running session, active if it does and attached
+// if the currently running client is attached to it's session.
+func (p *Project) Status() (ProjectStatus, error) {
+	var activeSessionName string
+	status := PROJECT_STATUS_INACTIVE
+	client, err := p.server.ActiveClient()
+	if err != nil && err != tmux.ErrNoActiveClient {
+		return status, fmt.Errorf("when getting active client for status: %w", err)
+	} else if err == nil {
+		session, err := client.Session()
+		if err != nil {
+			return status, fmt.Errorf("when getting active session for status: %w", err)
+		}
+		activeSessionName, err = session.Name()
+		if err != nil {
+			return status, fmt.Errorf("when getting active session name status: %w", err)
+		}
+	}
+	if activeSessionName == p.TmuxSessionName() {
+		status = PROJECT_STATUS_ATTACHED
+	} else if p.server.HasSessionWithName(p.TmuxSessionName()) {
+		status = PROJECT_STATUS_ACTIVE
+	}
+	return status, nil
 }
 
+// Return the project's tmux session.
+// If there is no session returns ErrSessionNotFound
 func (p *Project) Session() (*tmux.Session, error) {
 	s, err := p.server.GetSessionWithName(p.TmuxSessionName())
 	if err == tmux.ErrSessionNotFound {
@@ -43,6 +69,80 @@ func (p *Project) Session() (*tmux.Session, error) {
 	return s, nil
 }
 
+// Return the tmux session Name for the project. Since not all project names are
+// compatible with tmux, this will return a compatible name.
+func (p *Project) TmuxSessionName() string {
+	s := p.Name
+	b := strings.Builder{}
+	for i := 0; i < len(s); i++ {
+		if s[i] == '#' {
+			if i < len(s)-1 {
+				if s[i+1] == '#' {
+					// ##
+					b.WriteByte('#')
+					i++
+					continue
+				}
+				if s[i+1] == '}' {
+					// #}
+					b.WriteByte('}')
+					i++
+					continue
+				}
+				if s[i+1] == '}' {
+					// #,
+					b.WriteByte(',')
+					i++
+					continue
+				}
+			}
+		}
+		b.WriteByte(s[i])
+	}
+	s = b.String()
+	out := ""
+	for i := 0; i < len(s); {
+		r, size := utf8.DecodeRuneInString(s[i:])
+		switch r {
+		case '.':
+			out += `_`
+		case ':':
+			out += `_`
+		case '\a':
+			out += `\a`
+		case '\b':
+			out += `\b`
+		case '\f':
+			out += `\f`
+		case '\n':
+			out += `\n`
+		case '\r':
+			out += `\r`
+		case '\t':
+			out += `\t`
+		case '\v':
+			out += `\v`
+		case '\\':
+			out += `\\`
+		case '"':
+			out += `"`
+		default:
+			if r >= 0x20 && r <= 0x7e { // printable ASCII
+				out += string(r)
+			} else if (r >= 0x1 && r <= 0x7f) || r == utf8.RuneError {
+				// Control characters
+				out += fmt.Sprintf(`\%03o`, s[i])
+			} else {
+				out += string(r)
+			}
+		}
+		i += size
+	}
+	return out
+}
+
+// Return the last activity time of the projects session.
+// If no session exists will return ErrSessionNotFound
 func (p *Project) LastActivity() (*time.Time, error) {
 	session, err := p.Session()
 	if err != nil {
@@ -51,30 +151,8 @@ func (p *Project) LastActivity() (*time.Time, error) {
 	return session.LastActivity()
 }
 
-func (p *Project) Status() (ProjectState, error) {
-	var activeSessionName string
-	status := PROJECT_STATUS_INACTIVE
-	client, err := p.server.ActiveClient()
-	if err != nil && err != tmux.ErrNoActiveClient {
-		return status, fmt.Errorf("when geting active client for status: %w", err)
-	} else if err == nil {
-		session, err := client.Session()
-		if err != nil {
-			return status, fmt.Errorf("when geting active session for status: %w", err)
-		}
-		activeSessionName, err = session.Name()
-		if err != nil {
-			return status, fmt.Errorf("when geting active session name status: %w", err)
-		}
-	}
-	if activeSessionName == p.TmuxSessionName() {
-		status = PROJECT_STATUS_ATTACHED
-	} else if p.server.HasSessionWithName(p.TmuxSessionName()) {
-		status = PROJECT_STATUS_ACTIVE
-	}
-	return status, nil
-}
-
+// Starts a tmux session for the project, and creates all it's configured windows and panes.
+// If a session for the project already exists, it is returned and nothing else is done.
 func (p *Project) Start() (*tmux.Session, error) {
 	status, err := p.Status()
 	if err != nil {
@@ -104,11 +182,12 @@ func (p *Project) createWindows(s *tmux.Session) error {
 			if err != nil {
 				return fmt.Errorf("when creating window: %w", err)
 			}
-			err = setupWindow(w, windowConfig)
+			err = createPanes(w, windowConfig)
 			if err != nil {
 				return err
 			}
 		}
+		// Kill the default window.
 		windows, err := s.Windows()
 		if err != nil {
 			return fmt.Errorf("when listing windows: %w", err)
@@ -125,7 +204,7 @@ func (p *Project) createWindows(s *tmux.Session) error {
 	return nil
 }
 
-func setupWindow(w *tmux.Window, config config.WindowConfig) error {
+func createPanes(w *tmux.Window, config config.WindowConfig) error {
 	if config.Command == nil && len(config.Panes) == 0 {
 		return nil
 	}
@@ -134,6 +213,7 @@ func setupWindow(w *tmux.Window, config config.WindowConfig) error {
 		return fmt.Errorf("when creating window, getting window pane: %w", err)
 	}
 	firstPane := panes[0]
+	// If the window has a command, we need to run that command, and keep the pane
 	keepalive := false
 	if config.Command != nil {
 		keepalive = true
@@ -173,6 +253,13 @@ func setupWindow(w *tmux.Window, config config.WindowConfig) error {
 	return nil
 }
 
+// Kills the projects tmux session.
+// If no project session exists returns ErrSessionNotFound
+// If the session being killed is attached, will  switch to another project based on:
+// 1. If there is other active sessions, it will switch to the one with the most recent activity.
+// 2. Otherwise, it will try to start and switch to the default project
+// 3. If no default project is set, it will switch to a random project.
+// 4. It will exit tmux if there are no other configured projects.
 func (p *Project) Kill() error {
 	session, err := p.Session()
 	if err != nil {
@@ -183,22 +270,9 @@ func (p *Project) Kill() error {
 		return fmt.Errorf("when killing the session: %w", err)
 	}
 	if status == PROJECT_STATUS_ATTACHED {
-		all, err := List(p.server, p.fullConfig)
+		err = switchToBestProject(p)
 		if err != nil {
-			return fmt.Errorf("While listing projects before killing: %w", err)
-		}
-		err = sortProjects(p.fullConfig, all)
-		if err != nil {
-			return fmt.Errorf("While sorting projects before killing: %w", err)
-		}
-		for _, o := range all {
-			if o.Name != p.Name {
-				err = o.Switch()
-				if err != nil {
-					return fmt.Errorf("While switching project before killing: %w", err)
-				}
-				break
-			}
+			return fmt.Errorf("when killing the session: %w", err)
 		}
 	}
 	err = session.Kill()
@@ -208,6 +282,30 @@ func (p *Project) Kill() error {
 	return nil
 }
 
+func switchToBestProject(p *Project) error {
+	all, err := List(p.server, p.fullConfig)
+	if err != nil {
+		return fmt.Errorf("while listing projects for best switch: %w", err)
+	}
+	err = sortProjects(p.fullConfig, all)
+	if err != nil {
+		return fmt.Errorf("while sorting projects for best switch: %w", err)
+	}
+	for _, o := range all {
+		if o.Name != p.Name {
+			err = o.Switch()
+			if err != nil {
+				return err
+			}
+			break
+		}
+	}
+	return nil
+}
+
+// Switches the active tmux client to the project's tmux session,
+// and runs the switch commands.
+// If no session is running one will be started.
 func (p *Project) Switch() error {
 	session, err := p.Start()
 	if err != nil {
@@ -215,15 +313,17 @@ func (p *Project) Switch() error {
 	}
 	client, err := p.server.ActiveClient()
 	if err != nil {
-		return fmt.Errorf("when geting active client for switch: %w", err)
+		return fmt.Errorf("when getting active client for switch: %w", err)
 	}
 	err = client.Switch(session)
 	if err != nil {
-		return fmt.Errorf("when swtiching to the session: %w", err)
+		return fmt.Errorf("when switching to the session: %w", err)
 	}
 	return p.RunSwitchCommands()
 }
 
+// Runs the projects switch commands in it's active session.
+// If no session exists, it returns ErrSessionNotFound.
 func (p *Project) RunSwitchCommands() error {
 	if p.Config == nil {
 		return nil
@@ -254,6 +354,10 @@ func (p *Project) RunSwitchCommands() error {
 	return nil
 }
 
+// Resets a projects session to it's initial configured state.
+// Effectively calling stop and start on it.
+// If the session is currently attached, it will rerun the switch commands
+// If no session exists, will return ErrSessionNotFound.
 func (p *Project) Reset() (*tmux.Session, error) {
 	temp, err := p.createTempSession()
 	if err != nil {

@@ -1,7 +1,11 @@
 package project
 
 import (
+	"errors"
+	"fmt"
+	"math/rand"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -11,929 +15,825 @@ import (
 	"samuellando.com/tmixer/internal/tmux"
 )
 
-func TestProjectStatus(t *testing.T) {
-	config := &config.Config{
-		Projects: map[string]*config.ProjectConfig{
-			"bin": {
-				Directory: "/home/test/bin",
+func stringPointer(s string) *string {
+	return &s
+}
+
+var pane_counts = []int{1, 4, 3}
+var primes = []int{471193, 842887, 5197, 316219}
+
+func primeCommand(i, j int) *string {
+	return stringPointer(fmt.Sprintf("expr %d \\* %d", primes[i], primes[j]))
+}
+
+var testWindowConfigs = []config.WindowConfig{
+	{
+		Name:    "one",
+		Command: primeCommand(0, 0),
+	},
+	{
+		Name:    "two",
+		Command: primeCommand(1, 0),
+		Panes: []config.PaneConfig{
+			{
+				Command: primeCommand(1, 1),
+			},
+			{
+				Command: primeCommand(1, 2),
+				Split:   stringPointer("Horizontal"),
+			},
+			{
+				Command: primeCommand(1, 3),
+				Split:   stringPointer("Vertical"),
 			},
 		},
+	},
+	{
+		Name: "three",
+		Panes: []config.PaneConfig{
+			{
+				Command: primeCommand(2, 0),
+			},
+			{
+				Command: primeCommand(2, 1),
+				Split:   stringPointer("Horizontal"),
+			},
+			{
+				Command: primeCommand(2, 2),
+				Split:   stringPointer("Vertical"),
+			},
+		},
+	},
+}
+
+var switchCommands = []string{"touch $(random)", "touch $(random)"}
+
+var testConfig = &config.Config{
+	Projects: map[string]*config.ProjectConfig{
+		"inactive": {},
+		"inactive-windows": {
+			Windows: testWindowConfigs,
+		},
+		"inactive-switch": {
+			SwitchCommands: switchCommands,
+		},
+		"inactive-windows-switch": {
+			Windows:        testWindowConfigs,
+			SwitchCommands: switchCommands,
+		},
+		"active": {},
+		"active-windows": {
+			Windows: testWindowConfigs,
+		},
+		"active-switch": {
+			SwitchCommands: switchCommands,
+		},
+		"active-windows-switch": {
+			Windows:        testWindowConfigs,
+			SwitchCommands: switchCommands,
+		},
+		"attached-switch": {
+			SwitchCommands: switchCommands,
+		},
+	},
+}
+
+type projectTestCase struct {
+	project *Project
+	session *tmux.Session
+}
+
+func (tc *projectTestCase) initialStatus() ProjectStatus {
+	if strings.HasPrefix(tc.project.Name, "inactive") {
+		return PROJECT_STATUS_INACTIVE
 	}
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		projects, err := List(srv, config)
+	if strings.HasPrefix(tc.project.Name, "active") {
+		return PROJECT_STATUS_ACTIVE
+	}
+	if strings.HasPrefix(tc.project.Name, "attached") {
+		return PROJECT_STATUS_ATTACHED
+	}
+	panic("Invalid initial status")
+}
+
+func setupTestProjects(t *testing.T, srv *tmux.Server) (string, *os.File, []projectTestCase) {
+	dir, err := os.MkdirTemp(os.TempDir(), "tmixer-test-projects")
+	if err != nil {
+		t.Fatal(err)
+	}
+	testCases := make([]projectTestCase, 0)
+	var client *os.File
+	for name, pc := range testConfig.Projects {
+		tc := projectTestCase{}
+		pc.Directory = filepath.Join(dir, name)
+		err := os.Mkdir(pc.Directory, 0o700)
 		if err != nil {
-			t.Fatal(err)
+			t.Error(err)
 		}
-		var project *Project
-		for _, p := range projects {
-			if p.Name == "bin" {
-				project = p
+		p := Project{
+			Name:       name,
+			Config:     pc,
+			server:     srv,
+			fullConfig: testConfig,
+		}
+		tc.project = &p
+		if strings.HasPrefix(name, "active") || strings.HasPrefix(name, "attached") {
+			s, err := p.Start()
+			if err != nil {
+				t.Error(err)
 			}
+			tc.session = s
 		}
-		if project == nil {
-			t.Fatal("bin project not listed")
+		if strings.HasPrefix(name, "attached") {
+			client = testutil.SetupTestClient(srv, tc.session)
 		}
-		// Initially inactive
-		status, err := project.Status()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if status != PROJECT_STATUS_INACTIVE {
-			t.Fatal("Project should have inactive status")
-		}
-		// After a start, should be active
-		s, err := project.Start()
-		if err != nil {
-			t.Fatal(err)
-		}
-		status, err = project.Status()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if status != PROJECT_STATUS_ACTIVE {
-			t.Fatal("Project should have active status")
-		}
-		// Setup a cleint
-		f := testutil.SetupTestClient(srv, s)
-		defer f.Close()
-		status, err = project.Status()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if status != PROJECT_STATUS_ATTACHED {
-			t.Fatal("Project should have attached status")
-		}
-		// After we kill should be inactive again
-		err = project.Kill()
-		if err != nil {
-			t.Fatal(err)
-		}
-		status, err = project.Status()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if status != PROJECT_STATUS_INACTIVE {
-			t.Fatal("Project should have inactive status after kill")
+		testCases = append(testCases, tc)
+	}
+	return dir, client, testCases
+}
+
+func teardownTestProjects(t *testing.T, dir string, client *os.File) {
+	err := os.RemoveAll(dir)
+	if err != nil {
+		t.Error(err)
+	}
+	err = client.Close()
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestProjectStatus(t *testing.T) {
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		dir, client, testCases := setupTestProjects(t, srv)
+		defer teardownTestProjects(t, dir, client)
+		for _, tc := range testCases {
+			status, err := tc.project.Status()
+			if err != nil {
+				t.Error(err)
+			}
+			if tc.initialStatus() != status {
+				t.Errorf("Status does not match %d != %d", tc.initialStatus(), status)
+			}
 		}
 	})
 }
 
 func TestProjectSession(t *testing.T) {
-	config := &config.Config{
-		Projects: map[string]*config.ProjectConfig{
-			"bin": {
-				Directory: "/home/test/bin",
-			},
-		},
-	}
 	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		projects, err := List(srv, config)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var project *Project
-		for _, p := range projects {
-			if p.Name == "bin" {
-				project = p
+		dir, client, testCases := setupTestProjects(t, srv)
+		defer teardownTestProjects(t, dir, client)
+		for _, tc := range testCases {
+			res, err := tc.project.Session()
+			switch tc.initialStatus() {
+			case PROJECT_STATUS_INACTIVE:
+				if !errors.Is(err, ErrSessionNotFound) {
+					t.Error("Inactive project should give session not found")
+				}
+			default:
+				if err != nil {
+					t.Error(err)
+				}
+				if res.Id != tc.session.Id {
+					t.Errorf("Project session did not match %s != %s", res.Id, tc.session.Id)
+				}
 			}
 		}
-		if project == nil {
-			t.Fatal("bin project not listed")
+	})
+}
+
+func FuzzTmuxSessionName(f *testing.F) {
+	testcases := []string{"Hello World", "Hello.World", "!12345"}
+	for _, tc := range testcases {
+		f.Add(tc)
+	}
+	srv := testutil.SetupTestServer(f)
+	defer testutil.TeardownTestServer(srv)
+	f.Fuzz(func(t *testing.T, a string) {
+		if a == "" || strings.Contains(a, "\x00") {
+			t.Skip()
 		}
-		s, err := project.Start()
+		p := Project{
+			Name: a,
+			Config: &config.ProjectConfig{
+				Directory: "/tmp",
+			},
+			server: srv,
+		}
+		session, err := srv.New(a)
 		if err != nil {
 			t.Fatal(err)
 		}
-		name, err := s.Name()
+		sessionName, err := session.Name()
 		if err != nil {
 			t.Fatal(err)
 		}
-		if name != "bin" {
-			t.Fatal("Should get a session")
+		if sessionName != p.TmuxSessionName() {
+			t.Errorf("%s != %s", sessionName, p.TmuxSessionName())
+		}
+		err = session.Kill()
+		if err != nil {
+			t.Fatal(err)
 		}
 	})
 }
 
 func TestProjectLastActivity(t *testing.T) {
-	config := &config.Config{
-		Projects: map[string]*config.ProjectConfig{
-			"bin": {
-				Directory: "/home/test/bin",
-			},
-			"bin2": {
-				Directory: "/home/test/bin",
-			},
-			"bin3": {
-				Directory: "/home/test/bin",
-			},
-		},
-	}
 	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		projects, err := List(srv, config)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var bin *Project
-		var bin2 *Project
-		var bin3 *Project
-		for _, p := range projects {
-			if p.Name == "bin" {
-				bin = p
+		dir, client, testCases := setupTestProjects(t, srv)
+		defer teardownTestProjects(t, dir, client)
+		for _, tc := range testCases {
+			res, err := tc.project.LastActivity()
+			switch tc.initialStatus() {
+			case PROJECT_STATUS_INACTIVE:
+				if !errors.Is(err, ErrSessionNotFound) {
+					t.Error("Inactive project should give session not found")
+				}
+			default:
+				if err != nil {
+					t.Error(err)
+				}
+				if time.Since(*res) > 30*time.Second {
+					t.Errorf("Project last activity time should be recent %s", time.Since(*res))
+				}
 			}
-			if p.Name == "bin2" {
-				bin2 = p
-			}
-			if p.Name == "bin3" {
-				bin3 = p
-			}
-		}
-		bin.Start()
-		bin2.Start()
-		a1, err := bin.LastActivity()
-		if err != nil {
-			t.Fatal(err)
-		}
-		a2, err := bin2.LastActivity()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if a1.After(*a2) {
-			t.Fatal("Should be before")
-		}
-		_, err = bin3.LastActivity()
-		if err != ErrSessionNotFound {
-			t.Fatal(err)
-		}
-	})
-}
-
-func TestProjectSessionNotFound(t *testing.T) {
-	config := &config.Config{
-		Projects: map[string]*config.ProjectConfig{
-			"bin": {
-				Directory: "/home/test/bin",
-			},
-		},
-	}
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		projects, err := List(srv, config)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var project *Project
-		for _, p := range projects {
-			if p.Name == "bin" {
-				project = p
-			}
-		}
-		if project == nil {
-			t.Fatal("bin project not listed")
-		}
-		s, err := project.Session()
-		if err != ErrSessionNotFound {
-			t.Fatal("Should get a session not found error")
-		}
-		if s != nil {
-			t.Fatal("Should get a nil session")
 		}
 	})
 }
 
 func TestProjectStart(t *testing.T) {
-	config := &config.Config{
-		Projects: map[string]*config.ProjectConfig{
-			"bin": {
-				Directory: "/home/test/bin",
-			},
-		},
-	}
 	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		projects, err := List(srv, config)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var project *Project
-		for _, p := range projects {
-			if p.Name == "bin" {
-				project = p
+		dir, client, testCases := setupTestProjects(t, srv)
+		defer teardownTestProjects(t, dir, client)
+		for _, tc := range testCases {
+			res, err := tc.project.Start()
+			if err != nil {
+				t.Error(err)
 			}
-		}
-		if project == nil {
-			t.Fatal("bin project not listed")
-		}
-		s, err := project.Start()
-		if err != nil {
-			t.Fatal(err)
-		}
-		name, err := s.Name()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if name != "bin" {
-			t.Fatal("Should get a session")
-		}
-		status, err := project.Status()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if status != PROJECT_STATUS_ACTIVE {
-			t.Fatal("Project should be active")
+			if res == nil {
+				t.Error("Should not return a nil session")
+			}
+			if tc.session != nil && tc.session.Id != res.Id {
+				t.Error("Session Id should match")
+			}
+			status, err := tc.project.Status()
+			if err != nil {
+				t.Error(err)
+			}
+			switch tc.initialStatus() {
+			case PROJECT_STATUS_INACTIVE:
+				if status != PROJECT_STATUS_ACTIVE {
+					t.Error("Inactive project should be active now")
+				}
+			case PROJECT_STATUS_ACTIVE:
+				if status != PROJECT_STATUS_ACTIVE {
+					t.Error("Active project should still be active")
+				}
+			case PROJECT_STATUS_ATTACHED:
+				if status != PROJECT_STATUS_ATTACHED {
+					t.Error("Attached project should still be attached")
+				}
+			}
 		}
 	})
 }
 
-func TestProjectAlreadyStarted(t *testing.T) {
-	config := &config.Config{
-		Projects: map[string]*config.ProjectConfig{
-			"bin": {
-				Directory: "/home/test/bin",
-			},
-		},
-	}
+func TestProjectStartWindowsAndPanes(t *testing.T) {
 	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		projects, err := List(srv, config)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var project *Project
-		for _, p := range projects {
-			if p.Name == "bin" {
-				project = p
+		dir, client, testCases := setupTestProjects(t, srv)
+		defer teardownTestProjects(t, dir, client)
+		for _, tc := range testCases {
+			res, err := tc.project.Start()
+			time.Sleep(time.Second)
+			if err != nil {
+				t.Error(err)
 			}
-		}
-		if project == nil {
-			t.Fatal("bin project not listed")
-		}
-		s1, err := project.Start()
-		if err != nil {
-			t.Fatal(err)
-		}
-		s2, err := project.Start()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if s1.Id != s2.Id {
-			t.Fatal("Should return the already started project")
-		}
-	})
-}
-
-func TestProjectStartWindows(t *testing.T) {
-	c1 := "expr 5 \\* 5"
-	c2 := "expr 7 \\* 7"
-	config := &config.Config{
-		Projects: map[string]*config.ProjectConfig{
-			"bin": {
-				Directory: "/home/test/bin",
-				Windows: []config.WindowConfig{
-					{
-						Name:    "test1",
-						Command: &c1,
-					},
-					{
-						Name:    "test2",
-						Command: &c2,
-					},
-				},
-			},
-		},
-	}
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		projects, err := List(srv, config)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var project *Project
-		for _, p := range projects {
-			if p.Name == "bin" {
-				project = p
+			if strings.Contains(tc.project.Name, "windows") {
+				windows, err := res.Windows()
+				if err != nil {
+					t.Error(err)
+				}
+				if len(windows) != 3 {
+					t.Error("Should have 3 windows")
+				}
+				for i := range 3 {
+					panes, err := windows[i].Panes()
+					if err != nil {
+						t.Error(err)
+					}
+					for j := range pane_counts[i] {
+						expected := fmt.Sprintf("%d", primes[i]*primes[j])
+						out, err := panes[j].Capture()
+						if err != nil {
+							t.Error(err)
+						}
+						allOut := strings.Join(out, "")
+						if !strings.Contains(allOut, expected) {
+							t.Errorf("Missing output %s in %s", expected, allOut)
+						}
+					}
+				}
+			} else {
+				windows, err := res.Windows()
+				if err != nil {
+					t.Error(err)
+				}
+				if len(windows) != 1 {
+					t.Errorf("Should have 1 (default) window got %d", len(windows))
+				}
 			}
-		}
-		if project == nil {
-			t.Fatal("bin project not listed")
-		}
-		s, err := project.Start()
-		if err != nil {
-			t.Fatal(err)
-		}
-		time.Sleep(time.Second)
-		windows, _ := s.Windows()
-		if len(windows) != 2 {
-			t.Fatal("Should have 2 windows")
-		}
-		if name, _ := windows[0].Name(); name != "test1" {
-			t.Fatal("Should have test1 as window name")
-		}
-		if name, _ := windows[1].Name(); name != "test2" {
-			t.Fatal("Should have test2 as window name")
-		}
-		panes1, _ := windows[0].Panes()
-		if len(panes1) != 1 {
-			t.Fatal("should have 1 pane")
-		}
-		panes2, _ := windows[1].Panes()
-		if len(panes2) != 1 {
-			t.Fatal("should have 1 pane")
-		}
-		out1, _ := panes1[0].Capture()
-		if !strings.Contains(strings.Join(out1, ""), "25") {
-			t.Fatal("Command1 did not run!")
-		}
-		out2, _ := panes2[0].Capture()
-		if !strings.Contains(strings.Join(out2, ""), "49") {
-			t.Fatal("Command2 did not run!")
-		}
-	})
-}
-
-func TestProjectStartPanes(t *testing.T) {
-	c1 := "expr 5 \\* 5"
-	c2 := "expr 7 \\* 7"
-	config := &config.Config{
-		Projects: map[string]*config.ProjectConfig{
-			"bin": {
-				Directory: "/home/test/bin",
-				Windows: []config.WindowConfig{
-					{
-						Name: "test1",
-						Panes: []config.PaneConfig{
-							{Command: &c1},
-							{Command: &c2},
-						},
-					},
-				},
-			},
-		},
-	}
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		projects, err := List(srv, config)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var project *Project
-		for _, p := range projects {
-			if p.Name == "bin" {
-				project = p
-			}
-		}
-		if project == nil {
-			t.Fatal("bin project not listed")
-		}
-		s, err := project.Start()
-		if err != nil {
-			t.Fatal(err)
-		}
-		time.Sleep(time.Second)
-		windows, _ := s.Windows()
-		if len(windows) != 1 {
-			t.Fatal("Should have 1 window")
-		}
-		if name, _ := windows[0].Name(); name != "test1" {
-			t.Fatal("Should have test1 as window name")
-		}
-		panes1, _ := windows[0].Panes()
-		if len(panes1) != 2 {
-			t.Fatal("should have 2 pane2")
-		}
-		out1, _ := panes1[0].Capture()
-		if !strings.Contains(strings.Join(out1, ""), "25") {
-			t.Fatal("Command1 did not run!")
-		}
-		out2, _ := panes1[1].Capture()
-		if !strings.Contains(strings.Join(out2, ""), "49") {
-			t.Fatal("Command2 did not run!")
-		}
-	})
-}
-
-func TestProjectStartPanesWithWindowCommand(t *testing.T) {
-	c1 := "expr 5 \\* 5"
-	c2 := "expr 7 \\* 7"
-	cw := "expr 9 \\* 9"
-	config := &config.Config{
-		Projects: map[string]*config.ProjectConfig{
-			"bin": {
-				Directory: "/home/test/bin",
-				Windows: []config.WindowConfig{
-					{
-						Name:    "test1",
-						Command: &cw,
-						Panes: []config.PaneConfig{
-							{Command: &c1},
-							{Command: &c2},
-						},
-					},
-				},
-			},
-		},
-	}
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		projects, err := List(srv, config)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var project *Project
-		for _, p := range projects {
-			if p.Name == "bin" {
-				project = p
-			}
-		}
-		if project == nil {
-			t.Fatal("bin project not listed")
-		}
-		s, err := project.Start()
-		if err != nil {
-			t.Fatal(err)
-		}
-		time.Sleep(time.Second)
-		windows, _ := s.Windows()
-		if len(windows) != 1 {
-			t.Fatal("Should have 1 window")
-		}
-		if name, _ := windows[0].Name(); name != "test1" {
-			t.Fatal("Should have test1 as window name")
-		}
-		panes1, _ := windows[0].Panes()
-		if len(panes1) != 3 {
-			t.Fatal("should have 3 pane2")
-		}
-		out1, _ := panes1[0].Capture()
-		if !strings.Contains(strings.Join(out1, ""), "81") {
-			t.Fatal("Command1 did not run!")
-		}
-		out2, _ := panes1[1].Capture()
-		if !strings.Contains(strings.Join(out2, ""), "25") {
-			t.Fatal("Command2 did not run!")
-		}
-		out3, _ := panes1[2].Capture()
-		if !strings.Contains(strings.Join(out3, ""), "49") {
-			t.Fatal("Command2 did not run!")
 		}
 	})
 }
 
 func TestProjectKill(t *testing.T) {
-	config := &config.Config{
-		Projects: map[string]*config.ProjectConfig{
-			"bin": {
-				Directory: "/home/test/bin",
-			},
-		},
-	}
 	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		projects, err := List(srv, config)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var project *Project
-		for _, p := range projects {
-			if p.Name == "bin" {
-				project = p
+		dir, client, testCases := setupTestProjects(t, srv)
+		defer teardownTestProjects(t, dir, client)
+		for _, tc := range testCases {
+			res := tc.project.Kill()
+			status, err := tc.project.Status()
+			if err != nil {
+				t.Error(err)
 			}
-		}
-		if project == nil {
-			t.Fatal("bin project not listed")
-		}
-		_, err = project.Start()
-		status, err := project.Status()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if status != PROJECT_STATUS_ACTIVE {
-			t.Fatal("Project should be active")
-		}
-		err = project.Kill()
-		status, err = project.Status()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if status != PROJECT_STATUS_INACTIVE {
-			t.Fatal("Project should be inactive")
-		}
-	})
-}
-
-func TestProjectSwitch(t *testing.T) {
-	config := &config.Config{
-		Projects: map[string]*config.ProjectConfig{
-			"bin": {
-				Directory: "/home/test/bin",
-			},
-		},
-	}
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		s, _ := srv.New("ses-1")
-		f := testutil.SetupTestClient(srv, s)
-		defer f.Close()
-		projects, err := List(srv, config)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var project *Project
-		for _, p := range projects {
-			if p.Name == "bin" {
-				project = p
+			if status != PROJECT_STATUS_INACTIVE {
+				t.Error("Project should be inactive")
 			}
-		}
-		if project == nil {
-			t.Fatal("bin project not listed")
-		}
-		err = project.Switch()
-		if err != nil {
-			t.Fatal(err)
-		}
-		status, _ := project.Status()
-		if status != PROJECT_STATUS_ATTACHED {
-			t.Fatal("Project should be attached")
-		}
-	})
-}
-
-func TestProjectSwitchCommands(t *testing.T) {
-	dir, err := os.MkdirTemp(os.TempDir(), "tmixer-test-projects")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(dir)
-	config := &config.Config{
-		Projects: map[string]*config.ProjectConfig{
-			"bin": {
-				Directory:      dir,
-				SwitchCommands: []string{"touch file1", "touch file2"},
-			},
-		},
-	}
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		s, _ := srv.New("ses-1")
-		f := testutil.SetupTestClient(srv, s)
-		defer f.Close()
-		projects, err := List(srv, config)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var project *Project
-		for _, p := range projects {
-			if p.Name == "bin" {
-				project = p
+			switch tc.initialStatus() {
+			case PROJECT_STATUS_INACTIVE:
+				if !errors.Is(res, ErrSessionNotFound) {
+					t.Error("Inactive project give session not found errror")
+				}
+			default:
+				if res != nil {
+					t.Error(res)
+				}
 			}
-		}
-		if project == nil {
-			t.Fatal("bin project not listed")
-		}
-		err = project.Switch()
-		if err != nil {
-			t.Fatal(err)
-		}
-		time.Sleep(time.Second)
-		entries, _ := os.ReadDir(dir)
-		if len(entries) != 2 {
-			t.Fatal("Should have created 2 files")
-		}
-	})
-}
-
-func TestProjectRunSwitchCommands(t *testing.T) {
-	dir, err := os.MkdirTemp(os.TempDir(), "tmixer-test-projects")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(dir)
-	config := &config.Config{
-		Projects: map[string]*config.ProjectConfig{
-			"bin": {
-				Directory:      dir,
-				SwitchCommands: []string{"touch file1", "touch file2"},
-			},
-		},
-	}
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		s, _ := srv.New("ses-1")
-		f := testutil.SetupTestClient(srv, s)
-		defer f.Close()
-		projects, err := List(srv, config)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var project *Project
-		for _, p := range projects {
-			if p.Name == "bin" {
-				project = p
-			}
-		}
-		if project == nil {
-			t.Fatal("bin project not listed")
-		}
-		project.Start()
-		err = project.RunSwitchCommands()
-		if err != nil {
-			t.Fatal(err)
-		}
-		time.Sleep(time.Second)
-		entries, _ := os.ReadDir(dir)
-		if len(entries) != 2 {
-			t.Fatal("Should have created 2 files")
-		}
-	})
-}
-
-func TestProjectReset(t *testing.T) {
-	config := &config.Config{
-		Projects: map[string]*config.ProjectConfig{
-			"bin": {
-				Directory: "/home/test/bin",
-			},
-		},
-	}
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		projects, err := List(srv, config)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var project *Project
-		for _, p := range projects {
-			if p.Name == "bin" {
-				project = p
-			}
-		}
-		if project == nil {
-			t.Fatal("bin project not listed")
-		}
-		s1, _ := project.Start()
-		s2, err := project.Reset()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if s1.Id == s2.Id {
-			t.Fatal("Should be new id")
-		}
-		res, _ := project.Session()
-		if res.Id != s2.Id {
-			t.Fatal("Should match new session id")
-		}
-	})
-}
-
-func TestProjectResetWindows(t *testing.T) {
-	c1 := "expr 5 \\* 5"
-	c2 := "expr 7 \\* 7"
-	config := &config.Config{
-		Projects: map[string]*config.ProjectConfig{
-			"bin": {
-				Directory: "/home/test/bin",
-				Windows: []config.WindowConfig{
-					{
-						Name:    "test1",
-						Command: &c1,
-					},
-					{
-						Name:    "test2",
-						Command: &c2,
-					},
-				},
-			},
-		},
-	}
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		projects, err := List(srv, config)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var project *Project
-		for _, p := range projects {
-			if p.Name == "bin" {
-				project = p
-			}
-		}
-		if project == nil {
-			t.Fatal("bin project not listed")
-		}
-		project.Start()
-		_, err = project.Reset()
-		if err != nil {
-			t.Fatal(err)
-		}
-		res, _ := project.Session()
-		time.Sleep(time.Second)
-		windows, _ := res.Windows()
-		if len(windows) != 2 {
-			t.Fatal("Should have 2 windows")
-		}
-		if name, _ := windows[0].Name(); name != "test1" {
-			t.Fatal("Should have test1 as window name")
-		}
-		if name, _ := windows[1].Name(); name != "test2" {
-			t.Fatal("Should have test2 as window name")
-		}
-		panes1, _ := windows[0].Panes()
-		if len(panes1) != 1 {
-			t.Fatal("should have 1 pane")
-		}
-		panes2, _ := windows[1].Panes()
-		if len(panes2) != 1 {
-			t.Fatal("should have 1 pane")
-		}
-		out1, _ := panes1[0].Capture()
-		if !strings.Contains(strings.Join(out1, ""), "25") {
-			t.Fatal("Command1 did not run!")
-		}
-		out2, _ := panes2[0].Capture()
-		if !strings.Contains(strings.Join(out2, ""), "49") {
-			t.Fatal("Command2 did not run!")
-		}
-	})
-}
-
-func TestProjectResetAttached(t *testing.T) {
-	config := &config.Config{
-		Projects: map[string]*config.ProjectConfig{
-			"bin": {
-				Directory: "/home/test/bin",
-			},
-		},
-	}
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		projects, err := List(srv, config)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var project *Project
-		for _, p := range projects {
-			if p.Name == "bin" {
-				project = p
-			}
-		}
-		if project == nil {
-			t.Fatal("bin project not listed")
-		}
-		s1, _ := project.Start()
-		f := testutil.SetupTestClient(srv, s1)
-		defer f.Close()
-		s2, err := project.Reset()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if s1.Id == s2.Id {
-			t.Fatal("Should be new id")
-		}
-		res, _ := project.Session()
-		if res.Id != s2.Id {
-			t.Fatal("Should match new session id")
-		}
-		if status, _ := project.Status(); status != PROJECT_STATUS_ATTACHED {
-			t.Fatal("Should attach to new session")
 		}
 	})
 }
 
 func TestProjectKillAttachedLastActive(t *testing.T) {
-	config := &config.Config{
-		Projects: map[string]*config.ProjectConfig{
-			"bin": {
-				Directory: "/home/test/bin",
-			},
-			"dog": {
-				Directory: "/home/test/bin",
-			},
-			"cat": {
-				Directory: "/home/test/bin",
-			},
-		},
-	}
 	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		projects, err := List(srv, config)
+		dir, client, testCases := setupTestProjects(t, srv)
+		defer teardownTestProjects(t, dir, client)
+		time.Sleep(time.Second)
+		var attached *Project
+		var lastActive *Project
+		// Randomize the order of the projects
+		rand.Shuffle(len(testCases), func(i, j int) {
+			tmp := testCases[i]
+			testCases[i] = testCases[j]
+			testCases[j] = tmp
+		})
+		// Find the currently attached project
+		for _, tc := range testCases {
+			if tc.initialStatus() == PROJECT_STATUS_ATTACHED {
+				attached = tc.project
+			}
+		}
+		// Attach and switch back for all active projects to force a lastActivity update
+		for _, tc := range testCases {
+			if tc.initialStatus() == PROJECT_STATUS_ACTIVE {
+				err := tc.project.Switch()
+				if err != nil {
+					t.Error(err)
+				}
+				err = attached.Switch()
+				if err != nil {
+					t.Error(err)
+				}
+				lastActive = tc.project
+				time.Sleep(time.Second)
+			}
+		}
+		err := attached.Kill()
 		if err != nil {
-			t.Fatal(err)
+			t.Error(err)
 		}
-		var project *Project
-		var s1 *tmux.Session
-		var s2 *tmux.Session
-		for _, p := range projects {
-			if p.Name == "bin" {
-				project = p
-				s1, _ = p.Start()
-			}
-			if p.Name == "cat" {
-				s2, _ = p.Start()
-			}
+		status, err := lastActive.Status()
+		if err != nil {
+			t.Error(err)
 		}
-		f := testutil.SetupTestClient(srv, s1)
-		defer f.Close()
-		project.Kill()
-		client, _ := srv.ActiveClient()
-		cs, _ := client.Session()
-		if cs.Id != s2.Id {
-			t.Fatal("Should switch to the last active session")
+		if status != PROJECT_STATUS_ATTACHED {
+			t.Error("The last active project should be attached now")
 		}
 	})
 }
 
 func TestProjectKillAttachedDefault(t *testing.T) {
-	def := "cat"
-	config := &config.Config{
-		DefaultProject: &def,
-		Projects: map[string]*config.ProjectConfig{
-			"bin": {
-				Directory: "/home/test/bin",
-			},
-			"dog": {
-				Directory: "/home/test/bin",
-			},
-			"cat": {
-				Directory: "/home/test/bin",
-			},
-		},
-	}
+	def := "inactive-windows-switch"
 	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		projects, err := List(srv, config)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var project *Project
-		var s1 *tmux.Session
-		for _, p := range projects {
-			if p.Name == "bin" {
-				project = p
-				s1, _ = p.Start()
+		dir, client, testCases := setupTestProjects(t, srv)
+		defer teardownTestProjects(t, dir, client)
+		var attached *Project
+		var defProj *Project
+		for _, tc := range testCases {
+			if tc.initialStatus() == PROJECT_STATUS_ATTACHED {
+				attached = tc.project
+			}
+			if tc.initialStatus() == PROJECT_STATUS_ACTIVE {
+				err := tc.project.Kill()
+				if err != nil {
+					t.Error(err)
+				}
+			}
+			if tc.project.Name == def {
+				defProj = tc.project
 			}
 		}
 		// Kill the default test session
-		sessions, _ := srv.ListSessions()
-		for _, s := range sessions {
-			if s.Id != s1.Id {
-				name, _ := s.Name()
-				if name != tmux.CONTROL_SESSION_NAME {
-					s.Kill()
-				}
-			}
-
-		}
-		f := testutil.SetupTestClient(srv, s1)
-		defer f.Close()
-		project.Kill()
-		client, err := srv.ActiveClient()
+		ts, err := srv.GetSessionWithName(testutil.DEFAULT_TEST_SESSION)
 		if err != nil {
-			t.Fatal(err)
+			t.Error(err)
 		}
-		cs, err := client.Session()
+		err = ts.Kill()
 		if err != nil {
-			t.Fatal(err)
+			t.Error(err)
 		}
-		name, _ := cs.Name()
-		if name != def {
-			t.Fatalf("Should switch to the default project, got %s", name)
+		// Set the default project
+		attached.fullConfig.DefaultProject = &def
+		err = attached.Kill()
+		if err != nil {
+			t.Error(err)
+		}
+		status, err := defProj.Status()
+		if err != nil {
+			t.Error(err)
+		}
+		if status != PROJECT_STATUS_ATTACHED {
+			t.Error("The default project should be attached now")
 		}
 	})
 }
 
-func TestProjectResetAttachedSwitchCommands(t *testing.T) {
-	dir, err := os.MkdirTemp(os.TempDir(), "tmixer-test-projects")
-	if err != nil {
-		t.Fatal(err)
-	}
-	config := &config.Config{
-		Projects: map[string]*config.ProjectConfig{
-			"bin": {
-				Directory:      dir,
-				SwitchCommands: []string{"touch test"},
-			},
-		},
-	}
+func TestProjectKillAttachedNoDefault(t *testing.T) {
 	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		projects, err := List(srv, config)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var project *Project
-		for _, p := range projects {
-			if p.Name == "bin" {
-				project = p
+		dir, client, testCases := setupTestProjects(t, srv)
+		defer teardownTestProjects(t, dir, client)
+		var attached *Project
+		for _, tc := range testCases {
+			if tc.initialStatus() == PROJECT_STATUS_ATTACHED {
+				attached = tc.project
+			}
+			if tc.initialStatus() == PROJECT_STATUS_ACTIVE {
+				err := tc.project.Kill()
+				if err != nil {
+					t.Error(err)
+				}
 			}
 		}
-		if project == nil {
-			t.Fatal("bin project not listed")
-		}
-		s1, _ := project.Start()
-		f := testutil.SetupTestClient(srv, s1)
-		defer f.Close()
-		s2, err := project.Reset()
-		time.Sleep(time.Second)
+		// Kill the default test session
+		ts, err := srv.GetSessionWithName(testutil.DEFAULT_TEST_SESSION)
 		if err != nil {
-			t.Fatal(err)
+			t.Error(err)
 		}
-		if s1.Id == s2.Id {
-			t.Fatal("Should be new id")
+		err = ts.Kill()
+		if err != nil {
+			t.Error(err)
 		}
-		res, _ := project.Session()
-		if res.Id != s2.Id {
-			t.Fatal("Should match new session id")
+		// Set the default project
+		attached.fullConfig.DefaultProject = nil
+		err = attached.Kill()
+		if err != nil {
+			t.Error(err)
 		}
-		if status, _ := project.Status(); status != PROJECT_STATUS_ATTACHED {
-			t.Fatal("Should attach to new session")
+		someAttached := false
+		for _, tc := range testCases {
+			status, err := tc.project.Status()
+			if err != nil {
+				t.Error(err)
+			}
+			if status == PROJECT_STATUS_ATTACHED {
+				someAttached = true
+			}
 		}
-		entries, _ := os.ReadDir(dir)
-		if len(entries) != 1 {
-			t.Fatal("Should have created 1 files")
+		if !someAttached {
+			t.Error("Some project should be attached now")
 		}
+	})
+}
 
+func TestProjectKillAttachedNoProjects(t *testing.T) {
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		dir, client, testCases := setupTestProjects(t, srv)
+		defer teardownTestProjects(t, dir, client)
+		var attached *Project
+		for _, tc := range testCases {
+			if tc.initialStatus() == PROJECT_STATUS_ATTACHED {
+				attached = tc.project
+			}
+			if tc.initialStatus() == PROJECT_STATUS_ACTIVE {
+				err := tc.project.Kill()
+				if err != nil {
+					t.Error(err)
+				}
+			}
+		}
+		// Kill the default test session
+		ts, err := srv.GetSessionWithName(testutil.DEFAULT_TEST_SESSION)
+		if err != nil {
+			t.Error(err)
+		}
+		err = ts.Kill()
+		if err != nil {
+			t.Error(err)
+		}
+		// Set the default project
+		attached.fullConfig = &config.Config{
+			Projects: map[string]*config.ProjectConfig{
+				attached.Name: attached.Config,
+			},
+		}
+		err = attached.Kill()
+		if err != nil {
+			t.Error(err)
+		}
+		_, err = srv.ActiveClient()
+		if err == nil {
+			t.Error(err)
+		}
+	})
+}
+
+func TestProjectSwitch(t *testing.T) {
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		dir, client, testCases := setupTestProjects(t, srv)
+		defer teardownTestProjects(t, dir, client)
+		for _, tc := range testCases {
+			err := tc.project.Switch()
+			if err != nil {
+				t.Error(err)
+			}
+			status, err := tc.project.Status()
+			if err != nil {
+				t.Error(err)
+			}
+			if status != PROJECT_STATUS_ATTACHED {
+				t.Error("Should attache to project")
+			}
+		}
+	})
+}
+
+func TestProjectSwitchCreatesSession(t *testing.T) {
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		dir, client, testCases := setupTestProjects(t, srv)
+		defer teardownTestProjects(t, dir, client)
+		for _, tc := range testCases {
+			err := tc.project.Switch()
+			if err != nil {
+				t.Error(err)
+			}
+			session, err := tc.project.Session()
+			if err != nil {
+				t.Error(err)
+			}
+			if session == nil {
+				t.Error("Should have a session")
+			}
+			if tc.initialStatus() != PROJECT_STATUS_INACTIVE {
+				if tc.session.Id != session.Id {
+					t.Error("Should attach to existing sesison")
+				}
+			}
+		}
+	})
+}
+
+func TestProjectSwitchWindowsAndPanes(t *testing.T) {
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		dir, client, testCases := setupTestProjects(t, srv)
+		defer teardownTestProjects(t, dir, client)
+		for _, tc := range testCases {
+			err := tc.project.Switch()
+			time.Sleep(time.Second)
+			if err != nil {
+				t.Error(err)
+			}
+			res, err := tc.project.Session()
+			if err != nil {
+				t.Error(err)
+			}
+			if strings.Contains(tc.project.Name, "windows") {
+				windows, err := res.Windows()
+				if err != nil {
+					t.Error(err)
+				}
+				if len(windows) != 3 {
+					t.Error("Should have 3 windows")
+				}
+				for i := range 3 {
+					panes, err := windows[i].Panes()
+					if err != nil {
+						t.Error(err)
+					}
+					for j := range pane_counts[i] {
+						expected := fmt.Sprintf("%d", primes[i]*primes[j])
+						out, err := panes[j].Capture()
+						if err != nil {
+							t.Error(err)
+						}
+						allOut := strings.Join(out, "")
+						if !strings.Contains(allOut, expected) {
+							t.Errorf("Missing output %s in %s", expected, allOut)
+						}
+					}
+				}
+			} else {
+				windows, err := res.Windows()
+				if err != nil {
+					t.Error(err)
+				}
+				if len(windows) != 1 {
+					t.Errorf("Should have 1 (default) window got %d", len(windows))
+				}
+			}
+		}
+	})
+}
+
+func TestProjectSwitchCommands(t *testing.T) {
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		dir, client, testCases := setupTestProjects(t, srv)
+		defer teardownTestProjects(t, dir, client)
+		for _, tc := range testCases {
+			err := tc.project.Switch()
+			if err != nil {
+				t.Error(err)
+			}
+			time.Sleep(time.Second)
+			ls, err := os.ReadDir(tc.project.Config.Directory)
+			if err != nil {
+				t.Error(err)
+			}
+			if strings.Contains(tc.project.Name, "switch") {
+				if len(ls) != len(switchCommands) {
+					t.Errorf("Expected %d files from switch commands got %d", len(switchCommands), len(ls))
+				}
+			} else {
+				if len(ls) != 0 {
+					t.Errorf("Expected 0 files from switch commands got %d", len(ls))
+				}
+			}
+		}
+	})
+}
+
+func TestProjectRunSwitchCommands(t *testing.T) {
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		dir, client, testCases := setupTestProjects(t, srv)
+		defer teardownTestProjects(t, dir, client)
+		for _, tc := range testCases {
+			err := tc.project.RunSwitchCommands()
+			time.Sleep(time.Second)
+			if tc.initialStatus() == PROJECT_STATUS_INACTIVE {
+				if err != ErrSessionNotFound {
+					t.Error("Should retrun sesison not found error for inactive projects")
+				}
+			} else {
+				if err != nil {
+					t.Error(err)
+				}
+				ls, err := os.ReadDir(tc.project.Config.Directory)
+				if err != nil {
+					t.Error(err)
+				}
+				if strings.Contains(tc.project.Name, "switch") {
+					if len(ls) != len(switchCommands) {
+						t.Errorf("Expected %d files from switch commands got %d", len(switchCommands), len(ls))
+					}
+				} else {
+					if len(ls) != 0 {
+						t.Errorf("Expected 0 files from switch commands got %d", len(ls))
+					}
+				}
+			}
+		}
+	})
+}
+
+func TestProjectReset(t *testing.T) {
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		dir, client, testCases := setupTestProjects(t, srv)
+		defer teardownTestProjects(t, dir, client)
+		for _, tc := range testCases {
+			initialSessions, err := srv.ListSessions()
+			if err != nil {
+				t.Error(err)
+			}
+			res, reserr := tc.project.Reset()
+			status, err := tc.project.Status()
+			if err != nil {
+				t.Error(err)
+			}
+			switch tc.initialStatus() {
+			case PROJECT_STATUS_INACTIVE:
+				if !errors.Is(reserr, ErrSessionNotFound) {
+					t.Error("Inactive project should return not found error")
+				}
+				if res != nil {
+					t.Error("Should not return a sesison for inactive projects")
+				}
+			default:
+				if reserr != nil {
+					t.Error(reserr)
+				}
+				if status != tc.initialStatus() {
+					t.Error("Status should match original")
+				}
+				if res.Id == tc.session.Id {
+					t.Error("Status should not match original")
+				}
+			}
+			finalSessions, err := srv.ListSessions()
+			if err != nil {
+				t.Error(err)
+			}
+			if len(initialSessions) != len(finalSessions) {
+				t.Error("Number of sessions before and after should match")
+			}
+		}
+	})
+}
+
+func TestProjectResetWindowsAndPanes(t *testing.T) {
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		dir, client, testCases := setupTestProjects(t, srv)
+		defer teardownTestProjects(t, dir, client)
+		for _, tc := range testCases {
+			if tc.initialStatus() == PROJECT_STATUS_INACTIVE {
+				continue
+			}
+			res, err := tc.project.Reset()
+			if err != nil {
+				t.Error(err)
+			}
+			time.Sleep(time.Second)
+			if strings.Contains(tc.project.Name, "windows") {
+				windows, err := res.Windows()
+				if err != nil {
+					t.Error(err)
+				}
+				if len(windows) != 3 {
+					t.Error("Should have 3 windows")
+				}
+				for i := range 3 {
+					panes, err := windows[i].Panes()
+					if err != nil {
+						t.Error(err)
+					}
+					for j := range pane_counts[i] {
+						expected := fmt.Sprintf("%d", primes[i]*primes[j])
+						out, err := panes[j].Capture()
+						if err != nil {
+							t.Error(err)
+						}
+						allOut := strings.Join(out, "")
+						if !strings.Contains(allOut, expected) {
+							t.Errorf("Missing output %s in %s", expected, allOut)
+						}
+					}
+				}
+			} else {
+				windows, err := res.Windows()
+				if err != nil {
+					t.Error(err)
+				}
+				if len(windows) != 1 {
+					t.Errorf("Should have 1 (default) window got %d", len(windows))
+				}
+			}
+		}
+	})
+}
+
+func TestProjectResetCommands(t *testing.T) {
+	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		dir, client, testCases := setupTestProjects(t, srv)
+		defer teardownTestProjects(t, dir, client)
+		for _, tc := range testCases {
+			if tc.initialStatus() == PROJECT_STATUS_INACTIVE {
+				continue
+			}
+			_, err := tc.project.Reset()
+			if err != nil {
+				t.Error(err)
+			}
+			time.Sleep(time.Second)
+			ls, err := os.ReadDir(tc.project.Config.Directory)
+			if err != nil {
+				t.Error(err)
+			}
+			if strings.Contains(tc.project.Name, "switch") && tc.initialStatus() == PROJECT_STATUS_ATTACHED {
+				if len(ls) != len(switchCommands) {
+					t.Errorf("Expected %d files from switch commands got %d", len(switchCommands), len(ls))
+				}
+			} else {
+				if len(ls) != 0 {
+					t.Errorf("Expected 0 files from switch commands got %d", len(ls))
+				}
+			}
+		}
 	})
 }

@@ -10,13 +10,16 @@ import (
 	"samuellando.com/tmixer/internal/tmux"
 )
 
-var ERROR_AMBIGUOUS_NAME = errors.New("Ambiguous project name detected")
+var ErrAmbiguousName = errors.New("Ambiguous project name detected")
 
 // List all configured projects
 // - Creates a project for each sub directory
 //   - Giving them the name "[project_name]--[subdir_name]"
 //
 // - Creates projects for existing tmux sessions, if they do not match a config project
+//
+// Returns an ErrAmbiguousName if there are two configured projects with the same name,
+// And other errors if anything else goes wrong with the queries.
 func List(tmux *tmux.Server, config *config.Config) ([]*Project, error) {
 	projects := listBareProjects(config)
 	subDirProjects, err := listSubDirProjects(config)
@@ -25,7 +28,7 @@ func List(tmux *tmux.Server, config *config.Config) ([]*Project, error) {
 	}
 	projects = append(projects, subDirProjects...)
 	if l := getDuplicateNames(projects); len(l) > 0 {
-		return nil, fmt.Errorf("%w %v", ERROR_AMBIGUOUS_NAME, l)
+		return nil, fmt.Errorf("%w %v", ErrAmbiguousName, l)
 	}
 	if tmux != nil {
 		sessionProjects, err := listSessionsWithoutProject(tmux, projects)

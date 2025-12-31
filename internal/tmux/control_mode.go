@@ -127,7 +127,7 @@ func (srv *Server) runCommandInControlModeIfStarted(c cmd) ([]string, error) {
 	out, err := cmd.CombinedOutput()
 	lines := make([]string, 0)
 	for line := range bytes.SplitSeq(out, []byte{'\n'}) {
-		l := strings.TrimSpace(string(line))
+		l := string(line)
 		if len(l) > 0 {
 			lines = append(lines, l)
 		}

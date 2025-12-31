@@ -259,7 +259,7 @@ func TestAmbiguousNames(t *testing.T) {
 	}
 	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
 		_, err := List(srv, config)
-		if !errors.Is(err, ERROR_AMBIGUOUS_NAME) {
+		if !errors.Is(err, ErrAmbiguousName) {
 			t.Errorf("wrong error returned %v", err)
 		}
 	})
