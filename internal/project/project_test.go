@@ -66,7 +66,7 @@ var testWindowConfigs = []config.WindowConfig{
 	},
 }
 
-var switchCommands = []string{"touch $(random)", "touch $(random)"}
+var switchCommands = []string{"touch one-$(date +%s%N)", "touch two-$(date +%s%N)"}
 
 var testConfig = &config.Config{
 	Projects: map[string]*config.ProjectConfig{
