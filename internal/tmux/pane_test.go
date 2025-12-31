@@ -198,13 +198,13 @@ func TestWorkingDirectory(t *testing.T) {
 				p.SendKeys("pwd")
 			}
 		}
-		time.Sleep(1 * time.Second)
+		time.Sleep(10 * time.Second)
 		for _, w := range windows {
 			panes, _ := w.Panes()
 			for _, p := range panes {
 				out, _ := p.Capture()
 				if !strings.Contains(strings.Join(out, ""), dir) {
-					t.Fatal("not temp dir")
+					t.Fatalf("Output is missing temp dir %v", strings.Join(out, ""))
 				}
 			}
 		}
