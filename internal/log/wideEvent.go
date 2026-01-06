@@ -10,21 +10,6 @@ import (
 
 type WideEvent map[string]any
 
-func InitializeWideEvent(ctx context.Context) context.Context {
-	event := make(map[string]any)
-	event["time"] = time.Now()
-	event["level"] = "INFO"
-	return context.WithValue(ctx, "wideEvent", event)
-}
-
-func GetWideEvent(ctx context.Context) WideEvent {
-	event, ok := ctx.Value("wideEvent").(map[string]any)
-	if !ok {
-		panic("Must call InitializeWideEvent first")
-	}
-	return event
-}
-
 func Track[T any](ctx context.Context, eventName string, event *T) func() {
 	startTime := time.Now()
 
@@ -42,38 +27,63 @@ func Track[T any](ctx context.Context, eventName string, event *T) func() {
 		eventMap["time"] = startTime
 		eventMap["duration"] = time.Since(startTime)
 		// Add the map to the context
-		GetWideEvent(ctx)[eventName] = eventMap
+		getWideEvent(ctx).append(eventName, eventMap)
 	}
 }
 
-func Lock[T any](v *T) *T {
-	b, err := json.Marshal(v)
-	if err != nil {
-		panic(err)
+func TrackLevel[T any](level int, ctx context.Context, eventName string, event *T) func() {
+	minLevel := getWideEvent(ctx)["minLevel"].(int)
+	if level >= minLevel {
+		return Track(ctx, eventName, event)
 	}
-	out := new(T)
-	err = json.Unmarshal(b, out)
-	if err != nil {
-		panic(err)
-	}
-	return out
+	return func() {}
 }
 
-func LockArray[T any](v []T) []T {
-	b, err := json.Marshal(v)
-	if err != nil {
-		panic(err)
+func InitializeWideEvent(ctx context.Context, options *LoggerOptions) context.Context {
+	v := ctx.Value("wideEvent")
+	var event map[string]any
+	if v == nil {
+		event = make(map[string]any)
+		ctx = context.WithValue(ctx, "wideEvent", event)
+		event["time"] = time.Now()
+		event["level"] = "INFO"
+		if options != nil {
+			event["minLevel"] = options.Level
+		} else {
+			event["minLevel"] = LEVEL_INFO
+		}
+	} else {
+		event = v.(map[string]any)
 	}
-	out := make([]T, 0)
-	err = json.Unmarshal(b, &out)
-	if err != nil {
-		panic(err)
+	return ctx
+}
+
+func getWideEvent(ctx context.Context) WideEvent {
+	event, ok := ctx.Value("wideEvent").(map[string]any)
+	if !ok {
+		panic("Must call InitializeWideEvent first")
 	}
-	return out
+	return event
+}
+
+func (event WideEvent) append(key string, value any) {
+	current, vok := event[key]
+	currentarr, arrok := event[key+"s"]
+	if !vok && !arrok {
+		event[key] = value
+	} else {
+		delete(event, key)
+		arr, ok := currentarr.([]any)
+		if !ok {
+			event[key+"s"] = []any{current, value}
+		} else {
+			event[key+"s"] = append(arr, value)
+		}
+	}
 }
 
 func (event WideEvent) MarshalJSON() ([]byte, error) {
-	forcedBegining := []string{"level", "time", "error"}
+	forcedBegining := []string{"level", "time", "error", "minLevel"}
 	forcedEnd := []string{"duration"}
 	forced := make(map[string]bool)
 	for _, k := range forcedBegining {
@@ -82,39 +92,35 @@ func (event WideEvent) MarshalJSON() ([]byte, error) {
 	for _, k := range forcedEnd {
 		forced[k] = true
 	}
-	out := bytes.Buffer{}
-	i := 0
-	writeField := func(k string, v any) error {
-		b, err := json.Marshal(v)
-		if err != nil {
-			return err
-		}
-		fmt.Fprintf(&out, `"%s":%s`, k, string(b))
-		i++
-		if i < len(event) {
-			out.WriteByte(',')
-		}
-		return nil
+
+	type kv struct {
+		k string
+		v any
 	}
-	out.WriteByte('{')
+
+	var fields []kv
 	for _, k := range forcedBegining {
-		err := writeField(k, event[k])
-		if err != nil {
-			return nil, err
-		}
+		fields = append(fields, kv{k: k, v: event[k]})
 	}
 	for k, v := range event {
 		if !forced[k] {
-			err := writeField(k, v)
-			if err != nil {
-				return nil, err
-			}
+			fields = append(fields, kv{k: k, v: v})
 		}
 	}
 	for _, k := range forcedEnd {
-		err := writeField(k, event[k])
+		fields = append(fields, kv{k: k, v: event[k]})
+	}
+
+	out := bytes.Buffer{}
+	out.WriteByte('{')
+	for i, field := range fields {
+		b, err := json.Marshal(field.v)
 		if err != nil {
 			return nil, err
+		}
+		fmt.Fprintf(&out, `"%s":%s`, field.k, string(b))
+		if i < len(fields)-1 {
+			out.WriteByte(',')
 		}
 	}
 	out.WriteByte('}')

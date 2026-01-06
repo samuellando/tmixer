@@ -8,20 +8,31 @@ import (
 	"time"
 )
 
+const (
+	LEVEL_DEBUG = -1
+	LEVEL_INFO  = 0
+	LEVEL_ERROR = 1
+)
+
 type Logger struct {
 	w io.Writer
 }
 
-func New(w io.Writer) *Logger {
-	return &Logger{w: w}
+type LoggerOptions struct {
+	Level int
+}
+
+func New(ctx context.Context, w io.Writer, options *LoggerOptions) (context.Context, *Logger) {
+	ctx = InitializeWideEvent(ctx, options)
+	return ctx, &Logger{w: w}
 }
 
 func (log *Logger) Info(ctx context.Context) {
-	log.logEvent(GetWideEvent(ctx))
+	log.logEvent(getWideEvent(ctx))
 }
 
 func (log *Logger) Error(ctx context.Context, err error) {
-	event := GetWideEvent(ctx)
+	event := getWideEvent(ctx)
 	event["level"] = "ERROR"
 	event["error"] = err.Error()
 	log.logEvent(event)
