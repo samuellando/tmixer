@@ -7,17 +7,17 @@ import (
 	"time"
 )
 
-type sessionId string
+type SessionId string
 
-func parseSessionId(s string) (sessionId, error) {
+func parseSessionId(s string) (SessionId, error) {
 	if len(s) == 0 || s[0] != '$' {
 		return "", fmt.Errorf("invalid session id: %q", s)
 	}
-	return sessionId(s), nil
+	return SessionId(s), nil
 }
 
 type Session struct {
-	Id     sessionId
+	Id     SessionId
 	server *Server
 }
 

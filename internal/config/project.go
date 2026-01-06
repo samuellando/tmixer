@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"maps"
@@ -9,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/goccy/go-yaml"
+	"samuellando.com/tmixer/internal/log"
 )
 
 type Config struct {
@@ -54,23 +56,34 @@ func New() *Config {
 	}
 }
 
-func (config *Config) LoadFiles() error {
+func (config *Config) LoadFiles(ctx context.Context) error {
+	type configLoadEvent struct {
+		Result *Config  `json:"result"`
+		Errors []string `json:"errors"`
+	}
+	event := &configLoadEvent{}
+	finish := log.Track(ctx, "configLoadEvent", event)
+	defer finish()
+
 	allProjects := make([]map[string]*ProjectConfig, 0)
 	var errs error
 	for _, f := range config.ConfigFiles {
 		path, err := absPath(f)
 		if err != nil {
 			errs = errors.Join(errs, err)
+			event.Errors = append(event.Errors, err.Error())
 			continue
 		}
 		bytes, err := os.ReadFile(path)
 		if err != nil {
 			errs = errors.Join(errs, err)
+			event.Errors = append(event.Errors, err.Error())
 			continue
 		}
 		err = yaml.Unmarshal(bytes, config)
 		if err != nil {
 			errs = errors.Join(errs, err)
+			event.Errors = append(event.Errors, err.Error())
 			continue
 		}
 		allProjects = append(allProjects, config.Projects)
@@ -85,7 +98,9 @@ func (config *Config) LoadFiles() error {
 	err := convertToAbsolutePaths(config.Projects)
 	if err != nil {
 		errs = errors.Join(errs, err)
+		event.Errors = append(event.Errors, err.Error())
 	}
+	event.Result = config
 	return errs
 }
 

@@ -1,6 +1,7 @@
 package tmux
 
 import (
+	"context"
 	"errors"
 	"fmt"
 )
@@ -10,13 +11,14 @@ var ErrSessionNotFound = errors.New("session not found")
 type Server struct {
 	SocketPath        string
 	controlModeClient *controlModeClient
+	ctx               context.Context
 }
 
-func Tmux(socketPaths ...string) *Server {
+func Tmux(ctx context.Context, socketPaths ...string) *Server {
 	if len(socketPaths) > 0 {
-		return &Server{SocketPath: socketPaths[0]}
+		return &Server{ctx: ctx, SocketPath: socketPaths[0]}
 	} else {
-		return &Server{}
+		return &Server{ctx: ctx}
 	}
 }
 

@@ -3,23 +3,46 @@ package tmux
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
-	"log/slog"
 	"os/exec"
 	"strings"
+	"time"
+
+	"samuellando.com/tmixer/internal/log"
 )
 
 type controlModeClient struct {
 	controlModeCmd    *exec.Cmd
 	controlModeStdIn  io.WriteCloser
 	controlModeStdOut *bufio.Reader
+	logSession        *controlModeSession
+	finishLog         func()
+}
+
+type commandEvent struct {
+	Args        []string `json:"args"`
+	RawInput    string   `json:"rawInput"`
+	OutputLines []string `json:"outputLines"`
+	Error       *string  `json:"error"`
+}
+
+type controlModeSession struct {
+	CommandRuns     int           `json:"commandRuns"`
+	AverageDuration time.Duration `json:"AverageDuration"`
+	Errors          []string      `json:"errors"`
 }
 
 const CONTROL_SESSION_NAME = "__tmixer_control__"
 
 func (srv *Server) StartControlMode() error {
-	client := controlModeClient{}
+	session := &controlModeSession{}
+	finish := log.Track(srv.ctx, "controlModeSession", session)
+	client := controlModeClient{
+		logSession: session,
+		finishLog:  finish,
+	}
 	cmd := srv.command("new-session")
 	cmd = cmd.withTmuxFlag("-C").withFlag("-A").withSession(CONTROL_SESSION_NAME)
 	// Escape and setup stdin and stdout
@@ -27,6 +50,8 @@ func (srv *Server) StartControlMode() error {
 	srv.controlModeClient = &client
 	rollback := func(err error) error {
 		srv.controlModeClient = nil
+		session.Errors = append(session.Errors, err.Error())
+		finish()
 		return err
 	}
 	var err error
@@ -43,7 +68,7 @@ func (srv *Server) StartControlMode() error {
 	if err != nil {
 		return rollback(err)
 	}
-	_, err = client.readMessage()
+	_, err = client.readMessage(nil)
 	if err != nil {
 		return rollback(err)
 	}
@@ -54,36 +79,48 @@ func (srv *Server) StopControlMode() error {
 	if srv.controlModeClient == nil {
 		return fmt.Errorf("controlMode already closed")
 	}
+	session := srv.controlModeClient.logSession
+	defer srv.controlModeClient.finishLog()
 	err := srv.controlModeClient.controlModeStdIn.Close()
 	if err != nil {
-		return fmt.Errorf("when closing stdin %w", err)
+		err = fmt.Errorf("when closing stdin %w", err)
+		session.Errors = append(session.Errors, err.Error())
+		return err
 	}
-	srv.controlModeClient.readMessage()
+	srv.controlModeClient.readMessage(nil)
 	err = srv.controlModeClient.controlModeCmd.Wait()
 	if err != nil {
-		return fmt.Errorf("when waiting for command to exit: %w", err)
+		err = fmt.Errorf("when closing stdin %w", err)
+		session.Errors = append(session.Errors, err.Error())
+		return err
 	}
 	srv.controlModeClient = nil
 	// Finally clean up the session if we can
 	return nil
 }
 
-func (client *controlModeClient) sendCommand(c cmd) ([]string, error) {
-	slog.Debug(fmt.Sprintf("COMMAND> %s", c.String()))
+func (client *controlModeClient) sendCommand(ctx context.Context, c cmd) ([]string, error) {
+	event := &commandEvent{}
+	finish := log.TrackLevel(log.LEVEL_DEBUG, ctx, "controlModeCommandEvent", event)
+	start := time.Now()
+	defer finish()
+	event.Args = c.internalArguments()
+	event.RawInput = c.String()
 	_, err := client.controlModeStdIn.Write([]byte(c.String() + "\n"))
 	if err != nil {
 		return nil, fmt.Errorf("Failed to write to stdin: %w", err)
 	}
-	return client.readMessage()
+	out, err := client.readMessage(event)
+	client.logSession.AverageDuration = ((client.logSession.AverageDuration * time.Duration(client.logSession.CommandRuns)) + time.Since(start)) / time.Duration(client.logSession.CommandRuns+1)
+	client.logSession.CommandRuns++
+	return out, err
 }
 
-func (client *controlModeClient) readMessage() ([]string, error) {
+func (client *controlModeClient) readMessage(event *commandEvent) ([]string, error) {
 	readState := "before"
-	slog.Debug("READING")
 	out := make([]string, 0)
 	for {
 		outLine, err := client.controlModeStdOut.ReadString('\n')
-		slog.Debug(outLine)
 		if err == io.EOF {
 			break
 		}
@@ -110,20 +147,33 @@ func (client *controlModeClient) readMessage() ([]string, error) {
 			out = append(out, strings.TrimSpace(outLine))
 		}
 	}
+	if event != nil {
+		event.OutputLines = out
+	}
 	if readState == "done" {
 		return out, nil
 	} else if readState == "error" {
-		return out, fmt.Errorf("command returned error output \"%s\"", strings.Join(out, "\n"))
+		err := fmt.Errorf("command returned error output \"%s\"", strings.Join(out, "\n"))
+		sErr := err.Error()
+		event.Error = &sErr
+		return out, err
 	} else {
-		return out, fmt.Errorf("Critical read error")
+		err := fmt.Errorf("Critical read error")
+		sErr := err.Error()
+		event.Error = &sErr
+		return out, err
 	}
 }
 
 func (srv *Server) runCommandInControlModeIfStarted(c cmd) ([]string, error) {
 	if srv.controlModeClient != nil {
-		return srv.controlModeClient.sendCommand(c)
+		return srv.controlModeClient.sendCommand(srv.ctx, c)
 	}
+	event := &commandEvent{}
+	finish := log.TrackLevel(log.LEVEL_DEBUG, srv.ctx, "tmuxCommandEvent", event)
+	defer finish()
 	cmd := c.getExecCmd()
+	event.Args = cmd.Args
 	out, err := cmd.CombinedOutput()
 	lines := make([]string, 0)
 	for line := range bytes.SplitSeq(out, []byte{'\n'}) {
@@ -132,8 +182,12 @@ func (srv *Server) runCommandInControlModeIfStarted(c cmd) ([]string, error) {
 			lines = append(lines, l)
 		}
 	}
+	event.OutputLines = lines
 	if err != nil {
-		return lines, fmt.Errorf("command returned error: %w with output \"%s\"", err, strings.Join(lines, "\n"))
+		err := fmt.Errorf("command returned error: %w with output \"%s\"", err, strings.Join(lines, "\n"))
+		sErr := err.Error()
+		event.Error = &sErr
+		return lines, err
 	}
 	return lines, nil
 }
