@@ -221,7 +221,7 @@ func setupLogging(ctx context.Context, config *config.Config) (*log.Logger, []*o
 	if err != nil {
 		return nil, nil, err
 	}
-	logDir := filepath.Join(home, ".local/state/tmixer/log")
+	logDir := filepath.Join(home, ".local/state/tmixer/logs")
 	f, err := log.RotateLogFile(logDir, retention)
 	if err != nil {
 		return nil, nil, err
