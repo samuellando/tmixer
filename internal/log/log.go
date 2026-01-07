@@ -22,9 +22,9 @@ type LoggerOptions struct {
 	Level int
 }
 
-func New(ctx context.Context, w io.Writer, options *LoggerOptions) (context.Context, *Logger) {
+func New(ctx context.Context, options *LoggerOptions) (context.Context, *Logger) {
 	ctx = InitializeWideEvent(ctx, options)
-	return ctx, &Logger{w: []io.Writer{w}}
+	return ctx, &Logger{w: []io.Writer{}}
 }
 
 func (log *Logger) AddSink(w io.Writer) {

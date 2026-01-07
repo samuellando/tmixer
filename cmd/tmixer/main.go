@@ -215,6 +215,9 @@ func disableHooks(tmux *tmux.Server) error {
 }
 
 func setupLogging(ctx context.Context, config *config.Config) (*log.Logger, []*os.File, error) {
+	files := []*os.File{}
+	_, logger := log.New(ctx, nil)
+
 	retention := 24 * time.Hour * time.Duration(*config.LogRetentionDays)
 
 	home, err := os.UserHomeDir()
@@ -222,13 +225,17 @@ func setupLogging(ctx context.Context, config *config.Config) (*log.Logger, []*o
 		return nil, nil, err
 	}
 	logDir := filepath.Join(home, ".local/state/tmixer/logs")
+
 	f, err := log.RotateLogFile(logDir, retention)
 	if err != nil {
 		return nil, nil, err
 	}
-	_, logger := log.New(ctx, f, nil)
+	if f != nil {
+		logger.AddSink(f)
+		files = append(files, f)
+	} else {
+	}
 
-	files := []*os.File{f}
 	if config.LogFile != nil {
 		// Use log rotation with daily retention (24 hours)
 		f, err := os.OpenFile(*config.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)

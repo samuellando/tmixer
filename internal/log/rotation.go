@@ -44,12 +44,15 @@ func RotateLogFile(logDir string, retention time.Duration) (*os.File, error) {
 	logFileName := fmt.Sprintf("%s%s%s", logFilePrefix, currentDate, logFileSuffix)
 	logFilePath := filepath.Join(logDir, logFileName)
 
-	file, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open log file: %w", err)
+	if retention >= 0 {
+		file, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open log file: %w", err)
+		}
+		return file, nil
+	} else {
+		return nil, nil
 	}
-
-	return file, nil
 }
 
 // deleteOldLogs removes log files older than the retention duration

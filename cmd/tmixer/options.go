@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"samuellando.com/tmixer/internal/config"
 	"samuellando.com/tmixer/internal/flags"
@@ -16,7 +17,7 @@ var FLAGS = []flags.Flag{
 	{
 		Name:        "log",
 		ShortName:   "l",
-		Description: "Output logs to a file, for debug purposes",
+		Description: "Output logs to a file in addition to ~/.local/state/tmixer/logs .",
 		Usage:       "--log out.log, or -l out.log",
 		ParseInput: func(s string, c *config.Config) error {
 			if s == "" {
@@ -38,16 +39,22 @@ var FLAGS = []flags.Flag{
 	},
 	{
 		Name:        "logRetentionDays",
-		Description: "how many days of logs to keep in ~/.local/state/tmixer/logs",
+		Description: "how many previous days of logs to keep in ~/.local/state/tmixer/logs. Set to 0 to only keep current day and none to disable logging.",
 		Usage:       "--logRetentionDays 5",
 		Default:     "1",
 		ParseInput: func(s string, c *config.Config) error {
 			if s == "" {
 				return fmt.Errorf("log file must be provided")
 			}
-			v, err := strconv.Atoi(s)
-			if err != nil {
-				return fmt.Errorf("while parsing log retentionn days: %s", err)
+			var v int
+			var err error
+			if strings.ToLower(s) == "none" {
+				v = -1
+			} else {
+				v, err = strconv.Atoi(s)
+				if err != nil {
+					return fmt.Errorf("while parsing log retentionn days: %s", err)
+				}
 			}
 			c.LogRetentionDays = &v
 			return nil
