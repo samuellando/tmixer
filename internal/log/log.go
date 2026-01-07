@@ -15,7 +15,7 @@ const (
 )
 
 type Logger struct {
-	w io.Writer
+	w []io.Writer
 }
 
 type LoggerOptions struct {
@@ -24,7 +24,11 @@ type LoggerOptions struct {
 
 func New(ctx context.Context, w io.Writer, options *LoggerOptions) (context.Context, *Logger) {
 	ctx = InitializeWideEvent(ctx, options)
-	return ctx, &Logger{w: w}
+	return ctx, &Logger{w: []io.Writer{w}}
+}
+
+func (log *Logger) AddSink(w io.Writer) {
+	log.w = append(log.w, w)
 }
 
 func (log *Logger) Info(ctx context.Context) {
@@ -45,5 +49,7 @@ func (log *Logger) logEvent(event WideEvent) {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Fprintln(log.w, string(b))
+	for _, w := range log.w {
+		fmt.Fprintln(w, string(b))
+	}
 }

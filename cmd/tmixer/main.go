@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
+	"time"
 
 	"samuellando.com/tmixer/internal/config"
 	"samuellando.com/tmixer/internal/flags"
@@ -41,14 +42,16 @@ func run(args []string) {
 		displayHelp()
 		os.Exit(1)
 	}
-	logger, f, err := setupLogging(ctx, config)
+	logger, files, err := setupLogging(ctx, config)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	if f != nil {
-		defer f.Close()
-	}
+	defer func() {
+		for _, f := range files {
+			f.Close()
+		}
+	}()
 	// Finally run
 	if OPTION_DISPLAY_HELP {
 		displayHelp()
@@ -211,21 +214,32 @@ func disableHooks(tmux *tmux.Server) error {
 	return nil
 }
 
-func setupLogging(ctx context.Context, config *config.Config) (*log.Logger, *os.File, error) {
-	var logWriter io.Writer
-	var file *os.File
+func setupLogging(ctx context.Context, config *config.Config) (*log.Logger, []*os.File, error) {
+	retention := 24 * time.Hour
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, nil, err
+	}
+	logDir := filepath.Join(home, ".local/state/tmixer/log")
+	f, err := log.RotateLogFile(logDir, retention)
+	if err != nil {
+		return nil, nil, err
+	}
+	_, logger := log.New(ctx, f, nil)
+
+	files := []*os.File{f}
 	if config.LogFile != nil {
+		// Use log rotation with daily retention (24 hours)
 		f, err := os.OpenFile(*config.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			return nil, nil, err
 		}
-		logWriter = f
-		file = f
-	} else {
-		logWriter = io.Discard
+		logger.AddSink(f)
+		files = append(files, f)
 	}
-	_, logger := log.New(ctx, logWriter, nil)
-	return logger, file, nil
+
+	return logger, files, nil
 }
 
 func displayHelp() {
