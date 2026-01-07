@@ -14,12 +14,13 @@ import (
 )
 
 type Config struct {
-	DefaultProject  *string                   `yaml:"defaultProject"`
-	LogFile         *string                   `yaml:"logFile"`
-	FzfFlags        []string                  `yaml:"fzfFlags"`
-	ConfigFiles     []string                  `yaml:"configFiles"`
-	CombineProjects bool                      `yaml:"combineProjects"`
-	Projects        map[string]*ProjectConfig `yaml:"projects"`
+	DefaultProject   *string                   `yaml:"defaultProject"`
+	LogFile          *string                   `yaml:"logFile"`
+	LogRetentionDays *int                      `yaml:"logRetentionDays"`
+	FzfFlags         []string                  `yaml:"fzfFlags"`
+	ConfigFiles      []string                  `yaml:"configFiles"`
+	CombineProjects  bool                      `yaml:"combineProjects"`
+	Projects         map[string]*ProjectConfig `yaml:"projects"`
 }
 
 type ProjectConfig struct {
@@ -41,9 +42,11 @@ type PaneConfig struct {
 }
 
 func New() *Config {
+	logRetentionDays := 1
 	return &Config{
-		DefaultProject: nil,
-		LogFile:        nil,
+		DefaultProject:   nil,
+		LogFile:          nil,
+		LogRetentionDays: &logRetentionDays,
 		FzfFlags: []string{
 			"--ansi",
 			"--bind", "ctrl-k:execute(tmixer kill {2})+reload(tmixer list)",

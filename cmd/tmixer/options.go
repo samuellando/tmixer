@@ -37,6 +37,23 @@ var FLAGS = []flags.Flag{
 		},
 	},
 	{
+		Name:        "logRetentionDays",
+		Description: "how many days of logs to keep in ~/.local/state/tmixer/logs",
+		Usage:       "--logRetentionDays 5",
+		Default:     "1",
+		ParseInput: func(s string, c *config.Config) error {
+			if s == "" {
+				return fmt.Errorf("log file must be provided")
+			}
+			v, err := strconv.Atoi(s)
+			if err != nil {
+				return fmt.Errorf("while parsing log retentionn days: %s", err)
+			}
+			c.LogRetentionDays = &v
+			return nil
+		},
+	},
+	{
 		Name:        "config",
 		ShortName:   "c",
 		Description: "Provide an additional config file overriding global configs from ~/.tmixer.yml and ~/.config/tmixer/config.yml",
