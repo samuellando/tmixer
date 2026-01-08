@@ -15,7 +15,7 @@ import (
 
 func PickProject(ctx context.Context, config *config.Config, projects []*project.Project) (*project.Project, error) {
 	type pickProjectEvent struct {
-		Args         []string `json:"args`
+		Args         []string `json:"args"`
 		Output       string   `json:"output"`
 		ParsedOutput string   `json:"parsedOutput"`
 		Errors       []string `json:"errors"`
