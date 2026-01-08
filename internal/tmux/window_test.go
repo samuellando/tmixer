@@ -1,6 +1,7 @@
 package tmux_test
 
 import (
+	"context"
 	"testing"
 
 	"samuellando.com/tmixer/internal/testutil"
@@ -8,7 +9,7 @@ import (
 )
 
 func TestKill(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
 		s, err := srv.New("test_session")
 		if err != nil {
 			t.Fatal(err)
@@ -45,7 +46,7 @@ func TestKill(t *testing.T) {
 }
 
 func TestWindowName(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
 		s, _ := srv.New("test_ses")
 		w, _ := s.NewWindow("test_window")
 		res, err := w.Name()
@@ -59,7 +60,7 @@ func TestWindowName(t *testing.T) {
 }
 
 func TestPanes(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
 		s, _ := srv.New("test_session")
 		windows, _ := s.Windows()
 		w := windows[0]
@@ -76,7 +77,7 @@ func TestPanes(t *testing.T) {
 }
 
 func TestLink(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
 		s1, _ := srv.New("test_session")
 		s2, _ := srv.New("test_session2")
 		windows, _ := s1.Windows()
@@ -93,7 +94,7 @@ func TestLink(t *testing.T) {
 }
 
 func TestWindowOptions(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
 		name := "test_sess_name"
 		s, _ := srv.New(name)
 		err := s.SetOption("@hello", "world")
@@ -112,7 +113,7 @@ func TestWindowOptions(t *testing.T) {
 }
 
 func TestWindowOptionsNotSet(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
 		name := "test_sess_name"
 		s, _ := srv.New(name)
 		windows, _ := s.Windows()

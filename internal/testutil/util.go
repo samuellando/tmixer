@@ -1,6 +1,7 @@
 package testutil
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/creack/pty"
+	"samuellando.com/tmixer/internal/log"
 	"samuellando.com/tmixer/internal/tmux"
 )
 
@@ -30,18 +32,19 @@ func SetupTestClient(tmux *tmux.Server, session *tmux.Session) *os.File {
 	return f
 }
 
-func SetupTestServer(t testing.TB) *tmux.Server {
+func SetupTestServer(t testing.TB) (context.Context, *tmux.Server) {
+	ctx, _ := log.New(context.Background(), nil)
 	dir, err := os.MkdirTemp(os.TempDir(), "tmixer")
 	if err != nil {
 		t.Fatal(err)
 	}
-	tmux := tmux.Tmux(fmt.Sprintf("%s/test.sock", dir))
+	tmux := tmux.Tmux(ctx, fmt.Sprintf("%s/test.sock", dir))
 	// Start one extra session so the server starts
 	_, err = tmux.New(DEFAULT_TEST_SESSION)
 	if err != nil {
 		t.Fatal(fmt.Errorf("Error while starting server %w", err))
 	}
-	return tmux
+	return ctx, tmux
 }
 
 func TeardownTestServer(s *tmux.Server) {
@@ -59,17 +62,17 @@ func TeardownTestServer(s *tmux.Server) {
 	}
 }
 
-func RunWithAndWithoutControlMode(t *testing.T, f func(srv *tmux.Server)) {
-	tmux := SetupTestServer(t)
-	f(tmux)
+func RunWithAndWithoutControlMode(t *testing.T, f func(ctx context.Context, tmux *tmux.Server)) {
+	ctx, tmux := SetupTestServer(t)
+	f(ctx, tmux)
 	TeardownTestServer(tmux)
 	// And with control mode
-	tmux = SetupTestServer(t)
+	ctx, tmux = SetupTestServer(t)
 	err := tmux.StartControlMode()
 	if err != nil {
 		t.Fatal(err)
 	}
-	f(tmux)
+	f(ctx, tmux)
 	err = tmux.StopControlMode()
 	if err != nil {
 		t.Fatal(err)

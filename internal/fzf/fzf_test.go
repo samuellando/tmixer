@@ -15,7 +15,7 @@ import (
 
 func TestDisplayProjects(t *testing.T) {
 	// TODO: Sub dirs
-	tmux := testutil.SetupTestServer(t)
+	ctx, tmux := testutil.SetupTestServer(t)
 	defer testutil.TeardownTestServer(tmux)
 	s, _ := tmux.New("test-session")
 	f := testutil.SetupTestClient(tmux, s)
@@ -52,7 +52,7 @@ func TestDisplayProjects(t *testing.T) {
  cat
  dog`
 
-	projects, err := project.List(tmux, config)
+	projects, err := project.List(ctx, tmux, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,17 +65,17 @@ func TestDisplayProjects(t *testing.T) {
 	for _, p := range projects {
 		switch p.Name {
 		case "cats":
-			p.Start()
+			p.Start(ctx)
 		case "dogs":
-			p.Start()
+			p.Start(ctx)
 		case "zzz":
-			p.Start()
-			p.Switch()
+			p.Start(ctx)
+			p.Switch(ctx)
 		}
 		time.Sleep(time.Second)
 	}
 	w := &strings.Builder{}
-	err = DisplayProjects(projects, w)
+	err = DisplayProjects(ctx, projects, w)
 	if err != nil {
 		t.Fatal(err)
 	}

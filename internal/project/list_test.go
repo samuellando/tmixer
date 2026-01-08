@@ -1,6 +1,7 @@
 package project
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -8,6 +9,7 @@ import (
 	"testing"
 
 	"samuellando.com/tmixer/internal/config"
+	"samuellando.com/tmixer/internal/log"
 	"samuellando.com/tmixer/internal/testutil"
 	"samuellando.com/tmixer/internal/tmux"
 )
@@ -125,8 +127,8 @@ func TestListsAll(t *testing.T) {
 	dir, testCases := setupListTest(t)
 	defer teardownListTest(t, dir)
 	for _, tc := range testCases {
-		testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-			projects, err := List(srv, tc.config)
+		testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
+			projects, err := List(ctx, srv, tc.config)
 			if err != nil {
 				t.Error(err)
 			}
@@ -150,8 +152,8 @@ func TestSetsFields(t *testing.T) {
 	dir, testCases := setupListTest(t)
 	defer teardownListTest(t, dir)
 	for _, tc := range testCases {
-		testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-			projects, err := List(srv, tc.config)
+		testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
+			projects, err := List(ctx, srv, tc.config)
 			if err != nil {
 				t.Error(err)
 			}
@@ -176,11 +178,11 @@ func TestListIncludesAllSessions(t *testing.T) {
 	dir, testCases := setupListTest(t)
 	defer teardownListTest(t, dir)
 	for _, tc := range testCases {
-		testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+		testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
 			for i := range n {
 				srv.New("test-" + strconv.Itoa(i))
 			}
-			projects, err := List(srv, tc.config)
+			projects, err := List(ctx, srv, tc.config)
 			if err != nil {
 				t.Error(err)
 			}
@@ -204,8 +206,8 @@ func TestListMatchesExistingSessions(t *testing.T) {
 	dir, testCases := setupListTest(t)
 	defer teardownListTest(t, dir)
 	for _, tc := range testCases {
-		testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-			projects, err := List(srv, tc.config)
+		testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
+			projects, err := List(ctx, srv, tc.config)
 			if err != nil {
 				t.Error(err)
 			}
@@ -217,7 +219,7 @@ func TestListMatchesExistingSessions(t *testing.T) {
 					}
 				}
 			}
-			projects, err = List(srv, tc.config)
+			projects, err = List(ctx, srv, tc.config)
 			if err != nil {
 				t.Error(err)
 			}
@@ -257,8 +259,8 @@ func TestAmbiguousNames(t *testing.T) {
 			},
 		},
 	}
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		_, err := List(srv, config)
+	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
+		_, err := List(ctx, srv, config)
 		if !errors.Is(err, ErrAmbiguousName) {
 			t.Errorf("wrong error returned %v", err)
 		}
@@ -266,10 +268,11 @@ func TestAmbiguousNames(t *testing.T) {
 }
 
 func TestListNoTmux(t *testing.T) {
+	ctx, _ := log.New(context.Background(), nil)
 	dir, testCases := setupListTest(t)
 	defer teardownListTest(t, dir)
 	for _, tc := range testCases {
-		projects, err := List(nil, tc.config)
+		projects, err := List(ctx, nil, tc.config)
 		if err != nil {
 			t.Error(err)
 		}
@@ -309,13 +312,13 @@ func BenchmarkList(b *testing.B) {
 			},
 		},
 	}
-	tmux := testutil.SetupTestServer(b)
+	ctx, tmux := testutil.SetupTestServer(b)
 	defer testutil.TeardownTestServer(tmux)
 	for i := range 10 {
 		tmux.New("test-" + strconv.Itoa(i))
 	}
 	for b.Loop() {
-		projects, err := List(tmux, config)
+		projects, err := List(ctx, tmux, config)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -346,7 +349,7 @@ func BenchmarkListControlMode(b *testing.B) {
 			},
 		},
 	}
-	tmux := testutil.SetupTestServer(b)
+	ctx, tmux := testutil.SetupTestServer(b)
 	defer testutil.TeardownTestServer(tmux)
 	tmux.StartControlMode()
 	defer tmux.StopControlMode()
@@ -354,7 +357,7 @@ func BenchmarkListControlMode(b *testing.B) {
 		tmux.New("test-" + strconv.Itoa(i))
 	}
 	for b.Loop() {
-		projects, err := List(tmux, config)
+		projects, err := List(ctx, tmux, config)
 		if err != nil {
 			b.Fatal(err)
 		}

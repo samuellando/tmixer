@@ -8,7 +8,7 @@ import (
 )
 
 func TestStartStopControlMode(t *testing.T) {
-	s := testutil.SetupTestServer(t)
+	_, s := testutil.SetupTestServer(t)
 	defer testutil.TeardownTestServer(s)
 	for range 10 {
 		err := s.StartControlMode()
@@ -23,13 +23,13 @@ func TestStartStopControlMode(t *testing.T) {
 }
 
 func TestStartStopControlModeSimul(t *testing.T) {
-	s := testutil.SetupTestServer(t)
+	ctx, s := testutil.SetupTestServer(t)
 	defer testutil.TeardownTestServer(s)
 	n := 10
 	servers := make([]*tmux.Server, n)
 	var err error
 	for i := range n {
-		servers[i] = tmux.Tmux(s.SocketPath)
+		servers[i] = tmux.Tmux(ctx, s.SocketPath)
 		err = servers[i].StartControlMode()
 		if err != nil {
 			t.Fatal(err)
@@ -58,7 +58,7 @@ func TestStartStopControlModeSimul(t *testing.T) {
 }
 
 func TestRunCommand(t *testing.T) {
-	s := testutil.SetupTestServer(t)
+	_, s := testutil.SetupTestServer(t)
 	defer testutil.TeardownTestServer(s)
 	s.StartControlMode()
 	defer s.StopControlMode()
@@ -72,7 +72,7 @@ func TestRunCommand(t *testing.T) {
 }
 
 func TestUsesControlMode(t *testing.T) {
-	s := testutil.SetupTestServer(t)
+	_, s := testutil.SetupTestServer(t)
 	defer testutil.TeardownTestServer(s)
 	// Since control mode is so much fater (~7000x) this is a reliable test
 	n := 100
@@ -100,7 +100,7 @@ func TestUsesControlMode(t *testing.T) {
 }
 
 func BenchmarkRun(b *testing.B) {
-	s := testutil.SetupTestServer(b)
+	_, s := testutil.SetupTestServer(b)
 	defer testutil.TeardownTestServer(s)
 	for b.Loop() {
 		_, err := s.ListSessions()
@@ -111,7 +111,7 @@ func BenchmarkRun(b *testing.B) {
 }
 
 func BenchmarkControlModeRun(b *testing.B) {
-	s := testutil.SetupTestServer(b)
+	_, s := testutil.SetupTestServer(b)
 	defer testutil.TeardownTestServer(s)
 	s.StartControlMode()
 	defer s.StopControlMode()

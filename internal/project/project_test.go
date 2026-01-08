@@ -1,6 +1,7 @@
 package project
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -116,7 +117,7 @@ func (tc *projectTestCase) initialStatus() ProjectStatus {
 	panic("Invalid initial status")
 }
 
-func setupTestProjects(t *testing.T, srv *tmux.Server) (string, *os.File, []projectTestCase) {
+func setupTestProjects(t *testing.T, ctx context.Context, srv *tmux.Server) (string, *os.File, []projectTestCase) {
 	dir, err := os.MkdirTemp(os.TempDir(), "tmixer-test-projects")
 	if err != nil {
 		t.Fatal(err)
@@ -138,7 +139,7 @@ func setupTestProjects(t *testing.T, srv *tmux.Server) (string, *os.File, []proj
 		}
 		tc.project = &p
 		if strings.HasPrefix(name, "active") || strings.HasPrefix(name, "attached") {
-			s, err := p.Start()
+			s, err := p.Start(ctx)
 			if err != nil {
 				t.Error(err)
 			}
@@ -164,8 +165,8 @@ func teardownTestProjects(t *testing.T, dir string, client *os.File) {
 }
 
 func TestProjectStatus(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
+	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
+		dir, client, testCases := setupTestProjects(t, ctx, srv)
 		defer teardownTestProjects(t, dir, client)
 		for _, tc := range testCases {
 			status, err := tc.project.Status()
@@ -180,8 +181,8 @@ func TestProjectStatus(t *testing.T) {
 }
 
 func TestProjectSession(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
+	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
+		dir, client, testCases := setupTestProjects(t, ctx, srv)
 		defer teardownTestProjects(t, dir, client)
 		for _, tc := range testCases {
 			res, err := tc.project.Session()
@@ -207,7 +208,7 @@ func FuzzTmuxSessionName(f *testing.F) {
 	for _, tc := range testcases {
 		f.Add(tc)
 	}
-	srv := testutil.SetupTestServer(f)
+	_, srv := testutil.SetupTestServer(f)
 	defer testutil.TeardownTestServer(srv)
 	f.Fuzz(func(t *testing.T, a string) {
 		if a == "" || strings.Contains(a, "\x00") {
@@ -239,8 +240,8 @@ func FuzzTmuxSessionName(f *testing.F) {
 }
 
 func TestProjectLastActivity(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
+	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
+		dir, client, testCases := setupTestProjects(t, ctx, srv)
 		defer teardownTestProjects(t, dir, client)
 		for _, tc := range testCases {
 			res, err := tc.project.LastActivity()
@@ -262,11 +263,11 @@ func TestProjectLastActivity(t *testing.T) {
 }
 
 func TestProjectStart(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
+	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
+		dir, client, testCases := setupTestProjects(t, ctx, srv)
 		defer teardownTestProjects(t, dir, client)
 		for _, tc := range testCases {
-			res, err := tc.project.Start()
+			res, err := tc.project.Start(ctx)
 			if err != nil {
 				t.Error(err)
 			}
@@ -299,11 +300,11 @@ func TestProjectStart(t *testing.T) {
 }
 
 func TestProjectStartWindowsAndPanes(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
+	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
+		dir, client, testCases := setupTestProjects(t, ctx, srv)
 		defer teardownTestProjects(t, dir, client)
 		for _, tc := range testCases {
-			res, err := tc.project.Start()
+			res, err := tc.project.Start(ctx)
 			time.Sleep(time.Second)
 			if err != nil {
 				t.Error(err)
@@ -347,11 +348,14 @@ func TestProjectStartWindowsAndPanes(t *testing.T) {
 }
 
 func TestProjectKill(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
+	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
+		dir, client, testCases := setupTestProjects(t, ctx, srv)
 		defer teardownTestProjects(t, dir, client)
 		for _, tc := range testCases {
-			res := tc.project.Kill()
+			f, res := tc.project.Kill(ctx)
+			if f != nil {
+				f()
+			}
 			status, err := tc.project.Status()
 			if err != nil {
 				t.Error(err)
@@ -374,8 +378,8 @@ func TestProjectKill(t *testing.T) {
 }
 
 func TestProjectKillAttachedLastActive(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
+	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
+		dir, client, testCases := setupTestProjects(t, ctx, srv)
 		defer teardownTestProjects(t, dir, client)
 		time.Sleep(time.Second)
 		var attached *Project
@@ -395,11 +399,11 @@ func TestProjectKillAttachedLastActive(t *testing.T) {
 		// Attach and switch back for all active projects to force a lastActivity update
 		for _, tc := range testCases {
 			if tc.initialStatus() == PROJECT_STATUS_ACTIVE {
-				err := tc.project.Switch()
+				err := tc.project.Switch(ctx)
 				if err != nil {
 					t.Error(err)
 				}
-				err = attached.Switch()
+				err = attached.Switch(ctx)
 				if err != nil {
 					t.Error(err)
 				}
@@ -407,7 +411,10 @@ func TestProjectKillAttachedLastActive(t *testing.T) {
 				time.Sleep(time.Second)
 			}
 		}
-		err := attached.Kill()
+		f, err := attached.Kill(ctx)
+		if f != nil {
+			f()
+		}
 		if err != nil {
 			t.Error(err)
 		}
@@ -423,8 +430,8 @@ func TestProjectKillAttachedLastActive(t *testing.T) {
 
 func TestProjectKillAttachedDefault(t *testing.T) {
 	def := "inactive-windows-switch"
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
+	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
+		dir, client, testCases := setupTestProjects(t, ctx, srv)
 		defer teardownTestProjects(t, dir, client)
 		var attached *Project
 		var defProj *Project
@@ -433,7 +440,10 @@ func TestProjectKillAttachedDefault(t *testing.T) {
 				attached = tc.project
 			}
 			if tc.initialStatus() == PROJECT_STATUS_ACTIVE {
-				err := tc.project.Kill()
+				f, err := tc.project.Kill(ctx)
+				if f != nil {
+					f()
+				}
 				if err != nil {
 					t.Error(err)
 				}
@@ -453,7 +463,10 @@ func TestProjectKillAttachedDefault(t *testing.T) {
 		}
 		// Set the default project
 		attached.fullConfig.DefaultProject = &def
-		err = attached.Kill()
+		f, err := attached.Kill(ctx)
+		if f != nil {
+			f()
+		}
 		if err != nil {
 			t.Error(err)
 		}
@@ -468,8 +481,8 @@ func TestProjectKillAttachedDefault(t *testing.T) {
 }
 
 func TestProjectKillAttachedNoDefault(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
+	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
+		dir, client, testCases := setupTestProjects(t, ctx, srv)
 		defer teardownTestProjects(t, dir, client)
 		var attached *Project
 		for _, tc := range testCases {
@@ -477,7 +490,7 @@ func TestProjectKillAttachedNoDefault(t *testing.T) {
 				attached = tc.project
 			}
 			if tc.initialStatus() == PROJECT_STATUS_ACTIVE {
-				err := tc.project.Kill()
+				_, err := tc.project.Kill(ctx)
 				if err != nil {
 					t.Error(err)
 				}
@@ -494,7 +507,10 @@ func TestProjectKillAttachedNoDefault(t *testing.T) {
 		}
 		// Set the default project
 		attached.fullConfig.DefaultProject = nil
-		err = attached.Kill()
+		f, err := attached.Kill(ctx)
+		if f != nil {
+			f()
+		}
 		if err != nil {
 			t.Error(err)
 		}
@@ -515,8 +531,8 @@ func TestProjectKillAttachedNoDefault(t *testing.T) {
 }
 
 func TestProjectKillAttachedNoProjects(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
+	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
+		dir, client, testCases := setupTestProjects(t, ctx, srv)
 		defer teardownTestProjects(t, dir, client)
 		var attached *Project
 		for _, tc := range testCases {
@@ -524,7 +540,7 @@ func TestProjectKillAttachedNoProjects(t *testing.T) {
 				attached = tc.project
 			}
 			if tc.initialStatus() == PROJECT_STATUS_ACTIVE {
-				err := tc.project.Kill()
+				_, err := tc.project.Kill(ctx)
 				if err != nil {
 					t.Error(err)
 				}
@@ -545,7 +561,10 @@ func TestProjectKillAttachedNoProjects(t *testing.T) {
 				attached.Name: attached.Config,
 			},
 		}
-		err = attached.Kill()
+		f, err := attached.Kill(ctx)
+		if f != nil {
+			f()
+		}
 		if err != nil {
 			t.Error(err)
 		}
@@ -557,11 +576,11 @@ func TestProjectKillAttachedNoProjects(t *testing.T) {
 }
 
 func TestProjectSwitch(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
+	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
+		dir, client, testCases := setupTestProjects(t, ctx, srv)
 		defer teardownTestProjects(t, dir, client)
 		for _, tc := range testCases {
-			err := tc.project.Switch()
+			err := tc.project.Switch(ctx)
 			if err != nil {
 				t.Error(err)
 			}
@@ -577,11 +596,11 @@ func TestProjectSwitch(t *testing.T) {
 }
 
 func TestProjectSwitchCreatesSession(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
+	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
+		dir, client, testCases := setupTestProjects(t, ctx, srv)
 		defer teardownTestProjects(t, dir, client)
 		for _, tc := range testCases {
-			err := tc.project.Switch()
+			err := tc.project.Switch(ctx)
 			if err != nil {
 				t.Error(err)
 			}
@@ -602,11 +621,11 @@ func TestProjectSwitchCreatesSession(t *testing.T) {
 }
 
 func TestProjectSwitchWindowsAndPanes(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
+	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
+		dir, client, testCases := setupTestProjects(t, ctx, srv)
 		defer teardownTestProjects(t, dir, client)
 		for _, tc := range testCases {
-			err := tc.project.Switch()
+			err := tc.project.Switch(ctx)
 			time.Sleep(time.Second)
 			if err != nil {
 				t.Error(err)
@@ -654,11 +673,11 @@ func TestProjectSwitchWindowsAndPanes(t *testing.T) {
 }
 
 func TestProjectSwitchCommands(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
+	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
+		dir, client, testCases := setupTestProjects(t, ctx, srv)
 		defer teardownTestProjects(t, dir, client)
 		for _, tc := range testCases {
-			err := tc.project.Switch()
+			err := tc.project.Switch(ctx)
 			if err != nil {
 				t.Error(err)
 			}
@@ -681,11 +700,11 @@ func TestProjectSwitchCommands(t *testing.T) {
 }
 
 func TestProjectRunSwitchCommands(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
+	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
+		dir, client, testCases := setupTestProjects(t, ctx, srv)
 		defer teardownTestProjects(t, dir, client)
 		for _, tc := range testCases {
-			err := tc.project.RunSwitchCommands()
+			err := tc.project.RunSwitchCommands(ctx)
 			time.Sleep(time.Second)
 			if tc.initialStatus() == PROJECT_STATUS_INACTIVE {
 				if err != ErrSessionNotFound {
@@ -714,15 +733,18 @@ func TestProjectRunSwitchCommands(t *testing.T) {
 }
 
 func TestProjectReset(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
+	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
+		dir, client, testCases := setupTestProjects(t, ctx, srv)
 		defer teardownTestProjects(t, dir, client)
 		for _, tc := range testCases {
 			initialSessions, err := srv.ListSessions()
 			if err != nil {
 				t.Error(err)
 			}
-			res, reserr := tc.project.Reset()
+			res, f, reserr := tc.project.Reset(ctx)
+			if f != nil {
+				f()
+			}
 			status, err := tc.project.Status()
 			if err != nil {
 				t.Error(err)
@@ -758,14 +780,17 @@ func TestProjectReset(t *testing.T) {
 }
 
 func TestProjectResetWindowsAndPanes(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
+	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
+		dir, client, testCases := setupTestProjects(t, ctx, srv)
 		defer teardownTestProjects(t, dir, client)
 		for _, tc := range testCases {
 			if tc.initialStatus() == PROJECT_STATUS_INACTIVE {
 				continue
 			}
-			res, err := tc.project.Reset()
+			res, f, err := tc.project.Reset(ctx)
+			if f != nil {
+				f()
+			}
 			if err != nil {
 				t.Error(err)
 			}
@@ -809,14 +834,17 @@ func TestProjectResetWindowsAndPanes(t *testing.T) {
 }
 
 func TestProjectResetCommands(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
+	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
+		dir, client, testCases := setupTestProjects(t, ctx, srv)
 		defer teardownTestProjects(t, dir, client)
 		for _, tc := range testCases {
 			if tc.initialStatus() == PROJECT_STATUS_INACTIVE {
 				continue
 			}
-			_, err := tc.project.Reset()
+			_, f, err := tc.project.Reset(ctx)
+			if f != nil {
+				f()
+			}
 			if err != nil {
 				t.Error(err)
 			}

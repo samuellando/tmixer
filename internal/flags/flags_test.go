@@ -1,12 +1,15 @@
 package flags
 
 import (
+	"context"
 	"testing"
 
 	"samuellando.com/tmixer/internal/config"
+	"samuellando.com/tmixer/internal/log"
 )
 
 func TestParseArgs(t *testing.T) {
+	ctx, _ := log.New(context.Background(), nil)
 	counter := 0
 	flags := []Flag{
 		{
@@ -54,7 +57,7 @@ func TestParseArgs(t *testing.T) {
 		},
 	}
 	args := []string{"tmixer", "--four", "--one", "aaa", "-t", "--three", "bbb", "hello"}
-	remaining, err := ParseArgs(args, flags, nil)
+	remaining, err := ParseArgs(ctx, args, flags, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
