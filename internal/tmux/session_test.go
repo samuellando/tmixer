@@ -112,6 +112,32 @@ func TestSessionName(t *testing.T) {
 	})
 }
 
+func TestSessionReName(t *testing.T) {
+	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
+		name := "test_sess_name"
+		rename := "new_test_sess_name"
+		s, _ := srv.New(name)
+		res, err := s.Name()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if res != name {
+			t.Fatal("Names dont match")
+		}
+		err = s.Rename(rename)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res, err = s.Name()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if res != rename {
+			t.Fatal("Renames dont match")
+		}
+	})
+}
+
 func TestSessionLastActivity(t *testing.T) {
 	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
 		s1, _ := srv.New("s1")
