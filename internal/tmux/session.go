@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -60,7 +59,7 @@ func (s *Session) GetOption(key string) (string, error) {
 
 func (s *Session) Name() (string, error) {
 	lines, err := s.server.command("display").withFlag("-p").withTargetSession(s).withFormat("#{session_name}").run()
-	if strings.TrimSpace(strings.Join(lines, "")) == "" {
+	if len(lines) == 0 {
 		return "", errors.Join(fmt.Errorf("Got no name"), err)
 	}
 	return lines[0], err

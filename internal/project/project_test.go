@@ -352,10 +352,8 @@ func TestProjectKill(t *testing.T) {
 		dir, client, testCases := setupTestProjects(t, ctx, srv)
 		defer teardownTestProjects(t, dir, client)
 		for _, tc := range testCases {
-			f, res := tc.project.Kill(ctx)
-			if f != nil {
-				f()
-			}
+			initialSession, _ := tc.project.Session()
+			cleanup, res := tc.project.Kill(ctx)
 			status, err := tc.project.Status()
 			if err != nil {
 				t.Error(err)
@@ -363,15 +361,41 @@ func TestProjectKill(t *testing.T) {
 			if status != PROJECT_STATUS_INACTIVE {
 				t.Error("Project should be inactive")
 			}
+
 			switch tc.initialStatus() {
 			case PROJECT_STATUS_INACTIVE:
 				if !errors.Is(res, ErrSessionNotFound) {
 					t.Error("Inactive project give session not found errror")
 				}
-			default:
+				err = cleanup()
+				if err != nil {
+					t.Error(err)
+				}
+			case PROJECT_STATUS_ATTACHED:
 				if res != nil {
 					t.Error(res)
 				}
+				// old session is still active
+				if !srv.HasSession(initialSession) {
+					t.Error("Original session should still be active")
+				}
+				err = cleanup()
+				if err != nil {
+					t.Error(err)
+				}
+				if srv.HasSession(initialSession) {
+					t.Error("Should kill the original session")
+				}
+			case PROJECT_STATUS_ACTIVE:
+				if res != nil {
+					t.Error(res)
+				}
+				err = cleanup()
+				if err != nil {
+					t.Error(err)
+				}
+			default:
+				t.Error("Not implemented")
 			}
 		}
 	})
@@ -411,10 +435,8 @@ func TestProjectKillAttachedLastActive(t *testing.T) {
 				time.Sleep(time.Second)
 			}
 		}
-		f, err := attached.Kill(ctx)
-		if f != nil {
-			f()
-		}
+		cleanup, err := attached.Kill(ctx)
+		cleanup()
 		if err != nil {
 			t.Error(err)
 		}
@@ -440,10 +462,8 @@ func TestProjectKillAttachedDefault(t *testing.T) {
 				attached = tc.project
 			}
 			if tc.initialStatus() == PROJECT_STATUS_ACTIVE {
-				f, err := tc.project.Kill(ctx)
-				if f != nil {
-					f()
-				}
+				cleanup, err := tc.project.Kill(ctx)
+				cleanup()
 				if err != nil {
 					t.Error(err)
 				}
@@ -463,10 +483,8 @@ func TestProjectKillAttachedDefault(t *testing.T) {
 		}
 		// Set the default project
 		attached.fullConfig.DefaultProject = &def
-		f, err := attached.Kill(ctx)
-		if f != nil {
-			f()
-		}
+		cleanup, err := attached.Kill(ctx)
+		cleanup()
 		if err != nil {
 			t.Error(err)
 		}
@@ -507,10 +525,8 @@ func TestProjectKillAttachedNoDefault(t *testing.T) {
 		}
 		// Set the default project
 		attached.fullConfig.DefaultProject = nil
-		f, err := attached.Kill(ctx)
-		if f != nil {
-			f()
-		}
+		cleanup, err := attached.Kill(ctx)
+		cleanup()
 		if err != nil {
 			t.Error(err)
 		}
@@ -561,10 +577,8 @@ func TestProjectKillAttachedNoProjects(t *testing.T) {
 				attached.Name: attached.Config,
 			},
 		}
-		f, err := attached.Kill(ctx)
-		if f != nil {
-			f()
-		}
+		cleanup, err := attached.Kill(ctx)
+		cleanup()
 		if err != nil {
 			t.Error(err)
 		}
@@ -741,10 +755,8 @@ func TestProjectReset(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
-			res, f, reserr := tc.project.Reset(ctx)
-			if f != nil {
-				f()
-			}
+			initialSession, _ := tc.project.Session()
+			res, cleanup, reserr := tc.project.Reset(ctx)
 			status, err := tc.project.Status()
 			if err != nil {
 				t.Error(err)
@@ -757,7 +769,11 @@ func TestProjectReset(t *testing.T) {
 				if res != nil {
 					t.Error("Should not return a sesison for inactive projects")
 				}
-			default:
+				err = cleanup()
+				if err != nil {
+					t.Error(err)
+				}
+			case PROJECT_STATUS_ATTACHED:
 				if reserr != nil {
 					t.Error(reserr)
 				}
@@ -767,6 +783,32 @@ func TestProjectReset(t *testing.T) {
 				if res.Id == tc.session.Id {
 					t.Error("Status should not match original")
 				}
+				if !srv.HasSession(initialSession) {
+					t.Error("Original session should still be active")
+				}
+				err = cleanup()
+				if err != nil {
+					t.Error(err)
+				}
+				if srv.HasSession(initialSession) {
+					t.Error("Should kill the original session")
+				}
+			case PROJECT_STATUS_ACTIVE:
+				if reserr != nil {
+					t.Error(reserr)
+				}
+				if status != tc.initialStatus() {
+					t.Error("Status should match original")
+				}
+				if res.Id == tc.session.Id {
+					t.Error("Status should not match original")
+				}
+				err = cleanup()
+				if err != nil {
+					t.Error(err)
+				}
+			default:
+				t.Error("Not implemented")
 			}
 			finalSessions, err := srv.ListSessions()
 			if err != nil {
@@ -787,10 +829,8 @@ func TestProjectResetWindowsAndPanes(t *testing.T) {
 			if tc.initialStatus() == PROJECT_STATUS_INACTIVE {
 				continue
 			}
-			res, f, err := tc.project.Reset(ctx)
-			if f != nil {
-				f()
-			}
+			res, cleanup, err := tc.project.Reset(ctx)
+			cleanup()
 			if err != nil {
 				t.Error(err)
 			}
@@ -841,10 +881,8 @@ func TestProjectResetCommands(t *testing.T) {
 			if tc.initialStatus() == PROJECT_STATUS_INACTIVE {
 				continue
 			}
-			_, f, err := tc.project.Reset(ctx)
-			if f != nil {
-				f()
-			}
+			_, cleanup, err := tc.project.Reset(ctx)
+			cleanup()
 			if err != nil {
 				t.Error(err)
 			}
