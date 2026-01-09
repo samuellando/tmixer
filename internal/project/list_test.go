@@ -1,11 +1,14 @@
 package project
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"samuellando.com/tmixer/internal/config"
@@ -288,6 +291,81 @@ func TestListNoTmux(t *testing.T) {
 				t.Errorf("Project %s not listed", p)
 			}
 		}
+	}
+}
+
+// List should log errors, and results only in debug mode
+func TestListLogs(t *testing.T) {
+	dir, err := os.MkdirTemp(os.TempDir(), "tmixer-test-projects")
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := 10
+	for i := range n {
+		os.Mkdir(filepath.Join(dir, strconv.Itoa(i)), 0o700)
+	}
+	config := &config.Config{
+		Projects: map[string]*config.ProjectConfig{
+			"projects--5": {
+				Directory: "/home/test/bin",
+			},
+			"projects": {
+				Directory:      dir,
+				SubDirectories: true,
+			},
+		},
+	}
+	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
+		_, logger := log.New(ctx, nil)
+		out := bytes.Buffer{}
+		logger.AddSink(&out)
+		_, err := List(ctx, srv, config)
+		if !errors.Is(err, ErrAmbiguousName) {
+			t.Errorf("wrong error returned %v", err)
+		}
+		logger.Info(ctx)
+		res := make(map[string]any)
+		json.Unmarshal(out.Bytes(), &res)
+		errs := res["projectListEvent"].(map[string]any)["errors"].([]any)
+		if len(errs) != 1 {
+			t.Error("Should have one error")
+		}
+		if !strings.Contains(errs[0].(string), ErrAmbiguousName.Error()) {
+			t.Error("Should contain a ErrAmbiguousName")
+		}
+		if _, ok := res["projectListResult"]; ok {
+			t.Error("Should not log results at default log level")
+		}
+	})
+}
+
+func TestListLogsResult(t *testing.T) {
+	dir, testCases := setupListTest(t)
+	defer teardownListTest(t, dir)
+	for _, tc := range testCases {
+		testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
+			ctx, logger := log.New(ctx, &log.LoggerOptions{Level: log.LEVEL_DEBUG})
+			out := bytes.Buffer{}
+			logger.AddSink(&out)
+			_, err := List(ctx, srv, tc.config)
+			if err != nil {
+				t.Error(err)
+			}
+			logger.Info(ctx)
+			res := make(map[string]any)
+			json.Unmarshal(out.Bytes(), &res)
+			event := res["projectListResult"].(map[string]any)
+			list := event["result"].([]any)
+			seen := make(map[string]bool)
+			for _, p := range list {
+				seen[p.(map[string]any)["Name"].(string)] = true
+			}
+			for _, p := range tc.projects {
+				if !seen[p] {
+					t.Errorf("Project %s was not listed", p)
+				}
+			}
+		})
 	}
 }
 

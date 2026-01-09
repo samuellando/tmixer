@@ -15,7 +15,7 @@ import (
 var ErrAmbiguousName = errors.New("Ambiguous project name detected")
 
 type projectListEvent struct {
-	Errors []string `json:"errors"`
+	Errors []string `json:"errors,omitempty"`
 }
 type projectListResult struct {
 	Result []*Project `json:"result"`
@@ -30,6 +30,9 @@ type projectListResult struct {
 //
 // Returns an ErrAmbiguousName if there are two configured projects with the same name,
 // And other errors if anything else goes wrong with the queries.
+//
+// If the logging module is setup in ctx, it will log all errors at the Info level and
+// Results at the debug level.
 func List(ctx context.Context, tmux *tmux.Server, c *config.Config) ([]*Project, error) {
 	event, resultEvent, finish := setupListLogEvents(ctx)
 	defer finish()

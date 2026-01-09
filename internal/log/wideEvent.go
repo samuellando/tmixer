@@ -47,13 +47,13 @@ func InitializeWideEvent(ctx context.Context, options *LoggerOptions) context.Co
 		ctx = context.WithValue(ctx, "wideEvent", event)
 		event["time"] = time.Now()
 		event["level"] = "INFO"
-		if options != nil {
-			event["minLevel"] = options.Level
-		} else {
-			event["minLevel"] = LEVEL_INFO
-		}
 	} else {
 		event = v.(map[string]any)
+	}
+	if options != nil {
+		event["minLevel"] = options.Level
+	} else {
+		event["minLevel"] = LEVEL_INFO
 	}
 	return ctx
 }
