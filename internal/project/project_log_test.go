@@ -27,8 +27,8 @@ func runAllLogTestCases(t *testing.T, f func(ctx context.Context, srv *tmux.Serv
 			}
 			defer srv.StopControlMode()
 
-			client, _ := setupTestProjects(t, ctx, srv)
-			defer teardownTestProjects(t, client)
+			client := setupTestCase(t, ctx, tc, srv)
+			defer teardownTestCase(t, client)
 
 			ctx = context.Background()
 			ctx, logger := log.New(ctx, nil)

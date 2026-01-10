@@ -12,7 +12,7 @@ import (
 	"samuellando.com/tmixer/internal/tmux"
 )
 
-var ErrAmbiguousName = errors.New("Ambiguous project name detected")
+var ErrAmbiguousName = errors.New("ambiguous project name detected")
 
 type projectListEvent struct {
 	Errors []string `json:"errors,omitempty"`

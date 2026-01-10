@@ -116,46 +116,27 @@ func (tc *projectTestCase) initialStatus() ProjectStatus {
 	panic("Invalid initial status")
 }
 
-// Deprecated: Should use setupProjectInstead and avoid shared state between test cases
-func setupTestProjects(t *testing.T, ctx context.Context, srv *tmux.Server) (*os.File, []*projectTestCase) {
-	var client *os.File
-	testCases := getAllTestCases()
-	for _, tc := range testCases {
-		dir := t.TempDir()
-		pc := tc.project.Config
-		pc.Directory = dir
-		tc.project.server = srv
-		if strings.HasPrefix(tc.project.Name, "active") || strings.HasPrefix(tc.project.Name, "attached") {
-			s, err := tc.project.Start(ctx)
-			if err != nil {
-				t.Error(err)
-			}
-			tc.session = s
-		}
-		if strings.HasPrefix(tc.project.Name, "attached") {
-			client = testutil.SetupTestClient(srv, tc.session)
-		}
-	}
-	return client, testCases
-}
-
-func setupTestProject(t *testing.T, ctx context.Context, tc *projectTestCase, srv *tmux.Server) *os.File {
-	dir := t.TempDir()
-	pc := tc.project.Config
-	pc.Directory = dir
-	tc.project.server = srv
-	if strings.HasPrefix(tc.project.Name, "active") || strings.HasPrefix(tc.project.Name, "attached") {
-		s, err := tc.project.Start(ctx)
-		if err != nil {
-			t.Error(err)
-		}
-		tc.session = s
-	}
+func setupTestCase(t *testing.T, ctx context.Context, tc *projectTestCase, srv *tmux.Server) *os.File {
+	tc.session = setupTestProject(t, ctx, tc.project, srv)
 	if strings.HasPrefix(tc.project.Name, "attached") {
 		return testutil.SetupTestClient(srv, tc.session)
 	} else {
 		return testutil.SetupTestClient(srv, nil)
 	}
+}
+
+func setupTestProject(t *testing.T, ctx context.Context, project *Project, srv *tmux.Server) *tmux.Session {
+	dir := t.TempDir()
+	project.Config.Directory = dir
+	project.server = srv
+	if strings.HasPrefix(project.Name, "active") || strings.HasPrefix(project.Name, "attached") {
+		s, err := project.Start(ctx)
+		if err != nil {
+			t.Error(err)
+		}
+		return s
+	}
+	return nil
 }
 
 func getAllTestCases() []*projectTestCase {
@@ -175,12 +156,10 @@ func getAllTestCases() []*projectTestCase {
 	return testCases
 }
 
-func teardownTestProjects(t *testing.T, client *os.File) {
-	if client != nil {
-		err := client.Close()
-		if err != nil {
-			t.Error(err)
-		}
+func teardownTestCase(t *testing.T, client *os.File) {
+	err := client.Close()
+	if err != nil {
+		t.Error(err)
 	}
 }
 
@@ -190,8 +169,8 @@ func runAllTestCases(t *testing.T, f func(t *testing.T, ctx context.Context, srv
 		t.Run(tc.project.Name, func(t *testing.T) {
 			t.Parallel()
 			testutil.RunWithAndWithoutControlModeTestRun(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
-				client := setupTestProject(t, ctx, tc, srv)
-				defer teardownTestProjects(t, client)
+				client := setupTestCase(t, ctx, tc, srv)
+				defer teardownTestCase(t, client)
 				f(t, ctx, srv, tc)
 			})
 		})
@@ -434,10 +413,16 @@ func TestProjectKill(t *testing.T) {
 }
 
 func TestProjectKillAttachedLastActive(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
-		client, testCases := setupTestProjects(t, ctx, srv)
-		defer teardownTestProjects(t, client)
-		time.Sleep(time.Second)
+	testutil.RunWithAndWithoutControlModeTestRun(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+		testCases := getAllTestCases()
+		for _, tc := range testCases {
+			if tc.initialStatus() == PROJECT_STATUS_ATTACHED {
+				client := setupTestCase(t, ctx, tc, srv)
+				defer teardownTestCase(t, client)
+			} else {
+				setupTestProject(t, ctx, tc.project, srv)
+			}
+		}
 		var attached *Project
 		var lastActive *Project
 		// Randomize the order of the projects
@@ -484,9 +469,16 @@ func TestProjectKillAttachedLastActive(t *testing.T) {
 
 func TestProjectKillAttachedDefault(t *testing.T) {
 	def := "inactive-windows-switch"
-	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
-		client, testCases := setupTestProjects(t, ctx, srv)
-		defer teardownTestProjects(t, client)
+	testutil.RunWithAndWithoutControlModeTestRun(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+		testCases := getAllTestCases()
+		for _, tc := range testCases {
+			if tc.initialStatus() == PROJECT_STATUS_ATTACHED {
+				client := setupTestCase(t, ctx, tc, srv)
+				defer teardownTestCase(t, client)
+			} else {
+				setupTestProject(t, ctx, tc.project, srv)
+			}
+		}
 		var attached *Project
 		var defProj *Project
 		for _, tc := range testCases {
@@ -531,9 +523,16 @@ func TestProjectKillAttachedDefault(t *testing.T) {
 }
 
 func TestProjectKillAttachedNoDefault(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
-		client, testCases := setupTestProjects(t, ctx, srv)
-		defer teardownTestProjects(t, client)
+	testutil.RunWithAndWithoutControlModeTestRun(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+		testCases := getAllTestCases()
+		for _, tc := range testCases {
+			if tc.initialStatus() == PROJECT_STATUS_ATTACHED {
+				client := setupTestCase(t, ctx, tc, srv)
+				defer teardownTestCase(t, client)
+			} else {
+				setupTestProject(t, ctx, tc.project, srv)
+			}
+		}
 		var attached *Project
 		for _, tc := range testCases {
 			if tc.initialStatus() == PROJECT_STATUS_ATTACHED {
@@ -579,9 +578,16 @@ func TestProjectKillAttachedNoDefault(t *testing.T) {
 }
 
 func TestProjectKillAttachedNoProjects(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
-		client, testCases := setupTestProjects(t, ctx, srv)
-		defer teardownTestProjects(t, client)
+	testutil.RunWithAndWithoutControlModeTestRun(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+		testCases := getAllTestCases()
+		for _, tc := range testCases {
+			if tc.initialStatus() == PROJECT_STATUS_ATTACHED {
+				client := setupTestCase(t, ctx, tc, srv)
+				defer teardownTestCase(t, client)
+			} else {
+				setupTestProject(t, ctx, tc.project, srv)
+			}
+		}
 		var attached *Project
 		for _, tc := range testCases {
 			if tc.initialStatus() == PROJECT_STATUS_ATTACHED {
