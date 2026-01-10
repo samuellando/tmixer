@@ -160,11 +160,12 @@ func (p *Project) Start(ctx context.Context) (*tmux.Session, error) {
 		Name          string         `json:"name"`
 		InitialStatus ProjectStatus  `json:"initialStatus"`
 		SessionId     tmux.SessionId `json:"sessionId"`
-		Errors        []string       `json:"errors"`
+		Errors        []string       `json:"errors,omitempty"`
 	}
 	event := &projectStartEvent{Name: p.Name}
 	finish := log.Track(ctx, "projectStartEvent", event)
 	defer finish()
+
 	status, err := p.Status()
 	if err != nil {
 		err := fmt.Errorf("when getting project status: %w", err)
@@ -291,9 +292,9 @@ func (p *Project) Kill(ctx context.Context) (func() error, error) {
 	type projectKillEvent struct {
 		Name            string         `json:"name"`
 		InitialStatus   ProjectStatus  `json:"initialStatus"`
-		SessionId       tmux.SessionId `json:"sessionId"`
+		SessionId       tmux.SessionId `json:"sessionId,omitempty"`
 		TempSessionName string         `json:"tempSessionName,omitempty"`
-		Errors          []string       `json:"errors"`
+		Errors          []string       `json:"errors,omitempty"`
 	}
 	event := &projectKillEvent{Name: p.Name}
 	finish := log.Track(ctx, "projectKillEvent", event)
@@ -301,18 +302,18 @@ func (p *Project) Kill(ctx context.Context) (func() error, error) {
 
 	cleanup := func() error { return nil }
 
-	session, err := p.Session()
-	if err != nil {
-		event.Errors = append(event.Errors, err.Error())
-		return cleanup, fmt.Errorf("when killing the session: %w", err)
-	}
-	event.SessionId = session.Id
 	status, err := p.Status()
 	if err != nil {
 		event.Errors = append(event.Errors, err.Error())
 		return cleanup, fmt.Errorf("when killing the session: %w", err)
 	}
 	event.InitialStatus = status
+	session, err := p.Session()
+	if err != nil {
+		event.Errors = append(event.Errors, err.Error())
+		return cleanup, fmt.Errorf("when killing the session: %w", err)
+	}
+	event.SessionId = session.Id
 	if status == PROJECT_STATUS_ATTACHED {
 		err = switchToBestProject(ctx, p)
 		if err != nil {
@@ -341,11 +342,12 @@ func switchToBestProject(ctx context.Context, p *Project) error {
 		Name       string   `json:"name"`
 		SortResult []string `json:"sortResult"`
 		Selected   string   `json:"selected"`
-		Errors     []string `json:"errors"`
+		Errors     []string `json:"errors,omitempty"`
 	}
 	event := &switchToBestProjectEvent{Name: p.Name}
 	finish := log.Track(ctx, "switchToBestProject", event)
 	defer finish()
+
 	all, err := List(ctx, p.server, p.fullConfig)
 	if err != nil {
 		event.Errors = append(event.Errors, err.Error())
@@ -370,7 +372,7 @@ func switchToBestProject(ctx context.Context, p *Project) error {
 	for _, o := range all {
 		if o.Name != p.Name {
 			event.Selected = o.Name
-			err = o.Switch(ctx)
+			_, err = o.Switch(ctx)
 			if err != nil {
 				event.Errors = append(event.Errors, err.Error())
 				return err
@@ -384,12 +386,12 @@ func switchToBestProject(ctx context.Context, p *Project) error {
 // Switches the active tmux client to the project's tmux session,
 // and runs the switch commands.
 // If no session is running one will be started.
-func (p *Project) Switch(ctx context.Context) error {
+func (p *Project) Switch(ctx context.Context) (*tmux.Session, error) {
 	type projecSwitchEvent struct {
 		Name      string         `json:"name"`
 		SessionId tmux.SessionId `json:"sessionId"`
 		ClientId  tmux.ClientId  `json:"clientId"`
-		Errors    []string       `json:"errors"`
+		Errors    []string       `json:"errors,omitempty"`
 	}
 	event := &projecSwitchEvent{Name: p.Name}
 	finish := log.Track(ctx, "projectSwitchEvent", event)
@@ -397,21 +399,21 @@ func (p *Project) Switch(ctx context.Context) error {
 	session, err := p.Start(ctx)
 	if err != nil {
 		event.Errors = append(event.Errors, err.Error())
-		return fmt.Errorf("when starting the project for switching: %w", err)
+		return nil, fmt.Errorf("when starting the project for switching: %w", err)
 	}
 	event.SessionId = session.Id
 	client, err := p.server.ActiveClient()
 	if err != nil {
 		event.Errors = append(event.Errors, err.Error())
-		return fmt.Errorf("when getting active client for switch: %w", err)
+		return nil, fmt.Errorf("when getting active client for switch: %w", err)
 	}
 	event.ClientId = client.Id
 	err = client.Switch(session)
 	if err != nil {
 		event.Errors = append(event.Errors, err.Error())
-		return fmt.Errorf("when switching to the session: %w", err)
+		return nil, fmt.Errorf("when switching to the session: %w", err)
 	}
-	return p.RunSwitchCommands(ctx)
+	return session, p.RunSwitchCommands(ctx)
 }
 
 // Runs the projects switch commands in it's active session.
@@ -419,13 +421,14 @@ func (p *Project) Switch(ctx context.Context) error {
 func (p *Project) RunSwitchCommands(ctx context.Context) error {
 	type projecRunSwitchCommandsEvent struct {
 		Name      string         `json:"name"`
-		SessionId tmux.SessionId `json:"sessionId"`
-		Commands  []string       `json:"commands"`
-		Errors    []string       `json:"errors"`
+		SessionId tmux.SessionId `json:"sessionId,omitempty"`
+		Commands  []string       `json:"commands,omitempty"`
+		Errors    []string       `json:"errors,omitempty"`
 	}
 	event := &projecRunSwitchCommandsEvent{Name: p.Name}
 	finish := log.Track(ctx, "projecRunSwitchCommandsEvent", event)
 	defer finish()
+
 	if p.Config == nil {
 		return nil
 	}
@@ -477,12 +480,12 @@ func (p *Project) RunSwitchCommands(ctx context.Context) error {
 func (p *Project) Reset(ctx context.Context) (*tmux.Session, func() error, error) {
 	type projecResetEvent struct {
 		Name             string         `json:"name"`
-		InitialSessionId tmux.SessionId `json:"initialSessionId"`
+		InitialSessionId tmux.SessionId `json:"initialSessionId,omitempty"`
 		TempSessionName  string         `json:"tempSessionName,omitempty"`
 		InitialStatus    ProjectStatus  `json:"initialStatus"`
-		ClientId         tmux.ClientId  `json:"clientId"`
-		FinalSessionId   tmux.SessionId `json:"finalSessionId"`
-		Errors           []string       `json:"errors"`
+		ClientId         tmux.ClientId  `json:"clientId,omitempty"`
+		FinalSessionId   tmux.SessionId `json:"finalSessionId,omitempty"`
+		Errors           []string       `json:"errors,omitempty"`
 	}
 	event := &projecResetEvent{Name: p.Name}
 	finish := log.Track(ctx, "projecResetEvent", event)
@@ -490,18 +493,18 @@ func (p *Project) Reset(ctx context.Context) (*tmux.Session, func() error, error
 
 	cleanup := func() error { return nil }
 
-	session, err := p.Session()
-	if err != nil {
-		event.Errors = append(event.Errors, err.Error())
-		return nil, cleanup, fmt.Errorf("when getting session to reset: %w", err)
-	}
-	event.InitialSessionId = session.Id
 	status, err := p.Status()
 	if err != nil {
 		event.Errors = append(event.Errors, err.Error())
 		return nil, cleanup, fmt.Errorf("when checking status for reset: %w", err)
 	}
 	event.InitialStatus = status
+	session, err := p.Session()
+	if err != nil {
+		event.Errors = append(event.Errors, err.Error())
+		return nil, cleanup, fmt.Errorf("when getting session to reset: %w", err)
+	}
+	event.InitialSessionId = session.Id
 
 	// get rid of the current session.
 	if status == PROJECT_STATUS_ATTACHED {
@@ -534,7 +537,7 @@ func (p *Project) Reset(ctx context.Context) (*tmux.Session, func() error, error
 	}
 	event.FinalSessionId = s.Id
 	if status == PROJECT_STATUS_ATTACHED {
-		err = p.Switch(ctx)
+		_, err = p.Switch(ctx)
 		if err != nil {
 			event.Errors = append(event.Errors, err.Error())
 			return nil, cleanup, fmt.Errorf("when switching back after reset: %w", err)

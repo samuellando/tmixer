@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -17,6 +16,9 @@ import (
 var DEFAULT_TEST_SESSION = "default_test_session"
 
 func SetupTestClient(tmux *tmux.Server, session *tmux.Session) *os.File {
+	if session == nil {
+		session, _ = tmux.New("test_session")
+	}
 	cmd := exec.Command("tmux", "-S", tmux.SocketPath, "-u", "attach", "-t", string(session.Id))
 	f, err := pty.Start(cmd)
 	if err != nil {
@@ -34,13 +36,10 @@ func SetupTestClient(tmux *tmux.Server, session *tmux.Session) *os.File {
 
 func SetupTestServer(t testing.TB) (context.Context, *tmux.Server) {
 	ctx, _ := log.New(context.Background(), nil)
-	dir, err := os.MkdirTemp(os.TempDir(), "tmixer")
-	if err != nil {
-		t.Fatal(err)
-	}
+	dir := t.TempDir()
 	tmux := tmux.Tmux(ctx, fmt.Sprintf("%s/test.sock", dir))
 	// Start one extra session so the server starts
-	_, err = tmux.New(DEFAULT_TEST_SESSION)
+	_, err := tmux.New(DEFAULT_TEST_SESSION)
 	if err != nil {
 		t.Fatal(fmt.Errorf("Error while starting server %w", err))
 	}
@@ -48,20 +47,14 @@ func SetupTestServer(t testing.TB) (context.Context, *tmux.Server) {
 }
 
 func TeardownTestServer(s *tmux.Server) {
-	path := s.SocketPath
-	dir := filepath.Dir(path)
 	err := s.Kill()
 	if err != nil {
 		fmt.Println("Problem killing test server")
 		fmt.Println(err)
 	}
-	err = os.RemoveAll(dir)
-	if err != nil {
-		fmt.Println("Problem clearing test server path")
-		fmt.Println(err)
-	}
 }
 
+// Deprecated: Should use the TestRun version to enable parallelism
 func RunWithAndWithoutControlMode(t *testing.T, f func(ctx context.Context, tmux *tmux.Server)) {
 	ctx, tmux := SetupTestServer(t)
 	f(ctx, tmux)
@@ -78,4 +71,26 @@ func RunWithAndWithoutControlMode(t *testing.T, f func(ctx context.Context, tmux
 		t.Fatal(err)
 	}
 	TeardownTestServer(tmux)
+}
+
+func RunWithAndWithoutControlModeTestRun(t *testing.T, f func(t *testing.T, ctx context.Context, tmux *tmux.Server)) {
+	t.Run("noControlMode", func(t *testing.T) {
+		t.Parallel()
+		ctx, tmux := SetupTestServer(t)
+		f(t, ctx, tmux)
+		TeardownTestServer(tmux)
+	})
+	t.Run("ControlMode", func(t *testing.T) {
+		ctx, tmux := SetupTestServer(t)
+		err := tmux.StartControlMode()
+		if err != nil {
+			t.Fatal(err)
+		}
+		f(t, ctx, tmux)
+		err = tmux.StopControlMode()
+		if err != nil {
+			t.Fatal(err)
+		}
+		TeardownTestServer(tmux)
+	})
 }
