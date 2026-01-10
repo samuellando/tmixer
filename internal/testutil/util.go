@@ -24,13 +24,25 @@ func SetupTestClient(tmux *tmux.Server, session *tmux.Session) *os.File {
 	if err != nil {
 		panic(err)
 	}
-	// Read a single byte, waiting for the proccess to actually start
-	time.Sleep(time.Second)
-	buff := make([]byte, 100)
-	_, err = f.Read(buff)
-	if err != nil {
-		panic(err)
+	// Wait for the tmux session to become responsive or timeout
+	buff := make([]byte, 256)
+	readErrChan := make(chan error, 1)
+	go func() {
+		_, err := f.Read(buff)
+		readErrChan <- err
+	}()
+
+	select {
+	case err := <-readErrChan:
+		if err != nil {
+			f.Close()
+			panic(fmt.Errorf("failed to read from tmux client: %w", err))
+		}
+	case <-time.After(2 * time.Second):
+		f.Close()
+		panic(fmt.Errorf("timeout waiting for tmux client responsiveness"))
 	}
+
 	return f
 }
 
@@ -59,6 +71,8 @@ func RunWithAndWithoutControlMode(t *testing.T, f func(ctx context.Context, tmux
 	ctx, tmux := SetupTestServer(t)
 	f(ctx, tmux)
 	TeardownTestServer(tmux)
+	// Give shell processes and tmux server time to fully exit
+	time.Sleep(500 * time.Millisecond)
 	// And with control mode
 	ctx, tmux = SetupTestServer(t)
 	err := tmux.StartControlMode()
@@ -71,6 +85,8 @@ func RunWithAndWithoutControlMode(t *testing.T, f func(ctx context.Context, tmux
 		t.Fatal(err)
 	}
 	TeardownTestServer(tmux)
+	// Give shell processes and tmux server time to fully exit
+	time.Sleep(500 * time.Millisecond)
 }
 
 func RunWithAndWithoutControlModeTestRun(t *testing.T, f func(t *testing.T, ctx context.Context, tmux *tmux.Server)) {
@@ -79,6 +95,8 @@ func RunWithAndWithoutControlModeTestRun(t *testing.T, f func(t *testing.T, ctx 
 		ctx, tmux := SetupTestServer(t)
 		f(t, ctx, tmux)
 		TeardownTestServer(tmux)
+		// Give shell processes and tmux server time to fully exit
+		time.Sleep(500 * time.Millisecond)
 	})
 	t.Run("ControlMode", func(t *testing.T) {
 		ctx, tmux := SetupTestServer(t)
@@ -92,5 +110,7 @@ func RunWithAndWithoutControlModeTestRun(t *testing.T, f func(t *testing.T, ctx 
 			t.Fatal(err)
 		}
 		TeardownTestServer(tmux)
+		// Give shell processes and tmux server time to fully exit
+		time.Sleep(500 * time.Millisecond)
 	})
 }

@@ -162,9 +162,11 @@ func getAllTestCases() []*projectTestCase {
 	testCases := make([]*projectTestCase, 0)
 	for name, pc := range testConfig.Projects {
 		tc := projectTestCase{}
+		// Make a copy of the config to avoid race conditions in parallel tests
+		configCopy := *pc
 		p := Project{
 			Name:       name,
-			Config:     pc,
+			Config:     &configCopy,
 			fullConfig: testConfig,
 		}
 		tc.project = &p
@@ -183,8 +185,10 @@ func teardownTestProjects(t *testing.T, client *os.File) {
 }
 
 func runAllTestCases(t *testing.T, f func(t *testing.T, ctx context.Context, srv *tmux.Server, tc *projectTestCase)) {
+	t.Parallel()
 	for _, tc := range getAllTestCases() {
 		t.Run(tc.project.Name, func(t *testing.T) {
+			t.Parallel()
 			testutil.RunWithAndWithoutControlModeTestRun(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 				client := setupTestProject(t, ctx, tc, srv)
 				defer teardownTestProjects(t, client)
@@ -735,7 +739,9 @@ func TestProjectSwitchCommands(t *testing.T) {
 			if err != nil {
 				if i == maxAttempts {
 					t.Error(err)
+					break tickLoop
 				}
+				continue tickLoop
 			}
 			if strings.Contains(tc.project.Name, "switch") {
 				if len(ls) == len(switchCommands) {
@@ -776,7 +782,9 @@ func TestProjectRunSwitchCommands(t *testing.T) {
 				if err != nil {
 					if i == maxAttempts {
 						t.Error(err)
+						break tickLoop
 					}
+					continue tickLoop
 				}
 				if strings.Contains(tc.project.Name, "switch") {
 					if len(ls) == len(switchCommands) {
@@ -960,7 +968,9 @@ func TestProjectResetCommands(t *testing.T) {
 			if err != nil {
 				if i == maxAttempts {
 					t.Error(err)
+					break tickloop
 				}
+				continue tickloop
 			}
 			if strings.Contains(tc.project.Name, "switch") && tc.initialStatus() == PROJECT_STATUS_ATTACHED {
 				if len(ls) == len(switchCommands) {
