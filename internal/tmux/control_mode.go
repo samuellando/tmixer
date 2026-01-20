@@ -23,9 +23,10 @@ type controlModeClient struct {
 
 type commandEvent struct {
 	Args        []string `json:"args"`
-	RawInput    string   `json:"rawInput"`
+	RawInput    string   `json:"rawInput,omitempty"`
 	OutputLines []string `json:"outputLines"`
-	Error       *string  `json:"error"`
+	ControlMode bool     `json:"controlMode"`
+	Errors      []string `json:"errors,omitempty"`
 }
 
 type controlModeSession struct {
@@ -100,17 +101,22 @@ func (srv *Server) StopControlMode() error {
 }
 
 func (client *controlModeClient) sendCommand(ctx context.Context, c cmd) ([]string, error) {
-	event := &commandEvent{}
-	finish := log.TrackLevel(log.LEVEL_DEBUG, ctx, "controlModeCommandEvent", event)
+	event := &commandEvent{ControlMode: true}
+	finish := log.TrackLevel(log.LEVEL_DEBUG, ctx, "tmuxCommandEvent", event)
 	start := time.Now()
 	defer finish()
 	event.Args = c.internalArguments()
 	event.RawInput = c.String()
 	_, err := client.controlModeStdIn.Write([]byte(c.String() + "\n"))
 	if err != nil {
-		return nil, fmt.Errorf("Failed to write to stdin: %w", err)
+		err = fmt.Errorf("Failed to write to stdin: %w", err)
+		event.Errors = append(event.Errors, err.Error())
+		return nil, err
 	}
 	out, err := client.readMessage(event)
+	if err != nil {
+		event.Errors = append(event.Errors, err.Error())
+	}
 	client.logSession.AverageDuration = ((client.logSession.AverageDuration * time.Duration(client.logSession.CommandRuns)) + time.Since(start)) / time.Duration(client.logSession.CommandRuns+1)
 	client.logSession.CommandRuns++
 	return out, err
@@ -154,13 +160,11 @@ func (client *controlModeClient) readMessage(event *commandEvent) ([]string, err
 		return out, nil
 	} else if readState == "error" {
 		err := fmt.Errorf("command returned error output \"%s\"", strings.Join(out, "\n"))
-		sErr := err.Error()
-		event.Error = &sErr
+		event.Errors = append(event.Errors, err.Error())
 		return out, err
 	} else {
 		err := fmt.Errorf("Critical read error")
-		sErr := err.Error()
-		event.Error = &sErr
+		event.Errors = append(event.Errors, err.Error())
 		return out, err
 	}
 }
@@ -185,8 +189,7 @@ func (srv *Server) runCommandInControlModeIfStarted(c cmd) ([]string, error) {
 	event.OutputLines = lines
 	if err != nil {
 		err := fmt.Errorf("command returned error: %w with output \"%s\"", err, strings.Join(lines, "\n"))
-		sErr := err.Error()
-		event.Error = &sErr
+		event.Errors = append(event.Errors, err.Error())
 		return lines, err
 	}
 	return lines, nil
