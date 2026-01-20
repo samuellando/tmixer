@@ -7,6 +7,7 @@ import (
 
 	"samuellando.com/tmixer/internal/config"
 	"samuellando.com/tmixer/internal/flags"
+	"samuellando.com/tmixer/internal/log"
 )
 
 var (
@@ -24,6 +25,23 @@ var FLAGS = []flags.Flag{
 				return fmt.Errorf("log file must be provided")
 			}
 			c.LogFile = &s
+			return nil
+		},
+	},
+	{
+		Name:        "logLevel",
+		Description: "logging level: info or debug",
+		Default:     "info",
+		Usage:       "--logLevel debug",
+		ParseInput: func(s string, c *config.Config) error {
+			s = strings.ToLower(s)
+			if strings.HasPrefix(s, "i") {
+				c.LogLevel = log.LEVEL_INFO
+			} else if strings.HasPrefix(s, "d") {
+				c.LogLevel = log.LEVEL_DEBUG
+			} else {
+				return fmt.Errorf("Unrecognized log level")
+			}
 			return nil
 		},
 	},

@@ -75,6 +75,7 @@ func ParseArgs(ctx context.Context, args []string, flags []Flag, conf *config.Co
 				if parseerr := flag.ParseInput(val, conf); parseerr != nil {
 					err = errors.Join(err, fmt.Errorf("While parsing flag %s: %w", flag.Name, parseerr))
 					event.Errors = append(event.Errors, err.Error())
+					return nil, err
 				}
 				event.ParsedFlags = append(event.ParsedFlags, []string{flag.Name, val})
 				break

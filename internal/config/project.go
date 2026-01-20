@@ -16,6 +16,7 @@ import (
 type Config struct {
 	DefaultProject   *string                   `yaml:"defaultProject"`
 	LogFile          *string                   `yaml:"logFile"`
+	LogLevel         int                       `yaml:"logLevel"`
 	LogRetentionDays *int                      `yaml:"logRetentionDays"`
 	FzfFlags         []string                  `yaml:"fzfFlags"`
 	ConfigFiles      []string                  `yaml:"configFiles"`
@@ -46,6 +47,7 @@ func New() *Config {
 	return &Config{
 		DefaultProject:   nil,
 		LogFile:          nil,
+		LogLevel:         log.LEVEL_INFO,
 		LogRetentionDays: &logRetentionDays,
 		FzfFlags: []string{
 			"--ansi",

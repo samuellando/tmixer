@@ -11,7 +11,6 @@ import (
 const (
 	LEVEL_DEBUG = -1
 	LEVEL_INFO  = 0
-	LEVEL_ERROR = 1
 )
 
 type Logger struct {

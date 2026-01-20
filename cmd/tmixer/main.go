@@ -216,7 +216,7 @@ func disableHooks(tmux *tmux.Server) error {
 
 func setupLogging(ctx context.Context, config *config.Config) (*log.Logger, []*os.File, error) {
 	files := []*os.File{}
-	_, logger := log.New(ctx, nil)
+	_, logger := log.New(ctx, &log.LoggerOptions{Level: config.LogLevel})
 
 	retention := 24 * time.Hour * time.Duration(*config.LogRetentionDays)
 
