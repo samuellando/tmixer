@@ -64,7 +64,7 @@ func New() *Config {
 func (config *Config) LoadFiles(ctx context.Context) error {
 	type configLoadEvent struct {
 		Result *Config  `json:"result"`
-		Errors []string `json:"errors"`
+		Errors []string `json:"errors,omitempty"`
 	}
 	event := &configLoadEvent{}
 	finish := log.Track(ctx, "configLoadEvent", event)
