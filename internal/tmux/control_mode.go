@@ -82,6 +82,9 @@ func (srv *Server) StopControlMode() error {
 	}
 	session := srv.controlModeClient.logSession
 	defer srv.controlModeClient.finishLog()
+	defer func() {
+		srv.controlModeClient = nil
+	}()
 	err := srv.controlModeClient.controlModeStdIn.Close()
 	if err != nil {
 		err = fmt.Errorf("when closing stdin %w", err)
@@ -91,11 +94,10 @@ func (srv *Server) StopControlMode() error {
 	srv.controlModeClient.readMessage(nil)
 	err = srv.controlModeClient.controlModeCmd.Wait()
 	if err != nil {
-		err = fmt.Errorf("when closing stdin %w", err)
+		err = fmt.Errorf("when waiting for exit %w", err)
 		session.Errors = append(session.Errors, err.Error())
 		return err
 	}
-	srv.controlModeClient = nil
 	// Finally clean up the session if we can
 	return nil
 }
@@ -160,11 +162,15 @@ func (client *controlModeClient) readMessage(event *commandEvent) ([]string, err
 		return out, nil
 	} else if readState == "error" {
 		err := fmt.Errorf("command returned error output \"%s\"", strings.Join(out, "\n"))
-		event.Errors = append(event.Errors, err.Error())
+		if event != nil {
+			event.Errors = append(event.Errors, err.Error())
+		}
 		return out, err
 	} else {
 		err := fmt.Errorf("Critical read error")
-		event.Errors = append(event.Errors, err.Error())
+		if event != nil {
+			event.Errors = append(event.Errors, err.Error())
+		}
 		return out, err
 	}
 }
