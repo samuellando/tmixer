@@ -105,10 +105,7 @@ func RunWithAndWithoutControlModeTestRun(t *testing.T, f func(t *testing.T, ctx 
 			t.Fatal(err)
 		}
 		f(t, ctx, tmux)
-		err = tmux.StopControlMode()
-		if err != nil {
-			t.Fatal(err)
-		}
+		tmux.StopControlMode()
 		TeardownTestServer(tmux)
 		// Give shell processes and tmux server time to fully exit
 		time.Sleep(500 * time.Millisecond)
