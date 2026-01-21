@@ -1,9 +1,7 @@
 package tmux_test
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"strings"
 	"testing"
 
@@ -12,31 +10,17 @@ import (
 	"samuellando.com/tmixer/internal/tmux"
 )
 
-func setupLogging(ctx context.Context, level int) (context.Context, *log.Logger, *bytes.Buffer) {
-	ctx, logger := log.New(ctx, &log.LoggerOptions{Level: level})
-	out := &bytes.Buffer{}
-	logger.AddSink(out)
-	return ctx, logger, out
-}
-
-func getLogEvent(ctx context.Context, logger *log.Logger, out *bytes.Buffer) map[string]any {
-	logger.Info(ctx)
-	res := make(map[string]any)
-	json.Unmarshal(out.Bytes(), &res)
-	return res
-}
-
 func TestCommandDoesNotLogAtInfo(t *testing.T) {
 	testutil.RunWithAndWithoutControlModeTestRun(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		// Test with default log level (should not log command events)
-		ctx, logger, out := setupLogging(ctx, log.LEVEL_INFO)
+		ctx, logger, out := testutil.SetupLogging(ctx, log.LEVEL_INFO)
 
 		_, err := srv.ListSessions()
 		if err != nil {
 			t.Error(err)
 		}
 
-		res := getLogEvent(ctx, logger, out)
+		res := testutil.GetLogEvent(ctx, logger, out)
 
 		// Should not have tmuxCommandEvent at default log level
 		if _, ok := res["tmuxCommandEvent"]; ok {
@@ -47,14 +31,14 @@ func TestCommandDoesNotLogAtInfo(t *testing.T) {
 
 func TestCommandLogsEventAtDebug(t *testing.T) {
 	testutil.RunWithAndWithoutControlModeTestRun(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
-		ctx, logger, out := setupLogging(ctx, log.LEVEL_DEBUG)
+		ctx, logger, out := testutil.SetupLogging(ctx, log.LEVEL_DEBUG)
 
 		_, err := srv.ListSessions()
 		if err != nil {
 			t.Error(err)
 		}
 
-		res := getLogEvent(ctx, logger, out)
+		res := testutil.GetLogEvent(ctx, logger, out)
 
 		// Should have tmuxCommandEvent at debug level
 		if _, ok := res["tmuxCommandEvent"]; !ok {
@@ -65,14 +49,14 @@ func TestCommandLogsEventAtDebug(t *testing.T) {
 
 func TestCommandEventFields(t *testing.T) {
 	testutil.RunWithAndWithoutControlModeTestRun(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
-		ctx, logger, out := setupLogging(ctx, log.LEVEL_DEBUG)
+		ctx, logger, out := testutil.SetupLogging(ctx, log.LEVEL_DEBUG)
 
 		_, err := srv.ListSessions()
 		if err != nil {
 			t.Error(err)
 		}
 
-		res := getLogEvent(ctx, logger, out)
+		res := testutil.GetLogEvent(ctx, logger, out)
 		event := res["tmuxCommandEvent"].(map[string]any)
 
 		// Check required fields exist
@@ -112,7 +96,7 @@ func TestControlModeFieldInEvent(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		ctx, logger, out := setupLogging(ctx, log.LEVEL_DEBUG)
+		ctx, logger, out := testutil.SetupLogging(ctx, log.LEVEL_DEBUG)
 
 		_, err = srv.ListSessions()
 		if err != nil {
@@ -124,7 +108,7 @@ func TestControlModeFieldInEvent(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		res := getLogEvent(ctx, logger, out)
+		res := testutil.GetLogEvent(ctx, logger, out)
 		event := res["tmuxCommandEvent"].(map[string]any)
 		controlMode := event["controlMode"].(bool)
 
@@ -142,14 +126,14 @@ func TestControlModeFieldInEvent(t *testing.T) {
 		ctx, srv := testutil.SetupTestServer(t)
 		defer testutil.TeardownTestServer(srv)
 
-		ctx, logger, out := setupLogging(ctx, log.LEVEL_DEBUG)
+		ctx, logger, out := testutil.SetupLogging(ctx, log.LEVEL_DEBUG)
 
 		_, err := srv.ListSessions()
 		if err != nil {
 			t.Error(err)
 		}
 
-		res := getLogEvent(ctx, logger, out)
+		res := testutil.GetLogEvent(ctx, logger, out)
 		event := res["tmuxCommandEvent"].(map[string]any)
 		controlMode := event["controlMode"].(bool)
 
@@ -173,7 +157,7 @@ func TestCommandErrorLogging(t *testing.T) {
 		}
 
 		// NOW set up logging to capture only the error command
-		ctx, logger, out := setupLogging(ctx, log.LEVEL_DEBUG)
+		ctx, logger, out := testutil.SetupLogging(ctx, log.LEVEL_DEBUG)
 
 		// Try to create a session with the same name - this should fail and be logged
 		_, err = srv.New("test_error_session")
@@ -181,7 +165,7 @@ func TestCommandErrorLogging(t *testing.T) {
 			t.Error("Expected an error when creating duplicate session")
 		}
 
-		res := getLogEvent(ctx, logger, out)
+		res := testutil.GetLogEvent(ctx, logger, out)
 		event, ok := res["tmuxCommandEvent"].(map[string]any)
 		if !ok {
 			t.Fatalf("tmuxCommandEvent not found in log output")
@@ -210,7 +194,7 @@ func TestControlModeSessionTracking(t *testing.T) {
 	ctx, srv := testutil.SetupTestServer(t)
 	defer testutil.TeardownTestServer(srv)
 
-	ctx, logger, out := setupLogging(ctx, log.LEVEL_DEBUG)
+	ctx, logger, out := testutil.SetupLogging(ctx, log.LEVEL_DEBUG)
 
 	err := srv.StartControlMode()
 	if err != nil {
@@ -231,7 +215,7 @@ func TestControlModeSessionTracking(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res := getLogEvent(ctx, logger, out)
+	res := testutil.GetLogEvent(ctx, logger, out)
 	session := res["controlModeSession"].(map[string]any)
 
 	// Check that command runs are tracked
@@ -257,7 +241,7 @@ func TestControlModeSessionErrors(t *testing.T) {
 	ctx, _ := log.New(context.Background(), nil)
 	srv := tmux.Tmux(ctx, "/nonexistent/path/socket")
 
-	ctx, logger, out := setupLogging(ctx, log.LEVEL_DEBUG)
+	ctx, logger, out := testutil.SetupLogging(ctx, log.LEVEL_DEBUG)
 
 	err := srv.StartControlMode()
 	err = srv.StopControlMode()
@@ -265,7 +249,7 @@ func TestControlModeSessionErrors(t *testing.T) {
 		t.Error("Expected error when starting control mode with invalid socket")
 	}
 
-	res := getLogEvent(ctx, logger, out)
+	res := testutil.GetLogEvent(ctx, logger, out)
 	session := res["controlModeSession"].(map[string]any)
 
 	// Should have errors
@@ -282,7 +266,7 @@ func TestControlModeSessionErrors(t *testing.T) {
 
 func TestMultipleCommandsLoggedSeparately(t *testing.T) {
 	testutil.RunWithAndWithoutControlModeTestRun(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
-		ctx, logger, out := setupLogging(ctx, log.LEVEL_DEBUG)
+		ctx, logger, out := testutil.SetupLogging(ctx, log.LEVEL_DEBUG)
 
 		// Run multiple different commands
 		_, err := srv.ListSessions()
@@ -306,7 +290,7 @@ func TestMultipleCommandsLoggedSeparately(t *testing.T) {
 		}
 
 		// Count how many command events were logged
-		res := getLogEvent(ctx, logger, out)
+		res := testutil.GetLogEvent(ctx, logger, out)
 		events := res["tmuxCommandEvents"].([]any)
 
 		// Should have 4 command events (list-sessions, new-session, name, get session)
@@ -326,7 +310,7 @@ func TestRawInputOnlyInControlMode(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		ctx, logger, out := setupLogging(ctx, log.LEVEL_DEBUG)
+		ctx, logger, out := testutil.SetupLogging(ctx, log.LEVEL_DEBUG)
 
 		_, err = srv.ListSessions()
 		if err != nil {
@@ -338,7 +322,7 @@ func TestRawInputOnlyInControlMode(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		res := getLogEvent(ctx, logger, out)
+		res := testutil.GetLogEvent(ctx, logger, out)
 		event := res["tmuxCommandEvent"].(map[string]any)
 		rawInput, ok := event["rawInput"].(string)
 
@@ -360,14 +344,14 @@ func TestRawInputOnlyInControlMode(t *testing.T) {
 		ctx, srv := testutil.SetupTestServer(t)
 		defer testutil.TeardownTestServer(srv)
 
-		ctx, logger, out := setupLogging(ctx, log.LEVEL_DEBUG)
+		ctx, logger, out := testutil.SetupLogging(ctx, log.LEVEL_DEBUG)
 
 		_, err := srv.ListSessions()
 		if err != nil {
 			t.Error(err)
 		}
 
-		res := getLogEvent(ctx, logger, out)
+		res := testutil.GetLogEvent(ctx, logger, out)
 		event := res["tmuxCommandEvent"].(map[string]any)
 
 		// Should not have rawInput in non-control mode

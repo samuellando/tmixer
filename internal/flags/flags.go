@@ -47,12 +47,12 @@ func ParseArgs(ctx context.Context, args []string, flags []Flag, conf *config.Co
 		ParsedFlags   [][]string     `json:"parsedFlags"`
 		RemainingArgs []string       `json:"remainingArgs"`
 		Result        *config.Config `json:"result"`
-		Errors        []string       `json:"errors"`
+		Errors        []string       `json:"errors,omitempty"`
 	}
 	event := &flagParseEvent{
 		InputArgs:     args,
 		ParsedFlags:   make([][]string, 0),
-		RemainingArgs: nil,
+		RemainingArgs: make([]string, 0),
 		Errors:        make([]string, 0),
 	}
 	finish := log.Track(ctx, "flagParseEvent", event)

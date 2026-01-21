@@ -1,34 +1,19 @@
 package config_test
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"samuellando.com/tmixer/internal/config"
 	"samuellando.com/tmixer/internal/log"
+	"samuellando.com/tmixer/internal/testutil"
 )
-
-func setupLogging(ctx context.Context, level int) (context.Context, *log.Logger, *bytes.Buffer) {
-	ctx, logger := log.New(ctx, &log.LoggerOptions{Level: level})
-	out := &bytes.Buffer{}
-	logger.AddSink(out)
-	return ctx, logger, out
-}
-
-func getLogEvent(ctx context.Context, logger *log.Logger, out *bytes.Buffer) map[string]any {
-	logger.Info(ctx)
-	res := make(map[string]any)
-	json.Unmarshal(out.Bytes(), &res)
-	return res
-}
 
 func TestConfigLoadEventFields(t *testing.T) {
 	ctx := context.Background()
-	ctx, logger, out := setupLogging(ctx, log.LEVEL_DEBUG)
+	ctx, logger, out := testutil.SetupLogging(ctx, log.LEVEL_DEBUG)
 
 	// Create a valid config file
 	tmpDir := t.TempDir()
@@ -48,7 +33,7 @@ projects:
 	cfg.ConfigFiles = []string{configFile}
 	cfg.LoadFiles(ctx)
 
-	res := getLogEvent(ctx, logger, out)
+	res := testutil.GetLogEvent(ctx, logger, out)
 
 	// Check configLoadEvent exists
 	event, ok := res["configLoadEvent"].(map[string]any)
@@ -56,41 +41,17 @@ projects:
 		t.Fatal("configLoadEvent not found in log output")
 	}
 
-	// Check result field exists
-	if _, ok := event["result"]; !ok {
-		t.Error("configLoadEvent missing 'result' field")
+	// Check result field exists and contains expected values
+	result, ok := event["result"].(map[string]any)
+	if !ok {
+		t.Fatal("configLoadEvent missing 'result' field")
 	}
-
-	// Verify result is an object (Config struct)
-	if _, ok := event["result"].(map[string]any); !ok {
-		t.Error("'result' field should be an object")
+	// Verify taht result is correctly logged
+	if defaultProject, ok := result["DefaultProject"].(string); !ok {
+		t.Error("'result' should have 'DefaultProject' field")
+	} else if defaultProject != "test" {
+		t.Errorf("DefaultProject should be 'test', got '%s'", defaultProject)
 	}
-}
-
-func TestConfigLoadEventNoErrors(t *testing.T) {
-	ctx := context.Background()
-	ctx, logger, out := setupLogging(ctx, log.LEVEL_DEBUG)
-
-	// Create a valid config file
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "config.yml")
-	configContent := `
-defaultProject: test
-projects:
-  test:
-    directory: /tmp/test
-`
-	err := os.WriteFile(configFile, []byte(configContent), 0644)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	cfg := config.New()
-	cfg.ConfigFiles = []string{configFile}
-	cfg.LoadFiles(ctx)
-
-	res := getLogEvent(ctx, logger, out)
-	event := res["configLoadEvent"].(map[string]any)
 
 	// errors field should be omitted when there are no errors
 	if _, ok := event["errors"]; ok {
@@ -100,14 +61,14 @@ projects:
 
 func TestConfigLoadEventWithSingleError(t *testing.T) {
 	ctx := context.Background()
-	ctx, logger, out := setupLogging(ctx, log.LEVEL_DEBUG)
+	ctx, logger, out := testutil.SetupLogging(ctx, log.LEVEL_DEBUG)
 
 	// Use a non-existent file to trigger an error
 	cfg := config.New()
 	cfg.ConfigFiles = []string{"/nonexistent/path/config.yml"}
 	cfg.LoadFiles(ctx)
 
-	res := getLogEvent(ctx, logger, out)
+	res := testutil.GetLogEvent(ctx, logger, out)
 	event := res["configLoadEvent"].(map[string]any)
 
 	// errors field should be present
@@ -135,7 +96,7 @@ func TestConfigLoadEventWithSingleError(t *testing.T) {
 
 func TestConfigLoadEventWithMultipleErrors(t *testing.T) {
 	ctx := context.Background()
-	ctx, logger, out := setupLogging(ctx, log.LEVEL_DEBUG)
+	ctx, logger, out := testutil.SetupLogging(ctx, log.LEVEL_DEBUG)
 
 	// Create multiple scenarios that will cause errors:
 	// 1. Non-existent file
@@ -162,7 +123,7 @@ projects:
 	}
 	cfg.LoadFiles(ctx)
 
-	res := getLogEvent(ctx, logger, out)
+	res := testutil.GetLogEvent(ctx, logger, out)
 	event := res["configLoadEvent"].(map[string]any)
 
 	// errors field should be present
@@ -192,14 +153,14 @@ projects:
 
 func TestConfigLoadEventResultPopulatedWithErrors(t *testing.T) {
 	ctx := context.Background()
-	ctx, logger, out := setupLogging(ctx, log.LEVEL_DEBUG)
+	ctx, logger, out := testutil.SetupLogging(ctx, log.LEVEL_DEBUG)
 
 	// Use a non-existent file to trigger an error
 	cfg := config.New()
 	cfg.ConfigFiles = []string{"/nonexistent/path/config.yml"}
 	cfg.LoadFiles(ctx)
 
-	res := getLogEvent(ctx, logger, out)
+	res := testutil.GetLogEvent(ctx, logger, out)
 	event := res["configLoadEvent"].(map[string]any)
 
 	// result field should still exist even with errors
