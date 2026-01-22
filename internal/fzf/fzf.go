@@ -18,7 +18,7 @@ func PickProject(ctx context.Context, config *config.Config, projects []*project
 		Args         []string `json:"args"`
 		Output       string   `json:"output"`
 		ParsedOutput string   `json:"parsedOutput"`
-		Errors       []string `json:"errors"`
+		Errors       []string `json:"errors,omitempty"`
 	}
 	event := &pickProjectEvent{}
 	finish := log.Track(ctx, "pickProjectEvent", event)
@@ -70,7 +70,7 @@ func PickProject(ctx context.Context, config *config.Config, projects []*project
 
 func DisplayProjects(ctx context.Context, projects []*project.Project, w io.Writer) error {
 	type displayProjectsEvent struct {
-		Errors []string `json:"errors"`
+		Errors []string `json:"errors,omitempty"`
 	}
 	event := &displayProjectsEvent{}
 	finish := log.Track(ctx, "displayProjectsEvent", event)
