@@ -3,9 +3,11 @@ package main
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"samuellando.com/tmixer/internal/config"
 	"samuellando.com/tmixer/internal/flags"
+	"samuellando.com/tmixer/internal/log"
 )
 
 var (
@@ -14,10 +16,19 @@ var (
 
 var FLAGS = []flags.Flag{
 	{
-		Name:        "log",
-		ShortName:   "l",
-		Description: "Output logs to a file, for debug purposes",
-		Usage:       "--log out.log, or -l out.log",
+		Name:        "help",
+		ShortName:   "h",
+		Description: "display a help message to stdout",
+		Usage:       "--help or -h",
+		ParseInput: func(s string, c *config.Config) error {
+			OPTION_DISPLAY_HELP = true
+			return nil
+		},
+	},
+	{
+		Name:        "logFile",
+		Description: "Output logs to a file in addition to ~/.local/state/tmixer/logs .",
+		Usage:       "--logFile out.log",
 		ParseInput: func(s string, c *config.Config) error {
 			if s == "" {
 				return fmt.Errorf("log file must be provided")
@@ -27,12 +38,42 @@ var FLAGS = []flags.Flag{
 		},
 	},
 	{
-		Name:        "help",
-		ShortName:   "h",
-		Description: "display a help message to stdout",
-		Usage:       "--help or -h",
+		Name:        "logLevel",
+		Description: "logging level: info or debug",
+		Default:     "info",
+		Usage:       "--logLevel debug",
 		ParseInput: func(s string, c *config.Config) error {
-			OPTION_DISPLAY_HELP = true
+			s = strings.ToLower(s)
+			if strings.HasPrefix(s, "i") {
+				c.LogLevel = log.LEVEL_INFO
+			} else if strings.HasPrefix(s, "d") {
+				c.LogLevel = log.LEVEL_DEBUG
+			} else {
+				return fmt.Errorf("Unrecognized log level")
+			}
+			return nil
+		},
+	},
+	{
+		Name:        "logRetentionDays",
+		Description: "how many previous days of logs to keep in ~/.local/state/tmixer/logs. Set to 0 to only keep current day and none to disable logging.",
+		Usage:       "--logRetentionDays 5",
+		Default:     "1",
+		ParseInput: func(s string, c *config.Config) error {
+			if s == "" {
+				return fmt.Errorf("log file must be provided")
+			}
+			var v int
+			var err error
+			if strings.ToLower(s) == "none" {
+				v = -1
+			} else {
+				v, err = strconv.Atoi(s)
+				if err != nil {
+					return fmt.Errorf("while parsing log retentionn days: %s", err)
+				}
+			}
+			c.LogRetentionDays = &v
 			return nil
 		},
 	},

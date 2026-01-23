@@ -1,18 +1,28 @@
 package project
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"samuellando.com/tmixer/internal/config"
+	"samuellando.com/tmixer/internal/log"
 	"samuellando.com/tmixer/internal/tmux"
 )
 
-var ErrAmbiguousName = errors.New("Ambiguous project name detected")
+var ErrAmbiguousName = errors.New("ambiguous project name detected")
+
+type projectListEvent struct {
+	Errors []string `json:"errors,omitempty"`
+}
+type projectListResult struct {
+	Result []*Project `json:"result"`
+}
 
 // List all configured projects
+//
 // - Creates a project for each sub directory
 //   - Giving them the name "[project_name]--[subdir_name]"
 //
@@ -20,19 +30,32 @@ var ErrAmbiguousName = errors.New("Ambiguous project name detected")
 //
 // Returns an ErrAmbiguousName if there are two configured projects with the same name,
 // And other errors if anything else goes wrong with the queries.
-func List(tmux *tmux.Server, config *config.Config) ([]*Project, error) {
-	projects := listBareProjects(config)
-	subDirProjects, err := listSubDirProjects(config)
+//
+// If the logging module is setup in ctx, it will log all errors at the Info level and
+// Results at the debug level.
+func List(ctx context.Context, tmux *tmux.Server, c *config.Config) ([]*Project, error) {
+	event, resultEvent, finish := setupListLogEvents(ctx)
+	defer finish()
+	// The regular projects
+	projects := listBareProjects(c)
+	// Sub directory projects
+	subDirProjects, err := listSubDirProjects(c)
 	if err != nil {
+		event.Errors = append(event.Errors, err.Error())
 		return nil, err
 	}
 	projects = append(projects, subDirProjects...)
+	// Check for name ambiguity
 	if l := getDuplicateNames(projects); len(l) > 0 {
-		return nil, fmt.Errorf("%w %v", ErrAmbiguousName, l)
+		err = fmt.Errorf("%w: %v", ErrAmbiguousName, l)
+		event.Errors = append(event.Errors, err.Error())
+		return nil, err
 	}
+	// Existing tmux sessions
 	if tmux != nil {
 		sessionProjects, err := listSessionsWithoutProject(tmux, projects)
 		if err != nil {
+			event.Errors = append(event.Errors, err.Error())
 			return nil, err
 		}
 		projects = append(projects, sessionProjects...)
@@ -40,9 +63,22 @@ func List(tmux *tmux.Server, config *config.Config) ([]*Project, error) {
 	// Add the internal fileds to all projects
 	for _, p := range projects {
 		p.server = tmux
-		p.fullConfig = config
+		p.fullConfig = c
 	}
+	resultEvent.Result = projects
 	return projects, nil
+}
+
+func setupListLogEvents(ctx context.Context) (*projectListEvent, *projectListResult, func()) {
+	event := &projectListEvent{}
+	finish := log.Track(ctx, "projectListEvent", event)
+	resultEvent := &projectListResult{}
+	resultFinish := log.TrackLevel(log.LEVEL_DEBUG, ctx, "projectListResult", resultEvent)
+
+	return event, resultEvent, func() {
+		finish()
+		resultFinish()
+	}
 }
 
 func getDuplicateNames(projects []*Project) []string {

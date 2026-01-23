@@ -1,6 +1,7 @@
 package project
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"samuellando.com/tmixer/internal/config"
+	"samuellando.com/tmixer/internal/log"
 	"samuellando.com/tmixer/internal/tmux"
 )
 
@@ -153,22 +155,48 @@ func (p *Project) LastActivity() (*time.Time, error) {
 
 // Starts a tmux session for the project, and creates all it's configured windows and panes.
 // If a session for the project already exists, it is returned and nothing else is done.
-func (p *Project) Start() (*tmux.Session, error) {
+func (p *Project) Start(ctx context.Context) (*tmux.Session, error) {
+	type projectStartEvent struct {
+		Name          string         `json:"name"`
+		InitialStatus ProjectStatus  `json:"initialStatus"`
+		SessionId     tmux.SessionId `json:"sessionId"`
+		Errors        []string       `json:"errors,omitempty"`
+	}
+	event := &projectStartEvent{Name: p.Name}
+	finish := log.Track(ctx, "projectStartEvent", event)
+	defer finish()
+
 	status, err := p.Status()
 	if err != nil {
-		return nil, fmt.Errorf("when getting project status: %w", err)
+		err := fmt.Errorf("when getting project status: %w", err)
+		event.Errors = append(event.Errors, err.Error())
+		return nil, err
 	}
+
+	event.InitialStatus = status
 	if status >= PROJECT_STATUS_ACTIVE {
-		return p.Session()
+		session, err := p.Session()
+		if err != nil {
+			event.Errors = append(event.Errors, err.Error())
+			return nil, err
+		}
+		event.SessionId = session.Id
+		return session, nil
 	}
+
 	s, err := p.server.New(p.TmuxSessionName(), p.Config.Directory)
 	if err != nil {
-		return nil, fmt.Errorf("when starting project: %w", err)
+		err := fmt.Errorf("when starting project: %w", err)
+		event.Errors = append(event.Errors, err.Error())
+		return nil, err
 	}
 	err = p.createWindows(s)
 	if err != nil {
-		return nil, fmt.Errorf("when starting project: %w", err)
+		err := fmt.Errorf("when starting project: %w", err)
+		event.Errors = append(event.Errors, err.Error())
+		return nil, err
 	}
+	event.SessionId = s.Id
 	return s, nil
 }
 
@@ -260,41 +288,93 @@ func createPanes(w *tmux.Window, config config.WindowConfig) error {
 // 2. Otherwise, it will try to start and switch to the default project
 // 3. If no default project is set, it will switch to a random project.
 // 4. It will exit tmux if there are no other configured projects.
-func (p *Project) Kill() error {
-	session, err := p.Session()
-	if err != nil {
-		return fmt.Errorf("when killing the session: %w", err)
+func (p *Project) Kill(ctx context.Context) (func() error, error) {
+	type projectKillEvent struct {
+		Name            string         `json:"name"`
+		InitialStatus   ProjectStatus  `json:"initialStatus"`
+		SessionId       tmux.SessionId `json:"sessionId,omitempty"`
+		TempSessionName string         `json:"tempSessionName,omitempty"`
+		Errors          []string       `json:"errors,omitempty"`
 	}
+	event := &projectKillEvent{Name: p.Name}
+	finish := log.Track(ctx, "projectKillEvent", event)
+	defer finish()
+
+	cleanup := func() error { return nil }
+
 	status, err := p.Status()
 	if err != nil {
-		return fmt.Errorf("when killing the session: %w", err)
+		event.Errors = append(event.Errors, err.Error())
+		return cleanup, fmt.Errorf("when killing the session: %w", err)
 	}
-	if status == PROJECT_STATUS_ATTACHED {
-		err = switchToBestProject(p)
-		if err != nil {
-			return fmt.Errorf("when killing the session: %w", err)
-		}
-	}
-	err = session.Kill()
+	event.InitialStatus = status
+	session, err := p.Session()
 	if err != nil {
-		return fmt.Errorf("when killing the session: %w", err)
+		event.Errors = append(event.Errors, err.Error())
+		return cleanup, fmt.Errorf("when killing the session: %w", err)
 	}
-	return nil
+	event.SessionId = session.Id
+	if status == PROJECT_STATUS_ATTACHED {
+		err = switchToBestProject(ctx, p)
+		if err != nil {
+			event.Errors = append(event.Errors, err.Error())
+			return cleanup, fmt.Errorf("when killing the session: %w", err)
+		}
+		name, err := randomlyRename(session)
+		if err != nil {
+			event.Errors = append(event.Errors, err.Error())
+			return cleanup, fmt.Errorf("when randomly renaming attached session: %w", err)
+		}
+		event.TempSessionName = name
+		return session.Kill, nil
+	} else {
+		err = session.Kill()
+		if err != nil {
+			event.Errors = append(event.Errors, err.Error())
+			return cleanup, fmt.Errorf("when killing the session: %w", err)
+		}
+		return cleanup, nil
+	}
 }
 
-func switchToBestProject(p *Project) error {
-	all, err := List(p.server, p.fullConfig)
+func switchToBestProject(ctx context.Context, p *Project) error {
+	type switchToBestProjectEvent struct {
+		Name       string   `json:"name"`
+		SortResult []string `json:"sortResult"`
+		Selected   string   `json:"selected"`
+		Errors     []string `json:"errors,omitempty"`
+	}
+	event := &switchToBestProjectEvent{Name: p.Name}
+	finish := log.Track(ctx, "switchToBestProject", event)
+	defer finish()
+
+	all, err := List(ctx, p.server, p.fullConfig)
 	if err != nil {
+		event.Errors = append(event.Errors, err.Error())
 		return fmt.Errorf("while listing projects for best switch: %w", err)
 	}
 	err = sortProjects(p.fullConfig, all)
 	if err != nil {
+		event.Errors = append(event.Errors, err.Error())
 		return fmt.Errorf("while sorting projects for best switch: %w", err)
 	}
 	for _, o := range all {
+		status, err := o.Status()
+		if err != nil {
+			event.Errors = append(event.Errors, err.Error())
+		}
+		time, err := o.LastActivity()
+		if err != nil && err != ErrSessionNotFound {
+			event.Errors = append(event.Errors, err.Error())
+		}
+		event.SortResult = append(event.SortResult, fmt.Sprintf("%d %v: %s", status, time, o.Name))
+	}
+	for _, o := range all {
 		if o.Name != p.Name {
-			err = o.Switch()
+			event.Selected = o.Name
+			_, err = o.Switch(ctx)
 			if err != nil {
+				event.Errors = append(event.Errors, err.Error())
 				return err
 			}
 			break
@@ -306,48 +386,79 @@ func switchToBestProject(p *Project) error {
 // Switches the active tmux client to the project's tmux session,
 // and runs the switch commands.
 // If no session is running one will be started.
-func (p *Project) Switch() error {
-	session, err := p.Start()
-	if err != nil {
-		return fmt.Errorf("when starting the project for switching: %w", err)
+func (p *Project) Switch(ctx context.Context) (*tmux.Session, error) {
+	type projecSwitchEvent struct {
+		Name      string         `json:"name"`
+		SessionId tmux.SessionId `json:"sessionId"`
+		ClientId  tmux.ClientId  `json:"clientId"`
+		Errors    []string       `json:"errors,omitempty"`
 	}
+	event := &projecSwitchEvent{Name: p.Name}
+	finish := log.Track(ctx, "projectSwitchEvent", event)
+	defer finish()
+	session, err := p.Start(ctx)
+	if err != nil {
+		event.Errors = append(event.Errors, err.Error())
+		return nil, fmt.Errorf("when starting the project for switching: %w", err)
+	}
+	event.SessionId = session.Id
 	client, err := p.server.ActiveClient()
 	if err != nil {
-		return fmt.Errorf("when getting active client for switch: %w", err)
+		event.Errors = append(event.Errors, err.Error())
+		return nil, fmt.Errorf("when getting active client for switch: %w", err)
 	}
+	event.ClientId = client.Id
 	err = client.Switch(session)
 	if err != nil {
-		return fmt.Errorf("when switching to the session: %w", err)
+		event.Errors = append(event.Errors, err.Error())
+		return nil, fmt.Errorf("when switching to the session: %w", err)
 	}
-	return p.RunSwitchCommands()
+	return session, p.RunSwitchCommands(ctx)
 }
 
 // Runs the projects switch commands in it's active session.
 // If no session exists, it returns ErrSessionNotFound.
-func (p *Project) RunSwitchCommands() error {
+func (p *Project) RunSwitchCommands(ctx context.Context) error {
+	type projecRunSwitchCommandsEvent struct {
+		Name      string         `json:"name"`
+		SessionId tmux.SessionId `json:"sessionId,omitempty"`
+		Commands  []string       `json:"commands,omitempty"`
+		Errors    []string       `json:"errors,omitempty"`
+	}
+	event := &projecRunSwitchCommandsEvent{Name: p.Name}
+	finish := log.Track(ctx, "projecRunSwitchCommandsEvent", event)
+	defer finish()
+
 	if p.Config == nil {
 		return nil
 	}
 	session, err := p.Session()
 	if err != nil {
+		event.Errors = append(event.Errors, err.Error())
 		return err
 	}
+	event.SessionId = session.Id
 	windows, err := session.Windows()
 	if err != nil {
+		event.Errors = append(event.Errors, err.Error())
 		return fmt.Errorf("when getting windows for switch commands: %w", err)
 	}
 	panes, err := windows[0].Panes()
 	if err != nil {
+		event.Errors = append(event.Errors, err.Error())
 		return fmt.Errorf("when getting panes for switch commands: %w", err)
 	}
 	pane := panes[0]
 	for _, cmd := range p.Config.SwitchCommands {
 		cmdPane, err := pane.SplitHorizontally()
 		if err != nil {
+			event.Errors = append(event.Errors, err.Error())
 			return fmt.Errorf("when splitting command pane: %w", err)
 		}
+		event.Commands = append(event.Commands, cmd)
 		err = cmdPane.SendKeys(cmd + " && exit")
 		if err != nil {
+			event.Errors = append(event.Errors, err.Error())
 			return fmt.Errorf("when sending command to pane: %w", err)
 		}
 	}
@@ -356,57 +467,86 @@ func (p *Project) RunSwitchCommands() error {
 
 // Resets a projects session to it's initial configured state.
 // Effectively calling stop and start on it.
-// If the session is currently attached, it will rerun the switch commands
+//
+// Returns a the new session and a cleanup function that the caller must call.
+//
+// If the session is currently attached, it would imediently kill the session
+// but will instead randomly rename it. The cleanup function will delete it.
+// this is done so the running process is not killed.
+//
+// When reseting an attached session, the switch commands will be rerun.
+//
 // If no session exists, will return ErrSessionNotFound.
-func (p *Project) Reset() (*tmux.Session, error) {
-	temp, err := p.createTempSession()
-	if err != nil {
-		return nil, fmt.Errorf("when creating temp session: %w", err)
+func (p *Project) Reset(ctx context.Context) (*tmux.Session, func() error, error) {
+	type projecResetEvent struct {
+		Name             string         `json:"name"`
+		InitialSessionId tmux.SessionId `json:"initialSessionId,omitempty"`
+		TempSessionName  string         `json:"tempSessionName,omitempty"`
+		InitialStatus    ProjectStatus  `json:"initialStatus"`
+		ClientId         tmux.ClientId  `json:"clientId,omitempty"`
+		FinalSessionId   tmux.SessionId `json:"finalSessionId,omitempty"`
+		Errors           []string       `json:"errors,omitempty"`
 	}
-	defer temp.Kill()
-	session, err := p.Session()
-	if err != nil {
-		return nil, fmt.Errorf("when getting session to reset: %w", err)
-	}
-	windows, err := session.Windows()
-	for _, window := range windows {
-		err := window.Link(temp)
-		if err != nil {
-			return nil, fmt.Errorf("when linking window to temp session: %w", err)
-		}
-	}
+	event := &projecResetEvent{Name: p.Name}
+	finish := log.Track(ctx, "projecResetEvent", event)
+	defer finish()
+
+	cleanup := func() error { return nil }
+
 	status, err := p.Status()
 	if err != nil {
-		return nil, fmt.Errorf("when checking status for reset: %w", err)
+		event.Errors = append(event.Errors, err.Error())
+		return nil, cleanup, fmt.Errorf("when checking status for reset: %w", err)
 	}
+	event.InitialStatus = status
+	session, err := p.Session()
+	if err != nil {
+		event.Errors = append(event.Errors, err.Error())
+		return nil, cleanup, fmt.Errorf("when getting session to reset: %w", err)
+	}
+	event.InitialSessionId = session.Id
+
+	// get rid of the current session.
 	if status == PROJECT_STATUS_ATTACHED {
 		client, err := p.server.ActiveClient()
 		if err != nil {
-			return nil, fmt.Errorf("when geting active client for reset: %w", err)
+			event.Errors = append(event.Errors, err.Error())
+			return nil, cleanup, fmt.Errorf("when geting active client for reset: %w", err)
 		}
-		err = client.Switch(temp)
+		event.ClientId = client.Id
+		name, err := randomlyRename(session)
 		if err != nil {
-			return nil, fmt.Errorf("when switching to temp session: %w", err)
+			event.Errors = append(event.Errors, err.Error())
+			return nil, cleanup, fmt.Errorf("when temporarly renaming current session: %w", err)
+		}
+		event.TempSessionName = name
+		cleanup = session.Kill
+	} else {
+		_, err = p.Kill(ctx)
+		if err != nil {
+			event.Errors = append(event.Errors, err.Error())
+			return nil, cleanup, fmt.Errorf("when killing for reset: %w", err)
 		}
 	}
-	err = p.Kill()
+
+	// Start a new session
+	s, err := p.Start(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("when killing for reset: %w", err)
+		event.Errors = append(event.Errors, err.Error())
+		return nil, cleanup, fmt.Errorf("when starting for reset: %w", err)
 	}
-	s, err := p.Start()
-	if err != nil {
-		return nil, fmt.Errorf("when starting for reset: %w", err)
-	}
+	event.FinalSessionId = s.Id
 	if status == PROJECT_STATUS_ATTACHED {
-		err = p.Switch()
+		_, err = p.Switch(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("when switching back after reset: %w", err)
+			event.Errors = append(event.Errors, err.Error())
+			return nil, cleanup, fmt.Errorf("when switching back after reset: %w", err)
 		}
 	}
-	return s, nil
+	return s, cleanup, nil
 }
 
-func (p *Project) createTempSession() (*tmux.Session, error) {
+func randomlyRename(s *tmux.Session) (string, error) {
 	uuid := uuid.NewString()
-	return p.server.New(uuid)
+	return uuid, s.Rename(uuid)
 }

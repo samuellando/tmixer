@@ -7,17 +7,17 @@ import (
 	"time"
 )
 
-type sessionId string
+type SessionId string
 
-func parseSessionId(s string) (sessionId, error) {
+func parseSessionId(s string) (SessionId, error) {
 	if len(s) == 0 || s[0] != '$' {
 		return "", fmt.Errorf("invalid session id: %q", s)
 	}
-	return sessionId(s), nil
+	return SessionId(s), nil
 }
 
 type Session struct {
-	Id     sessionId
+	Id     SessionId
 	server *Server
 }
 
@@ -63,6 +63,11 @@ func (s *Session) Name() (string, error) {
 		return "", errors.Join(fmt.Errorf("Got no name"), err)
 	}
 	return lines[0], err
+}
+
+func (s *Session) Rename(name string) error {
+	_, err := s.server.command("rename-session").withTargetSession(s).withArgument(name).run()
+	return err
 }
 
 func (s *Session) LastActivity() (*time.Time, error) {

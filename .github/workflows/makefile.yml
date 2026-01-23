@@ -22,8 +22,8 @@ jobs:
     - name: Check TERM environment variable
       run: echo "TERM is set to $TERM"
 
-    - name: Install tmux
-      run: sudo apt-get update && sudo apt-get install -y tmux
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get install -y tmux fzf
 
     - name: Run check
       run: make check

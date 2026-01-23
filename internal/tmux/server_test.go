@@ -1,6 +1,7 @@
 package tmux_test
 
 import (
+	"context"
 	"testing"
 
 	"samuellando.com/tmixer/internal/testutil"
@@ -8,7 +9,7 @@ import (
 )
 
 func TestHasSession(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		s, err := srv.New("test_session")
 		if err != nil {
 			t.Fatal(err)
@@ -24,7 +25,7 @@ func TestHasSession(t *testing.T) {
 }
 
 func TestHasSessionWithName(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		name := "test_session"
 		s, err := srv.New(name)
 		if err != nil {
@@ -41,7 +42,7 @@ func TestHasSessionWithName(t *testing.T) {
 }
 
 func TestGetSessionWithNameFound(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		name := "test_session"
 		s, err := srv.New(name)
 		if err != nil {
@@ -58,9 +59,9 @@ func TestGetSessionWithNameFound(t *testing.T) {
 }
 
 func TestGetSessionWithNameNotFound(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(s *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		name := "test_session"
-		_, err := s.GetSessionWithName(name)
+		_, err := srv.GetSessionWithName(name)
 		if err != tmux.ErrSessionNotFound {
 			t.Fatal(err)
 		}

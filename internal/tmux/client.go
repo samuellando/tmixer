@@ -8,19 +8,19 @@ import (
 	"strings"
 )
 
-type clientId string
+type ClientId string
 
 var ErrNoActiveClient = errors.New("no active client")
 
-func parseClientId(s string) (clientId, error) {
+func parseClientId(s string) (ClientId, error) {
 	if strings.HasPrefix(s, "/dev/") {
-		return clientId(s), nil
+		return ClientId(s), nil
 	}
 	return "", fmt.Errorf("Client id must start with /dev/")
 }
 
 type Client struct {
-	Id     clientId
+	Id     ClientId
 	server *Server
 }
 

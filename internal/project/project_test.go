@@ -1,11 +1,11 @@
 package project
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/rand"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -116,87 +116,93 @@ func (tc *projectTestCase) initialStatus() ProjectStatus {
 	panic("Invalid initial status")
 }
 
-func setupTestProjects(t *testing.T, srv *tmux.Server) (string, *os.File, []projectTestCase) {
-	dir, err := os.MkdirTemp(os.TempDir(), "tmixer-test-projects")
-	if err != nil {
-		t.Fatal(err)
+func setupTestCase(t *testing.T, ctx context.Context, tc *projectTestCase, srv *tmux.Server) *os.File {
+	tc.session = setupTestProject(t, ctx, tc.project, srv)
+	if strings.HasPrefix(tc.project.Name, "attached") {
+		return testutil.SetupTestClient(srv, tc.session)
+	} else {
+		return testutil.SetupTestClient(srv, nil)
 	}
-	testCases := make([]projectTestCase, 0)
-	var client *os.File
-	for name, pc := range testConfig.Projects {
-		tc := projectTestCase{}
-		pc.Directory = filepath.Join(dir, name)
-		err := os.Mkdir(pc.Directory, 0o700)
+}
+
+func setupTestProject(t *testing.T, ctx context.Context, project *Project, srv *tmux.Server) *tmux.Session {
+	dir := t.TempDir()
+	project.Config.Directory = dir
+	project.server = srv
+	if strings.HasPrefix(project.Name, "active") || strings.HasPrefix(project.Name, "attached") {
+		s, err := project.Start(ctx)
 		if err != nil {
 			t.Error(err)
 		}
+		return s
+	}
+	return nil
+}
+
+func getAllTestCases() []*projectTestCase {
+	testCases := make([]*projectTestCase, 0)
+	for name, pc := range testConfig.Projects {
+		tc := projectTestCase{}
+		// Make a copy of the config to avoid race conditions in parallel tests
+		configCopy := *pc
 		p := Project{
 			Name:       name,
-			Config:     pc,
-			server:     srv,
+			Config:     &configCopy,
 			fullConfig: testConfig,
 		}
 		tc.project = &p
-		if strings.HasPrefix(name, "active") || strings.HasPrefix(name, "attached") {
-			s, err := p.Start()
-			if err != nil {
-				t.Error(err)
-			}
-			tc.session = s
-		}
-		if strings.HasPrefix(name, "attached") {
-			client = testutil.SetupTestClient(srv, tc.session)
-		}
-		testCases = append(testCases, tc)
+		testCases = append(testCases, &tc)
 	}
-	return dir, client, testCases
+	return testCases
 }
 
-func teardownTestProjects(t *testing.T, dir string, client *os.File) {
-	err := os.RemoveAll(dir)
+func teardownTestCase(t *testing.T, client *os.File) {
+	err := client.Close()
 	if err != nil {
 		t.Error(err)
 	}
-	err = client.Close()
-	if err != nil {
-		t.Error(err)
+}
+
+func runAllTestCases(t *testing.T, f func(t *testing.T, ctx context.Context, srv *tmux.Server, tc *projectTestCase)) {
+	t.Parallel()
+	for _, tc := range getAllTestCases() {
+		t.Run(tc.project.Name, func(t *testing.T) {
+			t.Parallel()
+			testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+				client := setupTestCase(t, ctx, tc, srv)
+				defer teardownTestCase(t, client)
+				f(t, ctx, srv, tc)
+			})
+		})
 	}
 }
 
 func TestProjectStatus(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
-		defer teardownTestProjects(t, dir, client)
-		for _, tc := range testCases {
-			status, err := tc.project.Status()
-			if err != nil {
-				t.Error(err)
-			}
-			if tc.initialStatus() != status {
-				t.Errorf("Status does not match %d != %d", tc.initialStatus(), status)
-			}
+	runAllTestCases(t, func(t *testing.T, ctx context.Context, srv *tmux.Server, tc *projectTestCase) {
+		status, err := tc.project.Status()
+		if err != nil {
+			t.Error(err)
+		}
+		if tc.initialStatus() != status {
+			t.Errorf("Status does not match %d != %d", tc.initialStatus(), status)
 		}
 	})
 }
 
 func TestProjectSession(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
-		defer teardownTestProjects(t, dir, client)
-		for _, tc := range testCases {
-			res, err := tc.project.Session()
-			switch tc.initialStatus() {
-			case PROJECT_STATUS_INACTIVE:
-				if !errors.Is(err, ErrSessionNotFound) {
-					t.Error("Inactive project should give session not found")
-				}
-			default:
-				if err != nil {
-					t.Error(err)
-				}
-				if res.Id != tc.session.Id {
-					t.Errorf("Project session did not match %s != %s", res.Id, tc.session.Id)
-				}
+	runAllTestCases(t, func(t *testing.T, ctx context.Context, srv *tmux.Server, tc *projectTestCase) {
+		res, err := tc.project.Session()
+		switch tc.initialStatus() {
+		case PROJECT_STATUS_INACTIVE:
+			if !errors.Is(err, ErrSessionNotFound) {
+				t.Error("Inactive project should give session not found")
+			}
+		default:
+			if err != nil {
+				t.Error(err)
+			}
+			if res.Id != tc.session.Id {
+				t.Errorf("Project session did not match %s != %s", res.Id, tc.session.Id)
 			}
 		}
 	})
@@ -207,7 +213,7 @@ func FuzzTmuxSessionName(f *testing.F) {
 	for _, tc := range testcases {
 		f.Add(tc)
 	}
-	srv := testutil.SetupTestServer(f)
+	_, srv := testutil.SetupTestServer(f)
 	defer testutil.TeardownTestServer(srv)
 	f.Fuzz(func(t *testing.T, a string) {
 		if a == "" || strings.Contains(a, "\x00") {
@@ -239,83 +245,82 @@ func FuzzTmuxSessionName(f *testing.F) {
 }
 
 func TestProjectLastActivity(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
-		defer teardownTestProjects(t, dir, client)
-		for _, tc := range testCases {
-			res, err := tc.project.LastActivity()
-			switch tc.initialStatus() {
-			case PROJECT_STATUS_INACTIVE:
-				if !errors.Is(err, ErrSessionNotFound) {
-					t.Error("Inactive project should give session not found")
-				}
-			default:
-				if err != nil {
-					t.Error(err)
-				}
-				if time.Since(*res) > 30*time.Second {
-					t.Errorf("Project last activity time should be recent %s", time.Since(*res))
-				}
+	runAllTestCases(t, func(t *testing.T, ctx context.Context, srv *tmux.Server, tc *projectTestCase) {
+		res, err := tc.project.LastActivity()
+		switch tc.initialStatus() {
+		case PROJECT_STATUS_INACTIVE:
+			if !errors.Is(err, ErrSessionNotFound) {
+				t.Error("Inactive project should give session not found")
+			}
+		default:
+			if err != nil {
+				t.Error(err)
+			}
+			if time.Since(*res) > 30*time.Second {
+				t.Errorf("Project last activity time should be recent %s", time.Since(*res))
 			}
 		}
 	})
 }
 
 func TestProjectStart(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
-		defer teardownTestProjects(t, dir, client)
-		for _, tc := range testCases {
-			res, err := tc.project.Start()
-			if err != nil {
-				t.Error(err)
+	runAllTestCases(t, func(t *testing.T, ctx context.Context, srv *tmux.Server, tc *projectTestCase) {
+		res, err := tc.project.Start(ctx)
+		if err != nil {
+			t.Error(err)
+		}
+		if res == nil {
+			t.Error("Should not return a nil session")
+		}
+		if tc.session != nil && tc.session.Id != res.Id {
+			t.Error("Session Id should match")
+		}
+		status, err := tc.project.Status()
+		if err != nil {
+			t.Error(err)
+		}
+		switch tc.initialStatus() {
+		case PROJECT_STATUS_INACTIVE:
+			if status != PROJECT_STATUS_ACTIVE {
+				t.Error("Inactive project should be active now")
 			}
-			if res == nil {
-				t.Error("Should not return a nil session")
+		case PROJECT_STATUS_ACTIVE:
+			if status != PROJECT_STATUS_ACTIVE {
+				t.Error("Active project should still be active")
 			}
-			if tc.session != nil && tc.session.Id != res.Id {
-				t.Error("Session Id should match")
-			}
-			status, err := tc.project.Status()
-			if err != nil {
-				t.Error(err)
-			}
-			switch tc.initialStatus() {
-			case PROJECT_STATUS_INACTIVE:
-				if status != PROJECT_STATUS_ACTIVE {
-					t.Error("Inactive project should be active now")
-				}
-			case PROJECT_STATUS_ACTIVE:
-				if status != PROJECT_STATUS_ACTIVE {
-					t.Error("Active project should still be active")
-				}
-			case PROJECT_STATUS_ATTACHED:
-				if status != PROJECT_STATUS_ATTACHED {
-					t.Error("Attached project should still be attached")
-				}
+		case PROJECT_STATUS_ATTACHED:
+			if status != PROJECT_STATUS_ATTACHED {
+				t.Error("Attached project should still be attached")
 			}
 		}
 	})
 }
 
 func TestProjectStartWindowsAndPanes(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
-		defer teardownTestProjects(t, dir, client)
-		for _, tc := range testCases {
-			res, err := tc.project.Start()
-			time.Sleep(time.Second)
-			if err != nil {
-				t.Error(err)
-			}
+	maxAttempts := 60
+	runAllTestCases(t, func(t *testing.T, ctx context.Context, srv *tmux.Server, tc *projectTestCase) {
+		res, err := tc.project.Start(ctx)
+		if err != nil {
+			t.Error(err)
+		}
+		ticker := time.Tick(time.Second)
+	tickloop:
+		for i := 0; ; i++ {
+			<-ticker
 			if strings.Contains(tc.project.Name, "windows") {
 				windows, err := res.Windows()
 				if err != nil {
 					t.Error(err)
 				}
 				if len(windows) != 3 {
-					t.Error("Should have 3 windows")
+					if i == maxAttempts {
+						t.Error("Should have 3 windows")
+						break tickloop
+					} else {
+						continue tickloop
+					}
 				}
+
 				for i := range 3 {
 					panes, err := windows[i].Panes()
 					if err != nil {
@@ -329,7 +334,12 @@ func TestProjectStartWindowsAndPanes(t *testing.T) {
 						}
 						allOut := strings.Join(out, "")
 						if !strings.Contains(allOut, expected) {
-							t.Errorf("Missing output %s in %s", expected, allOut)
+							if i == maxAttempts {
+								t.Errorf("Missing output %s in %s", expected, allOut)
+								break tickloop
+							} else {
+								continue tickloop
+							}
 						}
 					}
 				}
@@ -339,45 +349,80 @@ func TestProjectStartWindowsAndPanes(t *testing.T) {
 					t.Error(err)
 				}
 				if len(windows) != 1 {
-					t.Errorf("Should have 1 (default) window got %d", len(windows))
+					if i == maxAttempts {
+						t.Errorf("Should have 1 (default) window got %d", len(windows))
+						break tickloop
+					} else {
+						continue tickloop
+					}
 				}
 			}
+			break tickloop
 		}
 	})
 }
 
 func TestProjectKill(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
-		defer teardownTestProjects(t, dir, client)
-		for _, tc := range testCases {
-			res := tc.project.Kill()
-			status, err := tc.project.Status()
+	runAllTestCases(t, func(t *testing.T, ctx context.Context, srv *tmux.Server, tc *projectTestCase) {
+		initialSession, _ := tc.project.Session()
+		cleanup, res := tc.project.Kill(ctx)
+		status, err := tc.project.Status()
+		if err != nil {
+			t.Error(err)
+		}
+		if status != PROJECT_STATUS_INACTIVE {
+			t.Error("Project should be inactive")
+		}
+
+		switch tc.initialStatus() {
+		case PROJECT_STATUS_INACTIVE:
+			if !errors.Is(res, ErrSessionNotFound) {
+				t.Error("Inactive project give session not found errror")
+			}
+			err = cleanup()
 			if err != nil {
 				t.Error(err)
 			}
-			if status != PROJECT_STATUS_INACTIVE {
-				t.Error("Project should be inactive")
+		case PROJECT_STATUS_ATTACHED:
+			if res != nil {
+				t.Error(res)
 			}
-			switch tc.initialStatus() {
-			case PROJECT_STATUS_INACTIVE:
-				if !errors.Is(res, ErrSessionNotFound) {
-					t.Error("Inactive project give session not found errror")
-				}
-			default:
-				if res != nil {
-					t.Error(res)
-				}
+			// old session is still active
+			if !srv.HasSession(initialSession) {
+				t.Error("Original session should still be active")
 			}
+			err = cleanup()
+			if err != nil {
+				t.Error(err)
+			}
+			if srv.HasSession(initialSession) {
+				t.Error("Should kill the original session")
+			}
+		case PROJECT_STATUS_ACTIVE:
+			if res != nil {
+				t.Error(res)
+			}
+			err = cleanup()
+			if err != nil {
+				t.Error(err)
+			}
+		default:
+			t.Error("Not implemented")
 		}
 	})
 }
 
 func TestProjectKillAttachedLastActive(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
-		defer teardownTestProjects(t, dir, client)
-		time.Sleep(time.Second)
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+		testCases := getAllTestCases()
+		for _, tc := range testCases {
+			if tc.initialStatus() == PROJECT_STATUS_ATTACHED {
+				client := setupTestCase(t, ctx, tc, srv)
+				defer teardownTestCase(t, client)
+			} else {
+				setupTestProject(t, ctx, tc.project, srv)
+			}
+		}
 		var attached *Project
 		var lastActive *Project
 		// Randomize the order of the projects
@@ -395,11 +440,11 @@ func TestProjectKillAttachedLastActive(t *testing.T) {
 		// Attach and switch back for all active projects to force a lastActivity update
 		for _, tc := range testCases {
 			if tc.initialStatus() == PROJECT_STATUS_ACTIVE {
-				err := tc.project.Switch()
+				_, err := tc.project.Switch(ctx)
 				if err != nil {
 					t.Error(err)
 				}
-				err = attached.Switch()
+				_, err = attached.Switch(ctx)
 				if err != nil {
 					t.Error(err)
 				}
@@ -407,7 +452,8 @@ func TestProjectKillAttachedLastActive(t *testing.T) {
 				time.Sleep(time.Second)
 			}
 		}
-		err := attached.Kill()
+		cleanup, err := attached.Kill(ctx)
+		cleanup()
 		if err != nil {
 			t.Error(err)
 		}
@@ -423,9 +469,16 @@ func TestProjectKillAttachedLastActive(t *testing.T) {
 
 func TestProjectKillAttachedDefault(t *testing.T) {
 	def := "inactive-windows-switch"
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
-		defer teardownTestProjects(t, dir, client)
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+		testCases := getAllTestCases()
+		for _, tc := range testCases {
+			if tc.initialStatus() == PROJECT_STATUS_ATTACHED {
+				client := setupTestCase(t, ctx, tc, srv)
+				defer teardownTestCase(t, client)
+			} else {
+				setupTestProject(t, ctx, tc.project, srv)
+			}
+		}
 		var attached *Project
 		var defProj *Project
 		for _, tc := range testCases {
@@ -433,7 +486,8 @@ func TestProjectKillAttachedDefault(t *testing.T) {
 				attached = tc.project
 			}
 			if tc.initialStatus() == PROJECT_STATUS_ACTIVE {
-				err := tc.project.Kill()
+				cleanup, err := tc.project.Kill(ctx)
+				cleanup()
 				if err != nil {
 					t.Error(err)
 				}
@@ -453,7 +507,8 @@ func TestProjectKillAttachedDefault(t *testing.T) {
 		}
 		// Set the default project
 		attached.fullConfig.DefaultProject = &def
-		err = attached.Kill()
+		cleanup, err := attached.Kill(ctx)
+		cleanup()
 		if err != nil {
 			t.Error(err)
 		}
@@ -468,16 +523,23 @@ func TestProjectKillAttachedDefault(t *testing.T) {
 }
 
 func TestProjectKillAttachedNoDefault(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
-		defer teardownTestProjects(t, dir, client)
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+		testCases := getAllTestCases()
+		for _, tc := range testCases {
+			if tc.initialStatus() == PROJECT_STATUS_ATTACHED {
+				client := setupTestCase(t, ctx, tc, srv)
+				defer teardownTestCase(t, client)
+			} else {
+				setupTestProject(t, ctx, tc.project, srv)
+			}
+		}
 		var attached *Project
 		for _, tc := range testCases {
 			if tc.initialStatus() == PROJECT_STATUS_ATTACHED {
 				attached = tc.project
 			}
 			if tc.initialStatus() == PROJECT_STATUS_ACTIVE {
-				err := tc.project.Kill()
+				_, err := tc.project.Kill(ctx)
 				if err != nil {
 					t.Error(err)
 				}
@@ -494,7 +556,8 @@ func TestProjectKillAttachedNoDefault(t *testing.T) {
 		}
 		// Set the default project
 		attached.fullConfig.DefaultProject = nil
-		err = attached.Kill()
+		cleanup, err := attached.Kill(ctx)
+		cleanup()
 		if err != nil {
 			t.Error(err)
 		}
@@ -515,16 +578,23 @@ func TestProjectKillAttachedNoDefault(t *testing.T) {
 }
 
 func TestProjectKillAttachedNoProjects(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
-		defer teardownTestProjects(t, dir, client)
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+		testCases := getAllTestCases()
+		for _, tc := range testCases {
+			if tc.initialStatus() == PROJECT_STATUS_ATTACHED {
+				client := setupTestCase(t, ctx, tc, srv)
+				defer teardownTestCase(t, client)
+			} else {
+				setupTestProject(t, ctx, tc.project, srv)
+			}
+		}
 		var attached *Project
 		for _, tc := range testCases {
 			if tc.initialStatus() == PROJECT_STATUS_ATTACHED {
 				attached = tc.project
 			}
 			if tc.initialStatus() == PROJECT_STATUS_ACTIVE {
-				err := tc.project.Kill()
+				_, err := tc.project.Kill(ctx)
 				if err != nil {
 					t.Error(err)
 				}
@@ -545,7 +615,8 @@ func TestProjectKillAttachedNoProjects(t *testing.T) {
 				attached.Name: attached.Config,
 			},
 		}
-		err = attached.Kill()
+		cleanup, err := attached.Kill(ctx)
+		cleanup()
 		if err != nil {
 			t.Error(err)
 		}
@@ -557,71 +628,64 @@ func TestProjectKillAttachedNoProjects(t *testing.T) {
 }
 
 func TestProjectSwitch(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
-		defer teardownTestProjects(t, dir, client)
-		for _, tc := range testCases {
-			err := tc.project.Switch()
-			if err != nil {
-				t.Error(err)
-			}
-			status, err := tc.project.Status()
-			if err != nil {
-				t.Error(err)
-			}
-			if status != PROJECT_STATUS_ATTACHED {
-				t.Error("Should attache to project")
-			}
+	runAllTestCases(t, func(t *testing.T, ctx context.Context, srv *tmux.Server, tc *projectTestCase) {
+		session, err := tc.project.Switch(ctx)
+		if err != nil {
+			t.Error(err)
+		}
+		if session == nil {
+			t.Error("Should return a session")
+		}
+		status, err := tc.project.Status()
+		if err != nil {
+			t.Error(err)
+		}
+		if status != PROJECT_STATUS_ATTACHED {
+			t.Error("Should attache to project")
 		}
 	})
 }
 
-func TestProjectSwitchCreatesSession(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
-		defer teardownTestProjects(t, dir, client)
-		for _, tc := range testCases {
-			err := tc.project.Switch()
-			if err != nil {
-				t.Error(err)
-			}
-			session, err := tc.project.Session()
-			if err != nil {
-				t.Error(err)
-			}
-			if session == nil {
-				t.Error("Should have a session")
-			}
-			if tc.initialStatus() != PROJECT_STATUS_INACTIVE {
-				if tc.session.Id != session.Id {
-					t.Error("Should attach to existing sesison")
-				}
+func TestProjectSwitchCreatesAttachesSession(t *testing.T) {
+	runAllTestCases(t, func(t *testing.T, ctx context.Context, srv *tmux.Server, tc *projectTestCase) {
+		session, err := tc.project.Switch(ctx)
+		if err != nil {
+			t.Error(err)
+		}
+		if session == nil {
+			t.Error("Should have a session")
+		}
+		if tc.initialStatus() != PROJECT_STATUS_INACTIVE {
+			if tc.session.Id != session.Id {
+				t.Error("Should attach to existing sesison")
 			}
 		}
 	})
 }
 
 func TestProjectSwitchWindowsAndPanes(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
-		defer teardownTestProjects(t, dir, client)
-		for _, tc := range testCases {
-			err := tc.project.Switch()
-			time.Sleep(time.Second)
-			if err != nil {
-				t.Error(err)
-			}
-			res, err := tc.project.Session()
-			if err != nil {
-				t.Error(err)
-			}
+	maxAttempts := 60
+	runAllTestCases(t, func(t *testing.T, ctx context.Context, srv *tmux.Server, tc *projectTestCase) {
+		res, err := tc.project.Switch(ctx)
+		if err != nil {
+			t.Error(err)
+		}
+		ticker := time.Tick(time.Second)
+	tickLoop:
+		for i := 0; ; i++ {
+			<-ticker
 			if strings.Contains(tc.project.Name, "windows") {
 				windows, err := res.Windows()
 				if err != nil {
 					t.Error(err)
 				}
 				if len(windows) != 3 {
-					t.Error("Should have 3 windows")
+					if i == maxAttempts {
+						t.Error("Should have 3 windows")
+						break tickLoop
+					} else {
+						continue tickLoop
+					}
 				}
 				for i := range 3 {
 					panes, err := windows[i].Panes()
@@ -636,7 +700,12 @@ func TestProjectSwitchWindowsAndPanes(t *testing.T) {
 						}
 						allOut := strings.Join(out, "")
 						if !strings.Contains(allOut, expected) {
-							t.Errorf("Missing output %s in %s", expected, allOut)
+							if i == maxAttempts {
+								t.Errorf("Missing output %s in %s", expected, allOut)
+								break tickLoop
+							} else {
+								continue tickLoop
+							}
 						}
 					}
 				}
@@ -646,34 +715,53 @@ func TestProjectSwitchWindowsAndPanes(t *testing.T) {
 					t.Error(err)
 				}
 				if len(windows) != 1 {
-					t.Errorf("Should have 1 (default) window got %d", len(windows))
+					if i == maxAttempts {
+						t.Errorf("Should have 1 (default) window got %d", len(windows))
+						break tickLoop
+					} else {
+						continue tickLoop
+					}
 				}
 			}
+			break tickLoop
 		}
 	})
 }
 
 func TestProjectSwitchCommands(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
-		defer teardownTestProjects(t, dir, client)
-		for _, tc := range testCases {
-			err := tc.project.Switch()
-			if err != nil {
-				t.Error(err)
-			}
-			time.Sleep(time.Second)
+	maxAttempts := 60
+	runAllTestCases(t, func(t *testing.T, ctx context.Context, srv *tmux.Server, tc *projectTestCase) {
+		_, err := tc.project.Switch(ctx)
+		if err != nil {
+			t.Error(err)
+		}
+
+		ticker := time.Tick(time.Second)
+
+	tickLoop:
+		for i := 0; ; i++ {
+			<-ticker
 			ls, err := os.ReadDir(tc.project.Config.Directory)
 			if err != nil {
-				t.Error(err)
+				if i == maxAttempts {
+					t.Error(err)
+					break tickLoop
+				}
+				continue tickLoop
 			}
 			if strings.Contains(tc.project.Name, "switch") {
-				if len(ls) != len(switchCommands) {
+				if len(ls) == len(switchCommands) {
+					break tickLoop
+				} else if i == maxAttempts {
 					t.Errorf("Expected %d files from switch commands got %d", len(switchCommands), len(ls))
+					break tickLoop
 				}
 			} else {
-				if len(ls) != 0 {
+				if len(ls) == 0 {
+					break tickLoop
+				} else if i == maxAttempts {
 					t.Errorf("Expected 0 files from switch commands got %d", len(ls))
+					break tickLoop
 				}
 			}
 		}
@@ -681,102 +769,150 @@ func TestProjectSwitchCommands(t *testing.T) {
 }
 
 func TestProjectRunSwitchCommands(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
-		defer teardownTestProjects(t, dir, client)
-		for _, tc := range testCases {
-			err := tc.project.RunSwitchCommands()
-			time.Sleep(time.Second)
-			if tc.initialStatus() == PROJECT_STATUS_INACTIVE {
-				if err != ErrSessionNotFound {
-					t.Error("Should retrun sesison not found error for inactive projects")
-				}
-			} else {
-				if err != nil {
-					t.Error(err)
-				}
+	maxAttempts := 60
+	runAllTestCases(t, func(t *testing.T, ctx context.Context, srv *tmux.Server, tc *projectTestCase) {
+		err := tc.project.RunSwitchCommands(ctx)
+		if tc.initialStatus() == PROJECT_STATUS_INACTIVE {
+			if err != ErrSessionNotFound {
+				t.Error("Should retrun sesison not found error for inactive projects")
+			}
+		} else {
+			if err != nil {
+				t.Error(err)
+			}
+			ticker := time.Tick(time.Second)
+		tickLoop:
+			for i := 0; ; i++ {
+				<-ticker
 				ls, err := os.ReadDir(tc.project.Config.Directory)
 				if err != nil {
-					t.Error(err)
+					if i == maxAttempts {
+						t.Error(err)
+						break tickLoop
+					}
+					continue tickLoop
 				}
 				if strings.Contains(tc.project.Name, "switch") {
-					if len(ls) != len(switchCommands) {
+					if len(ls) == len(switchCommands) {
+						break tickLoop
+					} else if i == maxAttempts {
 						t.Errorf("Expected %d files from switch commands got %d", len(switchCommands), len(ls))
+						break tickLoop
 					}
 				} else {
-					if len(ls) != 0 {
+					if len(ls) == 0 {
+						break tickLoop
+					} else if i == maxAttempts {
 						t.Errorf("Expected 0 files from switch commands got %d", len(ls))
+						break tickLoop
 					}
 				}
+
 			}
 		}
 	})
 }
 
 func TestProjectReset(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
-		defer teardownTestProjects(t, dir, client)
-		for _, tc := range testCases {
-			initialSessions, err := srv.ListSessions()
+	runAllTestCases(t, func(t *testing.T, ctx context.Context, srv *tmux.Server, tc *projectTestCase) {
+		initialSessions, err := srv.ListSessions()
+		if err != nil {
+			t.Error(err)
+		}
+		initialSession, _ := tc.project.Session()
+		res, cleanup, reserr := tc.project.Reset(ctx)
+		status, err := tc.project.Status()
+		if err != nil {
+			t.Error(err)
+		}
+		switch tc.initialStatus() {
+		case PROJECT_STATUS_INACTIVE:
+			if !errors.Is(reserr, ErrSessionNotFound) {
+				t.Error("Inactive project should return not found error")
+			}
+			if res != nil {
+				t.Error("Should not return a sesison for inactive projects")
+			}
+			err = cleanup()
 			if err != nil {
 				t.Error(err)
 			}
-			res, reserr := tc.project.Reset()
-			status, err := tc.project.Status()
+		case PROJECT_STATUS_ATTACHED:
+			if reserr != nil {
+				t.Error(reserr)
+			}
+			if status != tc.initialStatus() {
+				t.Error("Status should match original")
+			}
+			if res.Id == tc.session.Id {
+				t.Error("Status should not match original")
+			}
+			if !srv.HasSession(initialSession) {
+				t.Error("Original session should still be active")
+			}
+			err = cleanup()
 			if err != nil {
 				t.Error(err)
 			}
-			switch tc.initialStatus() {
-			case PROJECT_STATUS_INACTIVE:
-				if !errors.Is(reserr, ErrSessionNotFound) {
-					t.Error("Inactive project should return not found error")
-				}
-				if res != nil {
-					t.Error("Should not return a sesison for inactive projects")
-				}
-			default:
-				if reserr != nil {
-					t.Error(reserr)
-				}
-				if status != tc.initialStatus() {
-					t.Error("Status should match original")
-				}
-				if res.Id == tc.session.Id {
-					t.Error("Status should not match original")
-				}
+			if srv.HasSession(initialSession) {
+				t.Error("Should kill the original session")
 			}
-			finalSessions, err := srv.ListSessions()
+		case PROJECT_STATUS_ACTIVE:
+			if reserr != nil {
+				t.Error(reserr)
+			}
+			if status != tc.initialStatus() {
+				t.Error("Status should match original")
+			}
+			if res.Id == tc.session.Id {
+				t.Error("Status should not match original")
+			}
+			err = cleanup()
 			if err != nil {
 				t.Error(err)
 			}
-			if len(initialSessions) != len(finalSessions) {
-				t.Error("Number of sessions before and after should match")
-			}
+		default:
+			t.Error("Not implemented")
+		}
+		finalSessions, err := srv.ListSessions()
+		if err != nil {
+			t.Error(err)
+		}
+		if len(initialSessions) != len(finalSessions) {
+			t.Error("Number of sessions before and after should match")
 		}
 	})
 }
 
 func TestProjectResetWindowsAndPanes(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
-		defer teardownTestProjects(t, dir, client)
-		for _, tc := range testCases {
-			if tc.initialStatus() == PROJECT_STATUS_INACTIVE {
-				continue
-			}
-			res, err := tc.project.Reset()
-			if err != nil {
-				t.Error(err)
-			}
-			time.Sleep(time.Second)
+	maxAttempts := 60
+	runAllTestCases(t, func(t *testing.T, ctx context.Context, srv *tmux.Server, tc *projectTestCase) {
+		if tc.initialStatus() == PROJECT_STATUS_INACTIVE {
+			return
+		}
+		res, cleanup, err := tc.project.Reset(ctx)
+		cleanup()
+		if err != nil {
+			t.Error(err)
+		}
+
+		ticker := time.Tick(time.Second)
+
+	tickLoop:
+		for i := 0; ; i++ {
+			<-ticker
 			if strings.Contains(tc.project.Name, "windows") {
 				windows, err := res.Windows()
 				if err != nil {
 					t.Error(err)
 				}
 				if len(windows) != 3 {
-					t.Error("Should have 3 windows")
+					if i == maxAttempts {
+						t.Error("Should have 3 windows")
+						break tickLoop
+					} else {
+						continue tickLoop
+					}
 				}
 				for i := range 3 {
 					panes, err := windows[i].Panes()
@@ -791,7 +927,12 @@ func TestProjectResetWindowsAndPanes(t *testing.T) {
 						}
 						allOut := strings.Join(out, "")
 						if !strings.Contains(allOut, expected) {
-							t.Errorf("Missing output %s in %s", expected, allOut)
+							if i == maxAttempts {
+								t.Errorf("Missing output %s in %s", expected, allOut)
+								break tickLoop
+							} else {
+								continue tickLoop
+							}
 						}
 					}
 				}
@@ -801,37 +942,55 @@ func TestProjectResetWindowsAndPanes(t *testing.T) {
 					t.Error(err)
 				}
 				if len(windows) != 1 {
-					t.Errorf("Should have 1 (default) window got %d", len(windows))
+					if i == maxAttempts {
+						t.Errorf("Should have 1 (default) window got %d", len(windows))
+						break tickLoop
+					} else {
+						continue tickLoop
+					}
 				}
 			}
+			break tickLoop
 		}
 	})
 }
 
 func TestProjectResetCommands(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
-		dir, client, testCases := setupTestProjects(t, srv)
-		defer teardownTestProjects(t, dir, client)
-		for _, tc := range testCases {
-			if tc.initialStatus() == PROJECT_STATUS_INACTIVE {
-				continue
-			}
-			_, err := tc.project.Reset()
-			if err != nil {
-				t.Error(err)
-			}
-			time.Sleep(time.Second)
+	maxAttempts := 60
+	runAllTestCases(t, func(t *testing.T, ctx context.Context, srv *tmux.Server, tc *projectTestCase) {
+		if tc.initialStatus() == PROJECT_STATUS_INACTIVE {
+			return
+		}
+		_, cleanup, err := tc.project.Reset(ctx)
+		cleanup()
+		if err != nil {
+			t.Error(err)
+		}
+		ticker := time.Tick(time.Second)
+	tickloop:
+		for i := 1; ; i++ {
+			<-ticker
 			ls, err := os.ReadDir(tc.project.Config.Directory)
 			if err != nil {
-				t.Error(err)
+				if i == maxAttempts {
+					t.Error(err)
+					break tickloop
+				}
+				continue tickloop
 			}
 			if strings.Contains(tc.project.Name, "switch") && tc.initialStatus() == PROJECT_STATUS_ATTACHED {
-				if len(ls) != len(switchCommands) {
+				if len(ls) == len(switchCommands) {
+					break tickloop
+				} else if i == maxAttempts {
 					t.Errorf("Expected %d files from switch commands got %d", len(switchCommands), len(ls))
+					break tickloop
 				}
 			} else {
-				if len(ls) != 0 {
-					t.Errorf("Expected 0 files from switch commands got %d", len(ls))
+				if len(ls) == 0 {
+					break tickloop
+				} else if i == maxAttempts {
+					t.Errorf("Expected 0 files from switch commands got %d in %s", len(ls), tc.project.Config.Directory)
+					break tickloop
 				}
 			}
 		}

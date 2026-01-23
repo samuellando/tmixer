@@ -1,7 +1,7 @@
 package tmux_test
 
 import (
-	"os"
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -11,7 +11,7 @@ import (
 )
 
 func TestSplit(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		sessions, _ := srv.ListSessions()
 		s := sessions[0]
 		windows, _ := s.Windows()
@@ -43,7 +43,7 @@ func TestSplit(t *testing.T) {
 }
 
 func TestSplitHorizontally(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		sessions, _ := srv.ListSessions()
 		s := sessions[0]
 		windows, _ := s.Windows()
@@ -75,7 +75,7 @@ func TestSplitHorizontally(t *testing.T) {
 }
 
 func TestKillPane(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		sessions, _ := srv.ListSessions()
 		s := sessions[0]
 		windows, _ := s.Windows()
@@ -114,7 +114,7 @@ func TestKillPane(t *testing.T) {
 }
 
 func TestSendKeysAndCapture(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		sessions, _ := srv.ListSessions()
 		s := sessions[0]
 		windows, _ := s.Windows()
@@ -138,7 +138,7 @@ func TestSendKeysAndCapture(t *testing.T) {
 }
 
 func TestPaneOptions(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		name := "test_sess_name"
 		s, _ := srv.New(name)
 		err := s.SetOption("@hello", "world")
@@ -158,7 +158,7 @@ func TestPaneOptions(t *testing.T) {
 }
 
 func TestPaneOptionsNotSet(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		name := "test_sess_name"
 		s, _ := srv.New(name)
 		windows, _ := s.Windows()
@@ -171,12 +171,8 @@ func TestPaneOptionsNotSet(t *testing.T) {
 }
 
 func TestWorkingDirectory(t *testing.T) {
-	dir, err := os.MkdirTemp(os.TempDir(), "tmixer-test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(dir)
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+		dir := t.TempDir()
 		name := "test_sess_name"
 		s, _ := srv.New(name, dir)
 		s.NewWindow("a")

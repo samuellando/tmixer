@@ -1,6 +1,7 @@
 package tmux_test
 
 import (
+	"context"
 	"testing"
 
 	"samuellando.com/tmixer/internal/testutil"
@@ -8,7 +9,7 @@ import (
 )
 
 func TestSwitchAndClientSession(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		s, _ := srv.New("client_session")
 		srv.New("client_session2")
 		s3, _ := srv.New("client_session3")
