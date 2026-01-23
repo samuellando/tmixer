@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/goccy/go-yaml"
 	"samuellando.com/tmixer/internal/config"
 	"samuellando.com/tmixer/internal/log"
 	"samuellando.com/tmixer/internal/tmux"
@@ -65,6 +66,8 @@ func List(ctx context.Context, tmux *tmux.Server, c *config.Config) ([]*Project,
 		p.server = tmux
 		p.fullConfig = c
 	}
+	// Load project-specific configs
+	loadProjectConfigs(ctx, projects)
 	resultEvent.Result = projects
 	return projects, nil
 }
@@ -154,4 +157,49 @@ func listSessionsWithoutProject(s *tmux.Server, configProjects []*Project) ([]*P
 		}
 	}
 	return projects, nil
+}
+
+// loadProjectConfigs loads project-specific .tmixer.yml files from project directories
+// and replaces the inherited config with project-specific overrides
+func loadProjectConfigs(ctx context.Context, projects []*Project) {
+	type loadProjectConfigsEvent struct {
+		LoadedProjects []string `json:"loadedProjects,omitempty"`
+		Errors         []string `json:"errors,omitempty"`
+	}
+	event := &loadProjectConfigsEvent{}
+	finish := log.Track(ctx, "loadProjectConfigsEvent", event)
+	defer finish()
+
+	for _, project := range projects {
+		// Skip orphaned sessions that don't have a config
+		if project.Config == nil {
+			continue
+		}
+
+		configPath := filepath.Join(project.Config.Directory, ".tmixer.yml")
+		if _, err := os.Stat(configPath); err != nil {
+			// No project-specific config, keep inherited config
+			continue
+		}
+
+		bytes, err := os.ReadFile(configPath)
+		if err != nil {
+			event.Errors = append(event.Errors, fmt.Sprintf("failed to read %s: %v", configPath, err))
+			continue
+		}
+
+		var projectConfig config.ProjectConfig
+		err = yaml.Unmarshal(bytes, &projectConfig)
+		if err != nil {
+			event.Errors = append(event.Errors, fmt.Sprintf("failed to parse %s: %v", configPath, err))
+			continue
+		}
+
+		// Replace the inherited config with project-specific config
+		// But keep some values as is:
+		projectConfig.Directory = project.Config.Directory
+		projectConfig.SubDirectories = project.Config.SubDirectories
+		project.Config = &projectConfig
+		event.LoadedProjects = append(event.LoadedProjects, project.Name)
+	}
 }

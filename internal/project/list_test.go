@@ -321,6 +321,63 @@ func TestListLogs(t *testing.T) {
 	})
 }
 
+func TestListLogsProjectConfigs(t *testing.T) {
+	t.Parallel()
+
+	validDir := t.TempDir()
+	invalidDir := t.TempDir()
+	config := &config.Config{
+		Projects: map[string]*config.ProjectConfig{
+			"valid-project": {
+				Directory: validDir,
+			},
+			"invalid-project": {
+				Directory: invalidDir,
+			},
+		},
+	}
+
+	validContent := `windows:
+  - name: overridden-terminal
+    command: overridden-bash
+switchCommands:
+  - overridden-pwd`
+	if err := os.WriteFile(filepath.Join(validDir, ".tmixer.yml"), []byte(validContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	invalidContent := `windows:
+  - name: editor
+    invalid_yaml_syntax: [unclosed bracket`
+	if err := os.WriteFile(filepath.Join(invalidDir, ".tmixer.yml"), []byte(invalidContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+		ctx, logger, out := testutil.SetupLogging(ctx, log.LEVEL_INFO)
+		_, err := List(ctx, srv, config)
+		if err != nil {
+			t.Error(err)
+		}
+
+		res := testutil.GetLogEvent(ctx, logger, out)
+		event := res["loadProjectConfigsEvent"].(map[string]any)
+
+		loadedProjects := event["loadedProjects"].([]any)
+		if len(loadedProjects) != 1 || loadedProjects[0].(string) != "valid-project" {
+			t.Errorf("Expected valid-project in loadedProjects, got %v", loadedProjects)
+		}
+
+		errs := event["errors"].([]any)
+		if len(errs) != 1 {
+			t.Errorf("Expected 1 error, got %d", len(errs))
+		}
+		if !strings.Contains(errs[0].(string), filepath.Join(invalidDir, ".tmixer.yml")) {
+			t.Errorf("Expected error to include invalid config path, got %v", errs[0])
+		}
+	})
+}
+
 func TestListLogsResult(t *testing.T) {
 	runAllListTestCases(t, func(ctx context.Context, srv *tmux.Server, tc listTestCase) {
 		ctx, logger := log.New(ctx, &log.LoggerOptions{Level: log.LEVEL_DEBUG})
@@ -378,6 +435,67 @@ func BenchmarkList(b *testing.B) {
 			b.Fatal("Missing projects")
 		}
 	}
+}
+
+func TestProjectSpecificConfigs(t *testing.T) {
+	runAllListTestCases(t, func(ctx context.Context, srv *tmux.Server, tc listTestCase) {
+		initialProjects, err := List(ctx, srv, tc.config)
+		if err != nil {
+			t.Error(err)
+		}
+		if len(initialProjects) == 0 {
+			t.Error("No projects returned")
+		}
+
+		// Create .tmixer.yml files for every second project with a real directory
+		overriddenProjects := make(map[string]bool)
+		content := `windows:
+  - name: overridden-terminal
+    command: overridden-bash
+switchCommands:
+  - overridden-pwd`
+		index := 0
+		for _, project := range initialProjects {
+			if project.Config == nil {
+				continue
+			}
+			if _, err := os.Stat(project.Config.Directory); err != nil {
+				continue
+			}
+			if index%2 == 0 {
+				err := os.WriteFile(filepath.Join(project.Config.Directory, ".tmixer.yml"), []byte(content), 0o644)
+				if err != nil {
+					t.Fatal(err)
+				}
+				overriddenProjects[project.Name] = true
+			}
+			index++
+		}
+
+		projects, err := List(ctx, srv, tc.config)
+		if err != nil {
+			t.Error(err)
+		}
+
+		// Check that projects with .tmixer.yml files were overridden
+		for _, project := range projects {
+			if project.Config == nil {
+				continue // Skip orphaned sessions
+			}
+
+			_, wasOverridden := overriddenProjects[project.Name]
+			if wasOverridden {
+				// Should have the overridden config
+				if len(project.Config.Windows) != 1 || project.Config.Windows[0].Name != "overridden-terminal" {
+					t.Errorf("Project %s should have been overridden but has windows: %v", project.Name, project.Config.Windows)
+				}
+				if len(project.Config.SwitchCommands) != 1 || project.Config.SwitchCommands[0] != "overridden-pwd" {
+					t.Errorf("Project %s should have been overridden but has switch commands: %v", project.Name, project.Config.SwitchCommands)
+				}
+			}
+			// Non-overridden projects can have any config (including empty), we just verify overridden ones
+		}
+	})
 }
 
 func BenchmarkListControlMode(b *testing.B) {
