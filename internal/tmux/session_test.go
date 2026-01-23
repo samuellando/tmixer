@@ -10,7 +10,7 @@ import (
 )
 
 func TestCreateAndKill(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		s, err := srv.New("test_session")
 		if err != nil {
 			t.Fatal(err)
@@ -29,7 +29,7 @@ func TestCreateAndKill(t *testing.T) {
 }
 
 func TestListSessions(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		n := 10
 		res, _ := srv.ListSessions()
 		initialCount := len(res)
@@ -64,7 +64,7 @@ func TestListSessions(t *testing.T) {
 }
 
 func TestWindows(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		n := 10
 		sessions, _ := srv.ListSessions()
 		s := sessions[0]
@@ -99,7 +99,7 @@ func TestWindows(t *testing.T) {
 }
 
 func TestSessionName(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		name := "test_sess_name"
 		s, _ := srv.New(name)
 		res, err := s.Name()
@@ -113,7 +113,7 @@ func TestSessionName(t *testing.T) {
 }
 
 func TestSessionReName(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		name := "test_sess_name"
 		rename := "new_test_sess_name"
 		s, _ := srv.New(name)
@@ -139,7 +139,7 @@ func TestSessionReName(t *testing.T) {
 }
 
 func TestSessionLastActivity(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		s1, _ := srv.New("s1")
 		s2, _ := srv.New("s2")
 		t1, err := s1.LastActivity()
@@ -157,7 +157,7 @@ func TestSessionLastActivity(t *testing.T) {
 }
 
 func TestOptions(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		name := "test_sess_name"
 		s, _ := srv.New(name)
 		err := s.SetOption("@hello", "world")
@@ -175,7 +175,7 @@ func TestOptions(t *testing.T) {
 }
 
 func TestOptionsNotSet(t *testing.T) {
-	testutil.RunWithAndWithoutControlMode(t, func(ctx context.Context, srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		name := "test_sess_name"
 		s, _ := srv.New(name)
 		_, err := s.GetOption("@hello")

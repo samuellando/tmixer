@@ -28,7 +28,7 @@ func runAllListTestCases(t *testing.T, f func(ctx context.Context, srv *tmux.Ser
 	for name, tc := range getAllListTestCases() {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			testutil.RunWithAndWithoutControlModeTestRun(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+			testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 				f(ctx, srv, tc(t))
 			})
 		})
@@ -246,7 +246,7 @@ func TestAmbiguousNames(t *testing.T) {
 			},
 		},
 	}
-	testutil.RunWithAndWithoutControlModeTestRun(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		_, err := List(ctx, srv, config)
 		if !errors.Is(err, ErrAmbiguousName) {
 			t.Errorf("wrong error returned %v", err)
@@ -297,7 +297,7 @@ func TestListLogs(t *testing.T) {
 			},
 		},
 	}
-	testutil.RunWithAndWithoutControlModeTestRun(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		_, logger := log.New(ctx, nil)
 		out := bytes.Buffer{}
 		logger.AddSink(&out)

@@ -168,7 +168,7 @@ func runAllTestCases(t *testing.T, f func(t *testing.T, ctx context.Context, srv
 	for _, tc := range getAllTestCases() {
 		t.Run(tc.project.Name, func(t *testing.T) {
 			t.Parallel()
-			testutil.RunWithAndWithoutControlModeTestRun(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+			testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 				client := setupTestCase(t, ctx, tc, srv)
 				defer teardownTestCase(t, client)
 				f(t, ctx, srv, tc)
@@ -413,7 +413,7 @@ func TestProjectKill(t *testing.T) {
 }
 
 func TestProjectKillAttachedLastActive(t *testing.T) {
-	testutil.RunWithAndWithoutControlModeTestRun(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		testCases := getAllTestCases()
 		for _, tc := range testCases {
 			if tc.initialStatus() == PROJECT_STATUS_ATTACHED {
@@ -469,7 +469,7 @@ func TestProjectKillAttachedLastActive(t *testing.T) {
 
 func TestProjectKillAttachedDefault(t *testing.T) {
 	def := "inactive-windows-switch"
-	testutil.RunWithAndWithoutControlModeTestRun(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		testCases := getAllTestCases()
 		for _, tc := range testCases {
 			if tc.initialStatus() == PROJECT_STATUS_ATTACHED {
@@ -523,7 +523,7 @@ func TestProjectKillAttachedDefault(t *testing.T) {
 }
 
 func TestProjectKillAttachedNoDefault(t *testing.T) {
-	testutil.RunWithAndWithoutControlModeTestRun(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		testCases := getAllTestCases()
 		for _, tc := range testCases {
 			if tc.initialStatus() == PROJECT_STATUS_ATTACHED {
@@ -578,7 +578,7 @@ func TestProjectKillAttachedNoDefault(t *testing.T) {
 }
 
 func TestProjectKillAttachedNoProjects(t *testing.T) {
-	testutil.RunWithAndWithoutControlModeTestRun(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		testCases := getAllTestCases()
 		for _, tc := range testCases {
 			if tc.initialStatus() == PROJECT_STATUS_ATTACHED {

@@ -11,7 +11,7 @@ import (
 )
 
 func TestCommandDoesNotLogAtInfo(t *testing.T) {
-	testutil.RunWithAndWithoutControlModeTestRun(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		// Test with default log level (should not log command events)
 		ctx, logger, out := testutil.SetupLogging(ctx, log.LEVEL_INFO)
 
@@ -30,7 +30,7 @@ func TestCommandDoesNotLogAtInfo(t *testing.T) {
 }
 
 func TestCommandLogsEventAtDebug(t *testing.T) {
-	testutil.RunWithAndWithoutControlModeTestRun(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		ctx, logger, out := testutil.SetupLogging(ctx, log.LEVEL_DEBUG)
 
 		_, err := srv.ListSessions()
@@ -48,7 +48,7 @@ func TestCommandLogsEventAtDebug(t *testing.T) {
 }
 
 func TestCommandEventFields(t *testing.T) {
-	testutil.RunWithAndWithoutControlModeTestRun(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		ctx, logger, out := testutil.SetupLogging(ctx, log.LEVEL_DEBUG)
 
 		_, err := srv.ListSessions()
@@ -149,7 +149,7 @@ func TestControlModeFieldInEvent(t *testing.T) {
 }
 
 func TestCommandErrorLogging(t *testing.T) {
-	testutil.RunWithAndWithoutControlModeTestRun(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		// Create a session BEFORE setting up logging
 		_, err := srv.New("test_error_session")
 		if err != nil {
@@ -265,7 +265,7 @@ func TestControlModeSessionErrors(t *testing.T) {
 }
 
 func TestMultipleCommandsLoggedSeparately(t *testing.T) {
-	testutil.RunWithAndWithoutControlModeTestRun(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		ctx, logger, out := testutil.SetupLogging(ctx, log.LEVEL_DEBUG)
 
 		// Run multiple different commands

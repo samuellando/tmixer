@@ -82,30 +82,7 @@ func TeardownTestServer(s *tmux.Server) {
 	}
 }
 
-// Deprecated: Should use the TestRun version to enable parallelism
-func RunWithAndWithoutControlMode(t *testing.T, f func(ctx context.Context, tmux *tmux.Server)) {
-	ctx, tmux := SetupTestServer(t)
-	f(ctx, tmux)
-	TeardownTestServer(tmux)
-	// Give shell processes and tmux server time to fully exit
-	time.Sleep(500 * time.Millisecond)
-	// And with control mode
-	ctx, tmux = SetupTestServer(t)
-	err := tmux.StartControlMode()
-	if err != nil {
-		t.Fatal(err)
-	}
-	f(ctx, tmux)
-	err = tmux.StopControlMode()
-	if err != nil {
-		t.Fatal(err)
-	}
-	TeardownTestServer(tmux)
-	// Give shell processes and tmux server time to fully exit
-	time.Sleep(500 * time.Millisecond)
-}
-
-func RunWithAndWithoutControlModeTestRun(t *testing.T, f func(t *testing.T, ctx context.Context, tmux *tmux.Server)) {
+func RunWithAndWithoutControlMode(t *testing.T, f func(t *testing.T, ctx context.Context, tmux *tmux.Server)) {
 	t.Run("noControlMode", func(t *testing.T) {
 		t.Parallel()
 		ctx, tmux := SetupTestServer(t)
