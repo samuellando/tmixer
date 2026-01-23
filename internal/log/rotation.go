@@ -9,9 +9,9 @@ import (
 )
 
 const (
-	logDateFormat = "2006-01-02"
-	logFilePrefix = "tmixer-"
-	logFileSuffix = ".jsonl"
+	LogDateFormat = "2006-01-02"
+	LogFilePrefix = "tmixer-"
+	LogFileSuffix = ".jsonl"
 )
 
 // RotateLogFile manages log file rotation based on retention duration.
@@ -40,8 +40,8 @@ func RotateLogFile(logDir string, retention time.Duration) (*os.File, error) {
 	}
 
 	// Create/open log file for current day
-	currentDate := time.Now().UTC().Format(logDateFormat)
-	logFileName := fmt.Sprintf("%s%s%s", logFilePrefix, currentDate, logFileSuffix)
+	currentDate := time.Now().UTC().Format(LogDateFormat)
+	logFileName := fmt.Sprintf("%s%s%s", LogFilePrefix, currentDate, LogFileSuffix)
 	logFilePath := filepath.Join(logDir, logFileName)
 
 	if retention >= 0 {
@@ -72,16 +72,16 @@ func deleteOldLogs(logDir string, retention time.Duration) error {
 		name := entry.Name()
 
 		// Only process files matching our log file pattern
-		if !strings.HasPrefix(name, logFilePrefix) || !strings.HasSuffix(name, logFileSuffix) {
+		if !strings.HasPrefix(name, LogFilePrefix) || !strings.HasSuffix(name, LogFileSuffix) {
 			continue
 		}
 
 		// Extract date from filename (e.g., "tmixer-2026-01-06.log" -> "2026-01-06")
-		dateStr := strings.TrimPrefix(name, logFilePrefix)
-		dateStr = strings.TrimSuffix(dateStr, logFileSuffix)
+		dateStr := strings.TrimPrefix(name, LogFilePrefix)
+		dateStr = strings.TrimSuffix(dateStr, LogFileSuffix)
 
 		// Parse the date from the filename
-		logDate, err := time.Parse(logDateFormat, dateStr)
+		logDate, err := time.Parse(LogDateFormat, dateStr)
 		if err != nil {
 			// Skip files that don't match our expected date format
 			continue

@@ -36,14 +36,14 @@ func (log *Logger) Info(ctx context.Context) {
 
 func (log *Logger) Error(ctx context.Context, err error) {
 	event := getWideEvent(ctx)
-	event["level"] = "ERROR"
-	event["error"] = err.Error()
+	event.data["level"] = "ERROR"
+	event.data["error"] = err.Error()
 	log.logEvent(event)
 }
 
 func (log *Logger) logEvent(event WideEvent) {
-	start := event["time"].(time.Time)
-	event["duration"] = time.Since(start)
+	start := event.data["time"].(time.Time)
+	event.data["duration"] = time.Since(start)
 	b, err := json.Marshal(event)
 	if err != nil {
 		panic(err)

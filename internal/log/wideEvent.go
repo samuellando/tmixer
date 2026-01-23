@@ -5,15 +5,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 )
 
-type WideEvent map[string]any
+type WideEvent struct {
+	mu   *sync.Mutex
+	data map[string]any
+}
 
 func Track[T any](ctx context.Context, eventName string, event *T) func() {
 	startTime := time.Now()
 
 	return func() {
+		// Convert to a generic map[string]any so we can add additonal fields.
 		eventMap := make(map[string]any)
 		b, err := json.Marshal(event)
 		if err != nil {
@@ -32,7 +37,7 @@ func Track[T any](ctx context.Context, eventName string, event *T) func() {
 }
 
 func TrackLevel[T any](level int, ctx context.Context, eventName string, event *T) func() {
-	minLevel := getWideEvent(ctx)["minLevel"].(int)
+	minLevel := getWideEvent(ctx).data["minLevel"].(int)
 	if level >= minLevel {
 		return Track(ctx, eventName, event)
 	}
@@ -41,25 +46,31 @@ func TrackLevel[T any](level int, ctx context.Context, eventName string, event *
 
 func InitializeWideEvent(ctx context.Context, options *LoggerOptions) context.Context {
 	v := ctx.Value("wideEvent")
-	var event map[string]any
+	var event WideEvent
 	if v == nil {
-		event = make(map[string]any)
+		event = WideEvent{
+			mu:   &sync.Mutex{},
+			data: make(map[string]any),
+		}
 		ctx = context.WithValue(ctx, "wideEvent", event)
-		event["time"] = time.Now()
-		event["level"] = "INFO"
+		event.data["time"] = time.Now()
+		event.data["level"] = "INFO"
 	} else {
-		event = v.(map[string]any)
+		event = v.(WideEvent)
 	}
+	// Update the options
+	event.mu.Lock()
+	defer event.mu.Unlock()
 	if options != nil {
-		event["minLevel"] = options.Level
+		event.data["minLevel"] = options.Level
 	} else {
-		event["minLevel"] = LEVEL_INFO
+		event.data["minLevel"] = LEVEL_INFO
 	}
 	return ctx
 }
 
 func getWideEvent(ctx context.Context) WideEvent {
-	event, ok := ctx.Value("wideEvent").(map[string]any)
+	event, ok := ctx.Value("wideEvent").(WideEvent)
 	if !ok {
 		panic("Must call InitializeWideEvent first")
 	}
@@ -67,22 +78,26 @@ func getWideEvent(ctx context.Context) WideEvent {
 }
 
 func (event WideEvent) append(key string, value any) {
-	current, vok := event[key]
-	currentarr, arrok := event[key+"s"]
+	event.mu.Lock()
+	defer event.mu.Unlock()
+	current, vok := event.data[key]
+	currentarr, arrok := event.data[key+"s"]
 	if !vok && !arrok {
-		event[key] = value
+		event.data[key] = value
 	} else {
-		delete(event, key)
+		delete(event.data, key)
 		arr, ok := currentarr.([]any)
 		if !ok {
-			event[key+"s"] = []any{current, value}
+			event.data[key+"s"] = []any{current, value}
 		} else {
-			event[key+"s"] = append(arr, value)
+			event.data[key+"s"] = append(arr, value)
 		}
 	}
 }
 
 func (event WideEvent) MarshalJSON() ([]byte, error) {
+	event.mu.Lock()
+	defer event.mu.Unlock()
 	forcedBegining := []string{"level", "time", "error", "minLevel"}
 	forcedEnd := []string{"duration"}
 	forced := make(map[string]bool)
@@ -100,15 +115,15 @@ func (event WideEvent) MarshalJSON() ([]byte, error) {
 
 	var fields []kv
 	for _, k := range forcedBegining {
-		fields = append(fields, kv{k: k, v: event[k]})
+		fields = append(fields, kv{k: k, v: event.data[k]})
 	}
-	for k, v := range event {
+	for k, v := range event.data {
 		if !forced[k] {
 			fields = append(fields, kv{k: k, v: v})
 		}
 	}
 	for _, k := range forcedEnd {
-		fields = append(fields, kv{k: k, v: event[k]})
+		fields = append(fields, kv{k: k, v: event.data[k]})
 	}
 
 	out := bytes.Buffer{}
