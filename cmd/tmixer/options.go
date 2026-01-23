@@ -16,10 +16,19 @@ var (
 
 var FLAGS = []flags.Flag{
 	{
-		Name:        "log",
-		ShortName:   "l",
+		Name:        "help",
+		ShortName:   "h",
+		Description: "display a help message to stdout",
+		Usage:       "--help or -h",
+		ParseInput: func(s string, c *config.Config) error {
+			OPTION_DISPLAY_HELP = true
+			return nil
+		},
+	},
+	{
+		Name:        "logFile",
 		Description: "Output logs to a file in addition to ~/.local/state/tmixer/logs .",
-		Usage:       "--log out.log, or -l out.log",
+		Usage:       "--logFile out.log",
 		ParseInput: func(s string, c *config.Config) error {
 			if s == "" {
 				return fmt.Errorf("log file must be provided")
@@ -42,16 +51,6 @@ var FLAGS = []flags.Flag{
 			} else {
 				return fmt.Errorf("Unrecognized log level")
 			}
-			return nil
-		},
-	},
-	{
-		Name:        "help",
-		ShortName:   "h",
-		Description: "display a help message to stdout",
-		Usage:       "--help or -h",
-		ParseInput: func(s string, c *config.Config) error {
-			OPTION_DISPLAY_HELP = true
 			return nil
 		},
 	},
