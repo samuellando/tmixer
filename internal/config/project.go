@@ -26,6 +26,7 @@ type Config struct {
 
 type ProjectConfig struct {
 	Directory      string         `yaml:"directory"`
+	Ttl            *string        `yaml:"ttl"`
 	SubDirectories bool           `yaml:"subDirectories"`
 	Windows        []WindowConfig `yaml:"windows"`
 	SwitchCommands []string       `yaml:"switchCommands"`

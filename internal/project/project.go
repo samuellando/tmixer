@@ -153,6 +153,23 @@ func (p *Project) LastActivity() (*time.Time, error) {
 	return session.LastActivity()
 }
 
+// Return wheter or not the project's configure time to live has passed
+// Will always return false if an error orrcurs internally, as well as returning the error
+func (p *Project) TtlPassed() (bool, error) {
+	if p.Config.Ttl == nil {
+		return false, nil
+	}
+	ttl, err := time.ParseDuration(*p.Config.Ttl)
+	if err != nil {
+		return false, fmt.Errorf("While checking if ttl has passed: %w", err)
+	}
+	la, err := p.LastActivity()
+	if err != nil {
+		return false, fmt.Errorf("While checking if ttl has passed: %w", err)
+	}
+	return time.Since(*la) >= ttl, nil
+}
+
 // Starts a tmux session for the project, and creates all it's configured windows and panes.
 // If a session for the project already exists, it is returned and nothing else is done.
 func (p *Project) Start(ctx context.Context) (*tmux.Session, error) {
@@ -288,6 +305,8 @@ func createPanes(w *tmux.Window, config config.WindowConfig) error {
 // 2. Otherwise, it will try to start and switch to the default project
 // 3. If no default project is set, it will switch to a random project.
 // 4. It will exit tmux if there are no other configured projects.
+//
+// Clenup function will be non nil IFF the project is attached
 func (p *Project) Kill(ctx context.Context) (func() error, error) {
 	type projectKillEvent struct {
 		Name            string         `json:"name"`
@@ -300,30 +319,28 @@ func (p *Project) Kill(ctx context.Context) (func() error, error) {
 	finish := log.Track(ctx, "projectKillEvent", event)
 	defer finish()
 
-	cleanup := func() error { return nil }
-
 	status, err := p.Status()
 	if err != nil {
 		event.Errors = append(event.Errors, err.Error())
-		return cleanup, fmt.Errorf("when killing the session: %w", err)
+		return nil, fmt.Errorf("when killing the session: %w", err)
 	}
 	event.InitialStatus = status
 	session, err := p.Session()
 	if err != nil {
 		event.Errors = append(event.Errors, err.Error())
-		return cleanup, fmt.Errorf("when killing the session: %w", err)
+		return nil, fmt.Errorf("when killing the session: %w", err)
 	}
 	event.SessionId = session.Id
 	if status == PROJECT_STATUS_ATTACHED {
 		err = switchToBestProject(ctx, p)
 		if err != nil {
 			event.Errors = append(event.Errors, err.Error())
-			return cleanup, fmt.Errorf("when killing the session: %w", err)
+			return nil, fmt.Errorf("when killing the session: %w", err)
 		}
 		name, err := randomlyRename(session)
 		if err != nil {
 			event.Errors = append(event.Errors, err.Error())
-			return cleanup, fmt.Errorf("when randomly renaming attached session: %w", err)
+			return nil, fmt.Errorf("when randomly renaming attached session: %w", err)
 		}
 		event.TempSessionName = name
 		return session.Kill, nil
@@ -331,9 +348,9 @@ func (p *Project) Kill(ctx context.Context) (func() error, error) {
 		err = session.Kill()
 		if err != nil {
 			event.Errors = append(event.Errors, err.Error())
-			return cleanup, fmt.Errorf("when killing the session: %w", err)
+			return nil, fmt.Errorf("when killing the session: %w", err)
 		}
-		return cleanup, nil
+		return nil, nil
 	}
 }
 
@@ -372,7 +389,7 @@ func switchToBestProject(ctx context.Context, p *Project) error {
 	for _, o := range all {
 		if o.Name != p.Name {
 			event.Selected = o.Name
-			_, err = o.Switch(ctx)
+			_, _, err = o.Switch(ctx)
 			if err != nil {
 				event.Errors = append(event.Errors, err.Error())
 				return err
@@ -386,9 +403,11 @@ func switchToBestProject(ctx context.Context, p *Project) error {
 // Switches the active tmux client to the project's tmux session,
 // and runs the switch commands.
 // If no session is running one will be started.
-func (p *Project) Switch(ctx context.Context) (*tmux.Session, error) {
+// The cleanup command will ne non nil IFF the project's ttl has passed and it is attached.
+func (p *Project) Switch(ctx context.Context) (*tmux.Session, func() error, error) {
 	type projecSwitchEvent struct {
 		Name      string         `json:"name"`
+		TtlPassed bool           `json:"ttlPassed"`
 		SessionId tmux.SessionId `json:"sessionId"`
 		ClientId  tmux.ClientId  `json:"clientId"`
 		Errors    []string       `json:"errors,omitempty"`
@@ -396,24 +415,41 @@ func (p *Project) Switch(ctx context.Context) (*tmux.Session, error) {
 	event := &projecSwitchEvent{Name: p.Name}
 	finish := log.Track(ctx, "projectSwitchEvent", event)
 	defer finish()
-	session, err := p.Start(ctx)
-	if err != nil {
-		event.Errors = append(event.Errors, err.Error())
-		return nil, fmt.Errorf("when starting the project for switching: %w", err)
+
+	var cleanup func() error
+	var session *tmux.Session
+	var err error
+	if passed, err := p.TtlPassed(); passed {
+		event.TtlPassed = true
+		session, cleanup, err = p.Reset(ctx)
+		if err != nil {
+			event.Errors = append(event.Errors, err.Error())
+			return session, cleanup, fmt.Errorf("when reseting the project for switching after passed ttl: %w", err)
+		}
+	} else if err != nil {
+		return nil, nil, fmt.Errorf("During project switch: %w", err)
+	} else {
+		session, err = p.Start(ctx)
+		if err != nil {
+			event.Errors = append(event.Errors, err.Error())
+			return session, nil, fmt.Errorf("when starting the project for switching: %w", err)
+		}
 	}
+
 	event.SessionId = session.Id
 	client, err := p.server.ActiveClient()
 	if err != nil {
 		event.Errors = append(event.Errors, err.Error())
-		return nil, fmt.Errorf("when getting active client for switch: %w", err)
+		return nil, cleanup, fmt.Errorf("when getting active client for switch: %w", err)
 	}
+
 	event.ClientId = client.Id
 	err = client.Switch(session)
 	if err != nil {
 		event.Errors = append(event.Errors, err.Error())
-		return nil, fmt.Errorf("when switching to the session: %w", err)
+		return nil, cleanup, fmt.Errorf("when switching to the session: %w", err)
 	}
-	return session, p.RunSwitchCommands(ctx)
+	return session, cleanup, p.RunSwitchCommands(ctx)
 }
 
 // Runs the projects switch commands in it's active session.
@@ -491,33 +527,32 @@ func (p *Project) Reset(ctx context.Context) (*tmux.Session, func() error, error
 	finish := log.Track(ctx, "projecResetEvent", event)
 	defer finish()
 
-	cleanup := func() error { return nil }
-
 	status, err := p.Status()
 	if err != nil {
 		event.Errors = append(event.Errors, err.Error())
-		return nil, cleanup, fmt.Errorf("when checking status for reset: %w", err)
+		return nil, nil, fmt.Errorf("when checking status for reset: %w", err)
 	}
 	event.InitialStatus = status
 	session, err := p.Session()
 	if err != nil {
 		event.Errors = append(event.Errors, err.Error())
-		return nil, cleanup, fmt.Errorf("when getting session to reset: %w", err)
+		return nil, nil, fmt.Errorf("when getting session to reset: %w", err)
 	}
 	event.InitialSessionId = session.Id
 
 	// get rid of the current session.
+	var cleanup func() error
 	if status == PROJECT_STATUS_ATTACHED {
 		client, err := p.server.ActiveClient()
 		if err != nil {
 			event.Errors = append(event.Errors, err.Error())
-			return nil, cleanup, fmt.Errorf("when geting active client for reset: %w", err)
+			return nil, nil, fmt.Errorf("when geting active client for reset: %w", err)
 		}
 		event.ClientId = client.Id
 		name, err := randomlyRename(session)
 		if err != nil {
 			event.Errors = append(event.Errors, err.Error())
-			return nil, cleanup, fmt.Errorf("when temporarly renaming current session: %w", err)
+			return nil, nil, fmt.Errorf("when temporarly renaming current session: %w", err)
 		}
 		event.TempSessionName = name
 		cleanup = session.Kill
@@ -525,7 +560,7 @@ func (p *Project) Reset(ctx context.Context) (*tmux.Session, func() error, error
 		_, err = p.Kill(ctx)
 		if err != nil {
 			event.Errors = append(event.Errors, err.Error())
-			return nil, cleanup, fmt.Errorf("when killing for reset: %w", err)
+			return nil, nil, fmt.Errorf("when killing for reset: %w", err)
 		}
 	}
 
@@ -537,7 +572,7 @@ func (p *Project) Reset(ctx context.Context) (*tmux.Session, func() error, error
 	}
 	event.FinalSessionId = s.Id
 	if status == PROJECT_STATUS_ATTACHED {
-		_, err = p.Switch(ctx)
+		_, _, err = p.Switch(ctx)
 		if err != nil {
 			event.Errors = append(event.Errors, err.Error())
 			return nil, cleanup, fmt.Errorf("when switching back after reset: %w", err)

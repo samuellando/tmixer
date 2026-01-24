@@ -145,7 +145,8 @@ func runTmixer(ctx context.Context, args []string, config *config.Config) error 
 	case "start":
 		err = startClient(ctx, selection)
 	case "switch":
-		_, err = selection.Switch(ctx)
+		_, cleanup, err = selection.Switch(ctx)
+		cleanupFuncs = append(cleanupFuncs, cleanup)
 	case "kill":
 		cleanup, err = selection.Kill(ctx)
 		cleanupFuncs = append(cleanupFuncs, cleanup)
