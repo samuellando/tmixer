@@ -16,6 +16,7 @@ import (
 type Config struct {
 	DefaultProject   *string                   `yaml:"defaultProject"`
 	LogFile          *string                   `yaml:"logFile"`
+	Ttl              *string                   `yaml:"ttl"`
 	LogLevel         int                       `yaml:"logLevel"`
 	LogRetentionDays *int                      `yaml:"logRetentionDays"`
 	FzfFlags         []string                  `yaml:"fzfFlags"`
@@ -26,7 +27,6 @@ type Config struct {
 
 type ProjectConfig struct {
 	Directory      string         `yaml:"directory"`
-	Ttl            *string        `yaml:"ttl"`
 	SubDirectories bool           `yaml:"subDirectories"`
 	Windows        []WindowConfig `yaml:"windows"`
 	SwitchCommands []string       `yaml:"switchCommands"`

@@ -95,6 +95,10 @@ func runTmixer(ctx context.Context, args []string, config *config.Config) error 
 	if err != nil {
 		return err
 	}
+	err = cleanupStaleProjects(ctx, projects)
+	if err != nil {
+		return err
+	}
 	var selection *project.Project
 	if len(args) >= 2 {
 		for _, p := range projects {
@@ -145,8 +149,7 @@ func runTmixer(ctx context.Context, args []string, config *config.Config) error 
 	case "start":
 		err = startClient(ctx, selection)
 	case "switch":
-		_, cleanup, err = selection.Switch(ctx)
-		cleanupFuncs = append(cleanupFuncs, cleanup)
+		_, err = selection.Switch(ctx)
 	case "kill":
 		cleanup, err = selection.Kill(ctx)
 		cleanupFuncs = append(cleanupFuncs, cleanup)
@@ -283,4 +286,20 @@ reset
 Flags: `)
 	fmt.Println()
 	fmt.Print(flags.HelpMessage(FLAGS))
+}
+
+func cleanupStaleProjects(ctx context.Context, projects []*project.Project) error {
+	for _, p := range projects {
+		status, err := p.Status()
+		if err != nil {
+			return err
+		}
+		if passed, _ := p.TtlPassed(); passed && status == project.PROJECT_STATUS_ACTIVE {
+			_, err := p.Kill(ctx)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
