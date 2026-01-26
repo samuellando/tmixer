@@ -309,6 +309,8 @@ func cleanupStaleProjects(ctx context.Context, projects []*project.Project) erro
 				if err != nil {
 					event.Errors = append(event.Errors, err.Error())
 					errs = errors.Join(errs, err)
+				} else {
+					event.ProjectsKilled = append(event.ProjectsKilled, p.Name)
 				}
 			}
 		}
