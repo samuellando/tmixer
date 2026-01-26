@@ -16,6 +16,7 @@ import (
 type Config struct {
 	DefaultProject   *string                   `yaml:"defaultProject"`
 	LogFile          *string                   `yaml:"logFile"`
+	Ttl              *string                   `yaml:"ttl"`
 	LogLevel         int                       `yaml:"logLevel"`
 	LogRetentionDays *int                      `yaml:"logRetentionDays"`
 	FzfFlags         []string                  `yaml:"fzfFlags"`

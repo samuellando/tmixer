@@ -153,6 +153,23 @@ func (p *Project) LastActivity() (*time.Time, error) {
 	return session.LastActivity()
 }
 
+// Return wheter or not the project's configure time to live has passed
+// Will always return false if an error orrcurs internally, as well as returning the error
+func (p *Project) TtlPassed() (bool, error) {
+	if p.fullConfig.Ttl == nil {
+		return false, nil
+	}
+	ttl, err := time.ParseDuration(*p.fullConfig.Ttl)
+	if err != nil {
+		return false, fmt.Errorf("While checking if ttl has passed: %w", err)
+	}
+	la, err := p.LastActivity()
+	if err != nil {
+		return false, fmt.Errorf("While checking if ttl has passed: %w", err)
+	}
+	return time.Since(*la) >= ttl, nil
+}
+
 // Starts a tmux session for the project, and creates all it's configured windows and panes.
 // If a session for the project already exists, it is returned and nothing else is done.
 func (p *Project) Start(ctx context.Context) (*tmux.Session, error) {

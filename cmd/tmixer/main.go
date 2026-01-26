@@ -95,6 +95,10 @@ func runTmixer(ctx context.Context, args []string, config *config.Config) error 
 	if err != nil {
 		return err
 	}
+	err = cleanupStaleProjects(ctx, projects)
+	if err != nil {
+		return err
+	}
 	var selection *project.Project
 	if len(args) >= 2 {
 		for _, p := range projects {
@@ -282,4 +286,34 @@ reset
 Flags: `)
 	fmt.Println()
 	fmt.Print(flags.HelpMessage(FLAGS))
+}
+
+func cleanupStaleProjects(ctx context.Context, projects []*project.Project) error {
+	type cleanupStaleProjectsEvent struct {
+		ProjectsKilled []string `json:"projectsKilled,omitempty"`
+		Errors         []string `json:"errors,omitempty"`
+	}
+	event := &cleanupStaleProjectsEvent{}
+	finish := log.Track(ctx, "cleanupStaleProjectsEvent", event)
+	defer finish()
+	var errs error
+	for _, p := range projects {
+		status, err := p.Status()
+		if err != nil {
+			event.Errors = append(event.Errors, err.Error())
+			errs = errors.Join(errs, err)
+		}
+		if status == project.PROJECT_STATUS_ACTIVE {
+			if passed, _ := p.TtlPassed(); passed {
+				_, err := p.Kill(ctx)
+				if err != nil {
+					event.Errors = append(event.Errors, err.Error())
+					errs = errors.Join(errs, err)
+				} else {
+					event.ProjectsKilled = append(event.ProjectsKilled, p.Name)
+				}
+			}
+		}
+	}
+	return errs
 }

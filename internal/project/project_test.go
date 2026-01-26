@@ -263,6 +263,128 @@ func TestProjectLastActivity(t *testing.T) {
 	})
 }
 
+func TestTtlPassed_NoTtlConfigured(t *testing.T) {
+	t.Parallel()
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+		p := &Project{
+			Name:       "ttl-none",
+			Config:     &config.ProjectConfig{},
+			fullConfig: &config.Config{},
+			server:     srv,
+		}
+		passed, err := p.TtlPassed()
+		if err != nil {
+			t.Error(err)
+		}
+		if passed {
+			t.Error("Expected ttl not to pass when not configured")
+		}
+	})
+}
+
+func TestTtlPassed_InvalidTtlFormat(t *testing.T) {
+	t.Parallel()
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+		p := &Project{
+			Name:   "ttl-invalid",
+			Config: &config.ProjectConfig{},
+			fullConfig: &config.Config{
+				Ttl: stringPointer("not-a-duration"),
+			},
+			server: srv,
+		}
+		passed, err := p.TtlPassed()
+		if err == nil {
+			t.Error("Expected ttl parse error")
+		}
+		if passed {
+			t.Error("Expected ttl to be false on parse error")
+		}
+	})
+}
+
+func TestTtlPassed_OneHourNotExpired(t *testing.T) {
+	t.Parallel()
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+		p := &Project{
+			Name:   "ttl-one-hour",
+			Config: &config.ProjectConfig{Directory: t.TempDir()},
+			fullConfig: &config.Config{
+				Ttl: stringPointer("1h"),
+			},
+			server: srv,
+		}
+		_, err := p.Start(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		passed, err := p.TtlPassed()
+		if err != nil {
+			t.Error(err)
+		}
+		if passed {
+			t.Error("Expected ttl not to pass immediately")
+		}
+	})
+}
+
+func TestTtlPassed_FiveSecondsExpired(t *testing.T) {
+	t.Parallel()
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+		p := &Project{
+			Name:   "ttl-five-seconds",
+			Config: &config.ProjectConfig{Directory: t.TempDir()},
+			fullConfig: &config.Config{
+				Ttl: stringPointer("5s"),
+			},
+			server: srv,
+		}
+		_, err := p.Start(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		passed, err := p.TtlPassed()
+		if err != nil {
+			t.Error(err)
+		}
+		if passed {
+			t.Error("Expected ttl not to pass immediately")
+		}
+		time.Sleep(6 * time.Second)
+		passed, err = p.TtlPassed()
+		if err != nil {
+			t.Error(err)
+		}
+		if !passed {
+			t.Error("Expected ttl to pass after sleep")
+		}
+	})
+}
+
+func TestTtlPassed_InactiveProject(t *testing.T) {
+	t.Parallel()
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+		p := &Project{
+			Name:   "ttl-inactive",
+			Config: &config.ProjectConfig{},
+			fullConfig: &config.Config{
+				Ttl: stringPointer("5s"),
+			},
+			server: srv,
+		}
+		passed, err := p.TtlPassed()
+		if err == nil {
+			t.Error("Expected session not found error")
+		}
+		if passed {
+			t.Error("Expected ttl to be false when inactive")
+		}
+		if !errors.Is(err, ErrSessionNotFound) {
+			t.Errorf("Expected session not found error, got %v", err)
+		}
+	})
+}
+
 func TestProjectStart(t *testing.T) {
 	runAllTestCases(t, func(t *testing.T, ctx context.Context, srv *tmux.Server, tc *projectTestCase) {
 		res, err := tc.project.Start(ctx)
