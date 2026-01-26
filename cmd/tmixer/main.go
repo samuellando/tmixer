@@ -289,17 +289,29 @@ Flags: `)
 }
 
 func cleanupStaleProjects(ctx context.Context, projects []*project.Project) error {
+	type cleanupStaleProjectsEvent struct {
+		ProjectsKilled []string `json:"projectsKilled,omitempty"`
+		Errors         []string `json:"errors,omitempty"`
+	}
+	event := &cleanupStaleProjectsEvent{}
+	finish := log.Track(ctx, "cleanupStaleProjectsEvent", event)
+	defer finish()
+	var errs error
 	for _, p := range projects {
 		status, err := p.Status()
 		if err != nil {
-			return err
+			event.Errors = append(event.Errors, err.Error())
+			errs = errors.Join(errs, err)
 		}
-		if passed, _ := p.TtlPassed(); passed && status == project.PROJECT_STATUS_ACTIVE {
-			_, err := p.Kill(ctx)
-			if err != nil {
-				return err
+		if status == project.PROJECT_STATUS_ACTIVE {
+			if passed, _ := p.TtlPassed(); passed {
+				_, err := p.Kill(ctx)
+				if err != nil {
+					event.Errors = append(event.Errors, err.Error())
+					errs = errors.Join(errs, err)
+				}
 			}
 		}
 	}
-	return nil
+	return errs
 }
