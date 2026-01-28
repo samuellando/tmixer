@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 
 	"samuellando.com/tmixer/internal/config"
@@ -11,12 +12,13 @@ import (
 )
 
 type Flag struct {
-	Name        string
-	ShortName   string
-	Description string
-	Usage       string
-	Default     string
-	ParseInput  func(string, *config.Config) error
+	Name                string
+	ShortName           string
+	Description         string
+	Usage               string
+	Default             string
+	ParseInput          func(string, *config.Config) error
+	EnvironmentVariable string
 }
 
 func HelpMessage(flags []Flag) string {
@@ -59,12 +61,14 @@ func ParseArgs(ctx context.Context, args []string, flags []Flag, conf *config.Co
 	defer finish()
 
 	remaining := make([]string, 0)
+	flagSet := make([]bool, len(flags))
 	var err error
 	for i := 1; i < len(args); i++ {
 		matched := false
-		for _, flag := range flags {
+		for j, flag := range flags {
 			if (isLongFlag(args[i]) && args[i][2:] == flag.Name) || (isShortFlag(args[i]) && args[i][1:] == flag.ShortName) {
 				matched = true
+				flagSet[j] = true
 				var val string
 				if i+1 < len(args) && !isFlag(args[i+1]) {
 					val = args[i+1]
@@ -83,6 +87,18 @@ func ParseArgs(ctx context.Context, args []string, flags []Flag, conf *config.Co
 		}
 		if !matched {
 			remaining = append(remaining, args[i])
+		}
+	}
+
+	for i, flag := range flags {
+		if !flagSet[i] && flag.EnvironmentVariable != "" {
+			if val, set := os.LookupEnv(flag.EnvironmentVariable); set {
+				if parseerr := flag.ParseInput(val, conf); parseerr != nil {
+					err = errors.Join(err, fmt.Errorf("While parsing flag env var %s: %w", flag.Name, parseerr))
+					event.Errors = append(event.Errors, err.Error())
+					return nil, err
+				}
+			}
 		}
 	}
 
