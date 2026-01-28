@@ -35,7 +35,7 @@ func run(args []string) {
 	ctx := context.Background()
 	ctx = log.InitializeWideEvent(ctx, &log.LoggerOptions{Level: log.LEVEL_INFO})
 	config := config.New()
-	args, err := flags.ParseArgs(ctx, args, FLAGS, config)
+	_, err := flags.ParseArgs(ctx, args, FLAGS, config)
 	if err != nil {
 		fmt.Println(err)
 		fmt.Println()
@@ -58,7 +58,16 @@ func run(args []string) {
 		logger.Info(ctx)
 		os.Exit(0)
 	}
+	// Parse the config files, and rerun the parse args.
 	config.LoadFiles(ctx)
+	args, err = flags.ParseArgs(ctx, args, FLAGS, config)
+	if err != nil {
+		fmt.Println(err)
+		logger.Error(ctx, err)
+		os.Exit(1)
+		os.Exit(1)
+	}
+
 	err = runTmixer(ctx, args, config)
 	if err != nil {
 		fmt.Println(err)
