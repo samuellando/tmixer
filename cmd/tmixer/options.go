@@ -36,6 +36,7 @@ var FLAGS = []flags.Flag{
 			c.LogFile = &s
 			return nil
 		},
+		EnvironmentVariable: "TMIXER_LOG_FILE",
 	},
 	{
 		Name:        "logLevel",
@@ -53,6 +54,7 @@ var FLAGS = []flags.Flag{
 			}
 			return nil
 		},
+		EnvironmentVariable: "TMIXER_LOG_LEVEL",
 	},
 	{
 		Name:        "logRetentionDays",
@@ -76,6 +78,7 @@ var FLAGS = []flags.Flag{
 			c.LogRetentionDays = &v
 			return nil
 		},
+		EnvironmentVariable: "TMIXER_LOG_RETENTION_DAYS",
 	},
 	{
 		Name:        "config",
@@ -89,6 +92,7 @@ var FLAGS = []flags.Flag{
 			c.ConfigFiles = append(c.ConfigFiles, s)
 			return nil
 		},
+		EnvironmentVariable: "TMIXER_CONFIG",
 	},
 	{
 		Name:        "defaultProject",
@@ -101,6 +105,7 @@ var FLAGS = []flags.Flag{
 			c.DefaultProject = &s
 			return nil
 		},
+		EnvironmentVariable: "TMIXER_DEFAULT_PROJECT",
 	},
 	{
 		Name:        "combineProjects",
@@ -115,5 +120,16 @@ var FLAGS = []flags.Flag{
 			c.CombineProjects = bool
 			return nil
 		},
+		EnvironmentVariable: "TMIXER_COMBINE_PROJECTS",
+	},
+	{
+		Name:        "projectTtl",
+		Description: "The project time to live, after it's inactive for a certain time it will automatically be killed",
+		Usage:       "--projectTtl 10h",
+		ParseInput: func(s string, c *config.Config) error {
+			c.Ttl = &s
+			return nil
+		},
+		EnvironmentVariable: "TMIXER_PROJECT_TTL",
 	},
 }

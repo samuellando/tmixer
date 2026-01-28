@@ -2,6 +2,7 @@ package flags
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"samuellando.com/tmixer/internal/config"
@@ -55,14 +56,26 @@ func TestParseArgs(t *testing.T) {
 				return nil
 			},
 		},
+		{
+			Name:                "five",
+			EnvironmentVariable: "TMIXER_TEST_FIVE",
+			ParseInput: func(s string, c *config.Config) error {
+				if s != "env_var" {
+					t.Fatal("incorrect input")
+				}
+				counter += 1
+				return nil
+			},
+		},
 	}
 	args := []string{"tmixer", "--four", "--one", "aaa", "-t", "--three", "bbb", "hello"}
+	os.Setenv("TMIXER_TEST_FIVE", "env_var")
 	remaining, err := ParseArgs(ctx, args, flags, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if counter != 4 {
-		t.Fatal("Should've parsed 3 flags")
+	if counter != 5 {
+		t.Fatal("Should've parsed 5 flags")
 	}
 	if len(remaining) != 1 || remaining[0] != "hello" {
 		t.Fatal("Should return remaining flags")
