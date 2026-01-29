@@ -15,9 +15,8 @@ func TestFlagParseEventFields(t *testing.T) {
 	ctx := context.Background()
 	ctx, logger, out := testutil.SetupLogging(ctx, log.LEVEL_DEBUG)
 
-	testFlags := []flags.Flag{
-		{
-			Name:      "test",
+	testFlags := map[string]flags.Flag{
+		"test": {
 			ShortName: "t",
 			ParseInput: func(s string, c *config.Config) error {
 				return nil
@@ -111,9 +110,8 @@ func TestFlagParseEventWithError(t *testing.T) {
 	ctx := context.Background()
 	ctx, logger, out := testutil.SetupLogging(ctx, log.LEVEL_DEBUG)
 
-	testFlags := []flags.Flag{
-		{
-			Name:      "failing",
+	testFlags := map[string]flags.Flag{
+		"failing": {
 			ShortName: "f",
 			ParseInput: func(s string, c *config.Config) error {
 				return errors.New("parse failed")

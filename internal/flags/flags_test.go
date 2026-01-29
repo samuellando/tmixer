@@ -12,9 +12,8 @@ import (
 func TestParseArgs(t *testing.T) {
 	ctx, _ := log.New(context.Background(), nil)
 	counter := 0
-	flags := []Flag{
-		{
-			Name:      "one",
+	flags := map[string]Flag{
+		"one": {
 			ShortName: "o",
 			ParseInput: func(s string, c *config.Config) error {
 				if s != "aaa" {
@@ -24,8 +23,7 @@ func TestParseArgs(t *testing.T) {
 				return nil
 			},
 		},
-		{
-			Name:      "two",
+		"two": {
 			ShortName: "t",
 			ParseInput: func(s string, c *config.Config) error {
 				if s != "" {
@@ -35,8 +33,7 @@ func TestParseArgs(t *testing.T) {
 				return nil
 			},
 		},
-		{
-			Name: "three",
+		"three": {
 			ParseInput: func(s string, c *config.Config) error {
 				if s != "bbb" {
 					t.Fatal("incorrect input")
@@ -45,8 +42,7 @@ func TestParseArgs(t *testing.T) {
 				return nil
 			},
 		},
-		{
-			Name:    "four",
+		"four": {
 			Default: "ddd",
 			ParseInput: func(s string, c *config.Config) error {
 				if s != "ddd" {
@@ -56,8 +52,7 @@ func TestParseArgs(t *testing.T) {
 				return nil
 			},
 		},
-		{
-			Name:                "five",
+		"five": {
 			EnvironmentVariable: "TMIXER_TEST_FIVE",
 			ParseInput: func(s string, c *config.Config) error {
 				if s != "env_var" {
@@ -83,23 +78,18 @@ func TestParseArgs(t *testing.T) {
 }
 
 func TestHelpMessage(t *testing.T) {
-	flags := []Flag{
-		{
-			Name:      "one",
+	flags := map[string]Flag{
+		"one": {
 			ShortName: "o",
 		},
-		{
-			Name:        "two",
+		"two": {
 			ShortName:   "t",
 			Description: "what it is",
 			Usage:       "How to use it",
 			Default:     "aaa",
 		},
-		{
-			Name: "three",
-		},
-		{
-			Name:    "four",
+		"three": {},
+		"four": {
 			Default: "ddd",
 		},
 	}
