@@ -14,9 +14,8 @@ var (
 	OPTION_DISPLAY_HELP = false
 )
 
-var FLAGS = []flags.Flag{
-	{
-		Name:        "help",
+var FLAGS = map[string]flags.Flag{
+	"help": {
 		ShortName:   "h",
 		Description: "display a help message to stdout",
 		Usage:       "--help or -h",
@@ -25,8 +24,7 @@ var FLAGS = []flags.Flag{
 			return nil
 		},
 	},
-	{
-		Name:        "logFile",
+	"logFile": {
 		Description: "Output logs to a file in addition to ~/.local/state/tmixer/logs .",
 		Usage:       "--logFile out.log",
 		ParseInput: func(s string, c *config.Config) error {
@@ -38,8 +36,7 @@ var FLAGS = []flags.Flag{
 		},
 		EnvironmentVariable: "TMIXER_LOG_FILE",
 	},
-	{
-		Name:        "logLevel",
+	"logLevel": {
 		Description: "logging level: info or debug",
 		Default:     "info",
 		Usage:       "--logLevel debug",
@@ -56,8 +53,7 @@ var FLAGS = []flags.Flag{
 		},
 		EnvironmentVariable: "TMIXER_LOG_LEVEL",
 	},
-	{
-		Name:        "logRetentionDays",
+	"logRetentionDays": {
 		Description: "how many previous days of logs to keep in ~/.local/state/tmixer/logs. Set to 0 to only keep current day and none to disable logging.",
 		Usage:       "--logRetentionDays 5",
 		Default:     "1",
@@ -80,8 +76,7 @@ var FLAGS = []flags.Flag{
 		},
 		EnvironmentVariable: "TMIXER_LOG_RETENTION_DAYS",
 	},
-	{
-		Name:        "config",
+	"config": {
 		ShortName:   "c",
 		Description: "Provide an additional config file overriding global configs from ~/.tmixer.yml and ~/.config/tmixer/config.yml",
 		Usage:       "--config config.yml or -c config.yml",
@@ -94,8 +89,7 @@ var FLAGS = []flags.Flag{
 		},
 		EnvironmentVariable: "TMIXER_CONFIG",
 	},
-	{
-		Name:        "defaultProject",
+	"defaultProject": {
 		Description: "Set a default project for the start command, if none is passed",
 		Usage:       "--defaultProject projects--tmixer",
 		ParseInput: func(s string, c *config.Config) error {
@@ -107,8 +101,7 @@ var FLAGS = []flags.Flag{
 		},
 		EnvironmentVariable: "TMIXER_DEFAULT_PROJECT",
 	},
-	{
-		Name:        "combineProjects",
+	"combineProjects": {
 		Description: "Wheter projects from all config files should be combined or overridden, --config > ~/.tmixer.yml > ~/.config/tmixer/config.yml",
 		Usage:       "--combineProjects false",
 		Default:     "true",
@@ -122,11 +115,13 @@ var FLAGS = []flags.Flag{
 		},
 		EnvironmentVariable: "TMIXER_COMBINE_PROJECTS",
 	},
-	{
-		Name:        "projectTtl",
+	"projectTtl": {
 		Description: "The project time to live, after it's inactive for a certain time it will automatically be killed",
 		Usage:       "--projectTtl 10h",
 		ParseInput: func(s string, c *config.Config) error {
+			if s == "" {
+				return fmt.Errorf("Requires ttl value")
+			}
 			c.Ttl = &s
 			return nil
 		},
