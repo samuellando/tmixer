@@ -1,0 +1,78 @@
+tmixer [flags] [command] [project_name]
+
+Commands:
+
+All commands will by default open fzf if no project_name is provided. Except for 
+the start command, which will start the configued default project in a new tmux client, 
+and the reset command, which will reset the attached session.
+
+switch (default)
+	switch the active tmux client to the project. It will eitehr switch to the 
+	existing session or start a session for the project, open it's configured 
+	startup windows and then switch to it.
+
+	After switching to a project/session, tmixer will run it's configured 
+	switch commands.
+
+	Note that a project's switch commands are automatically run any time you switch 
+	to the session in tmux, even without this command. For example with leader-b.
+
+start
+	Equivalent to starting tmux normally, but will open into a project. By
+	default it starts the defualt configured project.
+
+kill
+	kill the session/project.
+
+reset
+	kill and restart the project session. By default will reset the attached session.
+
+Flags: 
+
+--combineProjects
+	Wheter projects from all config files should be combined or overridden, --config > ~/.tmixer.yml > ~/.config/tmixer/config.yml
+	Usage: --combineProjects false
+	Default: true
+	EnvVar: $TMIXER_COMBINE_PROJECTS
+
+--config OR -c
+	Provide an additional config file overriding global configs from ~/.tmixer.yml and ~/.config/tmixer/config.yml
+	Usage: --config config.yml or -c config.yml
+	EnvVar: $TMIXER_CONFIG
+
+--defaultProject
+	Set a default project for the start command, if none is passed
+	Usage: --defaultProject projects--tmixer
+	EnvVar: $TMIXER_DEFAULT_PROJECT
+
+--help OR -h
+	display a help message to stdout
+	Usage: --help or -h
+
+--logFile
+	Output logs to a file in addition to ~/.local/state/tmixer/logs .
+	Usage: --logFile out.log
+	EnvVar: $TMIXER_LOG_FILE
+
+--logLevel
+	logging level: info or debug
+	Usage: --logLevel debug
+	Default: info
+	EnvVar: $TMIXER_LOG_LEVEL
+
+--logRetentionDays
+	how many previous days of logs to keep in ~/.local/state/tmixer/logs. Set to 0 to only keep current day and none to disable logging.
+	Usage: --logRetentionDays 5
+	Default: 1
+	EnvVar: $TMIXER_LOG_RETENTION_DAYS
+
+--projectTtl
+	The project time to live, after it's inactive for a certain time it will automatically be killed
+	Usage: --projectTtl 10h
+	EnvVar: $TMIXER_PROJECT_TTL
+
+--tmuxSocketPath OR -S
+	The tmux socket path, the tmux -S flag
+	Usage: --tmuxSocketPath /tmp/tmux/socket.sock
+	EnvVar: $TMIXER_SOCKET_PATH
+

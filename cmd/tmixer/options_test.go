@@ -200,3 +200,20 @@ func TestProjectTtlFlag(t *testing.T) {
 		t.Error("Project ttl should be set in conf")
 	}
 }
+func TestTmuxSocketPathFlag(t *testing.T) {
+	conf := config.New()
+	flag := FLAGS["tmuxSocketPath"]
+
+	err := flag.ParseInput("", conf)
+	if err == nil {
+		t.Error("Requires input")
+	}
+
+	err = flag.ParseInput("sock", conf)
+	if err != nil {
+		t.Error(err)
+	}
+	if conf.TmuxSocketPath == nil || *conf.TmuxSocketPath != "sock" {
+		t.Error("tmux socket should be set in conf")
+	}
+}

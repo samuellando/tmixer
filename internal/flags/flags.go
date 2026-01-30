@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"samuellando.com/tmixer/internal/config"
@@ -22,7 +23,15 @@ type Flag struct {
 
 func HelpMessage(flags map[string]Flag) string {
 	out := ""
-	for name, flag := range flags {
+	// Collect and sort keys
+	keys := make([]string, 0, len(flags))
+	for k := range flags {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, name := range keys {
+		flag := flags[name]
 		out += fmt.Sprintf("--%s", name)
 		if flag.ShortName != "" {
 			out += fmt.Sprintf(" OR -%s", flag.ShortName)
@@ -36,6 +45,9 @@ func HelpMessage(flags map[string]Flag) string {
 		}
 		if flag.Default != "" {
 			out += fmt.Sprintf("\tDefault: %s\n", flag.Default)
+		}
+		if flag.EnvironmentVariable != "" {
+			out += fmt.Sprintf("\tEnvVar: $%s\n", flag.EnvironmentVariable)
 		}
 		out += "\n"
 	}
@@ -62,7 +74,7 @@ func ParseArgs(ctx context.Context, args []string, flags map[string]Flag, conf *
 	remaining := make([]string, 0)
 	flagSet := make(map[string]bool)
 	var err error
-	for i := 1; i < len(args); i++ {
+	for i := 0; i < len(args); i++ {
 		matched := false
 		for name, flag := range flags {
 			if (isLongFlag(args[i]) && args[i][2:] == name) || (isShortFlag(args[i]) && args[i][1:] == flag.ShortName) {

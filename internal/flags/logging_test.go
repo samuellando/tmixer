@@ -24,7 +24,7 @@ func TestFlagParseEventFields(t *testing.T) {
 		},
 	}
 
-	args := []string{"tmixer", "--test", "value", "remaining"}
+	args := []string{"--test", "value", "remaining"}
 	flags.ParseArgs(ctx, args, testFlags, config.New())
 
 	res := testutil.GetLogEvent(ctx, logger, out)
@@ -43,16 +43,13 @@ func TestFlagParseEventFields(t *testing.T) {
 	if args, ok := inputArgs.([]any); !ok {
 		t.Error("'inputArgs' field should be an array")
 	} else {
-		if args[0] != "tmixer" {
-			t.Error("'inputArgs' field should be tmixer")
-		}
-		if args[1] != "--test" {
+		if args[0] != "--test" {
 			t.Error("'inputArgs' field should be --test")
 		}
-		if args[2] != "value" {
+		if args[1] != "value" {
 			t.Error("'inputArgs' field should be value")
 		}
-		if args[3] != "remaining" {
+		if args[2] != "remaining" {
 			t.Error("'inputArgs' field should be remaining")
 		}
 	}

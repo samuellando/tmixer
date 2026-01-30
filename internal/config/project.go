@@ -20,6 +20,7 @@ type Config struct {
 	LogLevel         int                       `yaml:"logLevel"`
 	LogRetentionDays *int                      `yaml:"logRetentionDays"`
 	FzfFlags         []string                  `yaml:"fzfFlags"`
+	TmuxSocketPath   *string                   `yaml:"TmuxSocketPath"`
 	ConfigFiles      []string                  `yaml:"configFiles"`
 	CombineProjects  bool                      `yaml:"combineProjects"`
 	Projects         map[string]*ProjectConfig `yaml:"projects"`

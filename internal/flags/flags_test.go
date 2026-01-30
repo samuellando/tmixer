@@ -63,7 +63,7 @@ func TestParseArgs(t *testing.T) {
 			},
 		},
 	}
-	args := []string{"tmixer", "--four", "--one", "aaa", "-t", "--three", "bbb", "hello"}
+	args := []string{"--four", "--one", "aaa", "-t", "--three", "bbb", "hello"}
 	os.Setenv("TMIXER_TEST_FIVE", "env_var")
 	remaining, err := ParseArgs(ctx, args, flags, nil)
 	if err != nil {
@@ -94,17 +94,17 @@ func TestHelpMessage(t *testing.T) {
 		},
 	}
 	res := HelpMessage(flags)
-	expected := `--one OR -o
+	expected := `--four
+	Default: ddd
+
+--one OR -o
+
+--three
 
 --two OR -t
 	what it is
 	Usage: How to use it
 	Default: aaa
-
---three
-
---four
-	Default: ddd
 
 `
 	if res != expected {

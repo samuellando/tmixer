@@ -127,4 +127,17 @@ var FLAGS = map[string]flags.Flag{
 		},
 		EnvironmentVariable: "TMIXER_PROJECT_TTL",
 	},
+	"tmuxSocketPath": {
+		Description: "The tmux socket path, the tmux -S flag",
+		ShortName:   "S",
+		Usage:       "--tmuxSocketPath /tmp/tmux/socket.sock",
+		ParseInput: func(s string, c *config.Config) error {
+			if s == "" {
+				return fmt.Errorf("Requires socket path")
+			}
+			c.TmuxSocketPath = &s
+			return nil
+		},
+		EnvironmentVariable: "TMIXER_SOCKET_PATH",
+	},
 }

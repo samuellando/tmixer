@@ -20,10 +20,16 @@ import (
 
 var ERR_NO_SELECTION = errors.New("No selection made")
 
+func main() {
+	err := run(os.Args[1:]...)
+	if err != nil {
+		os.Exit(1)
+	}
+}
+
 var cleanupFuncs = []func() error{}
 
-func main() {
-	run(os.Args)
+func cleanup() {
 	for _, f := range cleanupFuncs {
 		if f != nil {
 			f()
@@ -31,7 +37,8 @@ func main() {
 	}
 }
 
-func run(args []string) {
+func run(args ...string) error {
+	defer cleanup()
 	ctx := context.Background()
 	ctx = log.InitializeWideEvent(ctx, &log.LoggerOptions{Level: log.LEVEL_INFO})
 	config := config.New()
@@ -40,12 +47,12 @@ func run(args []string) {
 		fmt.Println(err)
 		fmt.Println()
 		displayHelp()
-		os.Exit(1)
+		return err
 	}
 	logger, files, err := setupLogging(ctx, config)
 	if err != nil {
 		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 	defer func() {
 		for _, f := range files {
@@ -56,7 +63,7 @@ func run(args []string) {
 	if OPTION_DISPLAY_HELP {
 		displayHelp()
 		logger.Info(ctx)
-		os.Exit(0)
+		return nil
 	}
 	// Parse the config files, and rerun the parse args.
 	config.LoadFiles(ctx)
@@ -64,18 +71,18 @@ func run(args []string) {
 	if err != nil {
 		fmt.Println(err)
 		logger.Error(ctx, err)
-		os.Exit(1)
-		os.Exit(1)
+		return err
 	}
 
 	err = runTmixer(ctx, args, config)
 	if err != nil {
 		fmt.Println(err)
 		logger.Error(ctx, err)
-		os.Exit(1)
+		return err
 	} else {
 		logger.Info(ctx)
 	}
+	return nil
 }
 
 func runTmixer(ctx context.Context, args []string, config *config.Config) error {
@@ -97,16 +104,24 @@ func runTmixer(ctx context.Context, args []string, config *config.Config) error 
 			return nil
 		}
 	}
-	tmux := tmux.Tmux(ctx)
-	tmux.StartControlMode()
-	defer tmux.StopControlMode()
-	projects, err := project.List(ctx, tmux, config)
+	var srv *tmux.Server
+	if config.TmuxSocketPath != nil {
+		srv = tmux.Tmux(ctx, *config.TmuxSocketPath)
+	} else {
+		srv = tmux.Tmux(ctx)
+	}
+	srv.StartControlMode()
+	defer srv.StopControlMode()
+	projects, err := project.List(ctx, srv, config)
 	if err != nil {
 		return err
 	}
 	err = cleanupStaleProjects(ctx, projects)
 	if err != nil {
 		return err
+	}
+	if command == "list" {
+		return fzf.DisplayProjects(ctx, projects, os.Stdout)
 	}
 	var selection *project.Project
 	if len(args) >= 2 {
@@ -118,8 +133,6 @@ func runTmixer(ctx context.Context, args []string, config *config.Config) error 
 		}
 	} else {
 		switch command {
-		case "list":
-			return fzf.DisplayProjects(ctx, projects, os.Stdout)
 		case "start":
 			if config.DefaultProject != nil {
 				for _, p := range projects {
@@ -149,7 +162,7 @@ func runTmixer(ctx context.Context, args []string, config *config.Config) error 
 		event.Errors = append(event.Errors, ERR_NO_SELECTION.Error())
 		return ERR_NO_SELECTION
 	}
-	err = disableHooks(tmux)
+	err = disableHooks(srv)
 	if err != nil {
 		return err
 	}
@@ -173,7 +186,7 @@ func runTmixer(ctx context.Context, args []string, config *config.Config) error 
 	if err != nil {
 		return err
 	}
-	err = setupHooks(tmux)
+	err = setupHooks(srv)
 	return err
 }
 
@@ -246,7 +259,6 @@ func setupLogging(ctx context.Context, config *config.Config) (*log.Logger, []*o
 	if f != nil {
 		logger.AddSink(f)
 		files = append(files, f)
-	} else {
 	}
 
 	if config.LogFile != nil {
