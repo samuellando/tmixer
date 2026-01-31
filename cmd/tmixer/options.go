@@ -10,17 +10,13 @@ import (
 	"samuellando.com/tmixer/internal/log"
 )
 
-var (
-	OPTION_DISPLAY_HELP = false
-)
-
 var FLAGS = map[string]flags.Flag{
 	"help": {
 		ShortName:   "h",
 		Description: "display a help message to stdout",
 		Usage:       "--help or -h",
 		ParseInput: func(s string, c *config.Config) error {
-			OPTION_DISPLAY_HELP = true
+			c.DisplayHelp = true
 			return nil
 		},
 	},

@@ -60,7 +60,7 @@ func run(args ...string) error {
 		}
 	}()
 	// Finally run
-	if OPTION_DISPLAY_HELP {
+	if config.DisplayHelp {
 		displayHelp()
 		logger.Info(ctx)
 		return nil

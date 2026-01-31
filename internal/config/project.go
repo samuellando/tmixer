@@ -24,6 +24,7 @@ type Config struct {
 	ConfigFiles      []string                  `yaml:"configFiles"`
 	CombineProjects  bool                      `yaml:"combineProjects"`
 	Projects         map[string]*ProjectConfig `yaml:"projects"`
+	DisplayHelp      bool                      `yaml:"displayHelp"`
 }
 
 type ProjectConfig struct {
