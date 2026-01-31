@@ -14,9 +14,6 @@ import (
 )
 
 func TestLogs(t *testing.T) {
-	defer func() {
-		OPTION_DISPLAY_HELP = false
-	}()
 	home, err := os.UserHomeDir()
 	if err != nil {
 		t.Fatal(err)
@@ -57,9 +54,6 @@ func TestLogs(t *testing.T) {
 }
 
 func TestLogFile(t *testing.T) {
-	defer func() {
-		OPTION_DISPLAY_HELP = false
-	}()
 	testutil.CaptureStdout(func() {
 		logFile := filepath.Join(t.TempDir(), "log.jsonl")
 		sockefile := filepath.Join(t.TempDir(), "tmux.sock")
@@ -83,9 +77,6 @@ func TestLogFile(t *testing.T) {
 }
 
 func TestDisplayHelp(t *testing.T) {
-	defer func() {
-		OPTION_DISPLAY_HELP = false
-	}()
 	testutil.GoldenTest(t, testutil.CaptureStdout(func() {
 		err := run("--help")
 		if err != nil {
@@ -227,6 +218,7 @@ projects:
 }
 
 func TestResetCurrent(t *testing.T) {
+	t.Parallel()
 	config := `
 projects:
   test-reset:
@@ -258,6 +250,7 @@ projects:
 			t.Fatal(err)
 		}
 
+		time.Sleep(7 * time.Second)
 		sessions, _ := srv.ListSessions()
 		if len(origSessions)+3 != len(sessions) {
 			t.Error("Should have two new session + control")
@@ -335,4 +328,54 @@ projects:
 	if len(out) != 0 {
 		t.Error("Should produce no output")
 	}
+}
+
+func TestProjectTtl(t *testing.T) {
+	t.Parallel()
+	config := `
+projects:
+  test-ttl:
+    directory: "/tmp"
+  test-ttl2:
+    directory: "/tmp"
+`
+	configFile := filepath.Join(t.TempDir(), "config.yml")
+	err := os.WriteFile(configFile, []byte(config), 0755)
+	if err != nil {
+		t.Fatal(err)
+	}
+	testutil.CaptureStdout(func() {
+		_, srv := testutil.SetupTestServer(t)
+		defer testutil.TeardownTestServer(srv)
+		f := testutil.SetupTestClient(srv, nil)
+		defer f.Close()
+
+		origSessions, _ := srv.ListSessions()
+
+		err = run("-S", srv.SocketPath, "-c", configFile, "--combineProjects", "false", "switch", "test-ttl")
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = run("-S", srv.SocketPath, "-c", configFile, "--combineProjects", "false", "switch", "test-ttl2")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		time.Sleep(7 * time.Second)
+		sessions, _ := srv.ListSessions()
+		if len(origSessions)+3 != len(sessions) {
+			t.Error("Should have two new session + control")
+		}
+
+		// Should kill the original sessiopn
+		err = run("-S", srv.SocketPath, "-c", configFile, "--combineProjects", "false", "--projectTtl", "1s", "list")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		sessions, _ = srv.ListSessions()
+		if len(origSessions) != len(sessions) {
+			t.Error("Should have killed the unattached sessions")
+		}
+	})
 }

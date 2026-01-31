@@ -8,6 +8,7 @@ import (
 )
 
 func TestHelpFlag(t *testing.T) {
+	t.Parallel()
 	conf := config.New()
 	flag := FLAGS["help"]
 
@@ -16,12 +17,13 @@ func TestHelpFlag(t *testing.T) {
 		t.Error(err)
 	}
 
-	if !OPTION_DISPLAY_HELP {
+	if !conf.DisplayHelp {
 		t.Error("Should set the display help option")
 	}
 }
 
 func TestLogFileFlag(t *testing.T) {
+	t.Parallel()
 	conf := config.New()
 	flag := FLAGS["logFile"]
 
@@ -40,6 +42,7 @@ func TestLogFileFlag(t *testing.T) {
 }
 
 func TestLogLevelFlag(t *testing.T) {
+	t.Parallel()
 	conf := config.New()
 	flag := FLAGS["logLevel"]
 
@@ -82,6 +85,7 @@ func TestLogLevelFlag(t *testing.T) {
 }
 
 func TestLogRetentionDaysFlag(t *testing.T) {
+	t.Parallel()
 	conf := config.New()
 	flag := FLAGS["logRetentionDays"]
 
@@ -113,6 +117,7 @@ func TestLogRetentionDaysFlag(t *testing.T) {
 }
 
 func TestConfigFlag(t *testing.T) {
+	t.Parallel()
 	conf := config.New()
 	flag := FLAGS["config"]
 	startingConfigFiles := len(conf.ConfigFiles)
@@ -140,6 +145,7 @@ func TestConfigFlag(t *testing.T) {
 }
 
 func TestDefaultProjectFlag(t *testing.T) {
+	t.Parallel()
 	conf := config.New()
 	flag := FLAGS["defaultProject"]
 
@@ -158,6 +164,7 @@ func TestDefaultProjectFlag(t *testing.T) {
 }
 
 func TestCombineProjectsFlag(t *testing.T) {
+	t.Parallel()
 	conf := config.New()
 	flag := FLAGS["combineProjects"]
 
@@ -184,6 +191,7 @@ func TestCombineProjectsFlag(t *testing.T) {
 }
 
 func TestProjectTtlFlag(t *testing.T) {
+	t.Parallel()
 	conf := config.New()
 	flag := FLAGS["projectTtl"]
 
@@ -200,7 +208,9 @@ func TestProjectTtlFlag(t *testing.T) {
 		t.Error("Project ttl should be set in conf")
 	}
 }
+
 func TestTmuxSocketPathFlag(t *testing.T) {
+	t.Parallel()
 	conf := config.New()
 	flag := FLAGS["tmuxSocketPath"]
 
