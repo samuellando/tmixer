@@ -11,6 +11,7 @@ import (
 
 	"samuellando.com/tmixer/internal/log"
 	"samuellando.com/tmixer/internal/testutil"
+	"samuellando.com/tmixer/internal/tmux"
 )
 
 func TestLogs(t *testing.T) {
@@ -251,32 +252,34 @@ projects:
 		}
 
 		time.Sleep(7 * time.Second)
+
 		sessions, _ := srv.ListSessions()
-		if len(origSessions)+3 != len(sessions) {
-			t.Error("Should have two new session + control")
+		sessions, _ = srv.ListSessions()
+		if len(sessions) != len(origSessions)+3 {
+			t.Error(testutil.ErrorNotEqual[int]{Actual: len(sessions), Expected: len(origSessions) + 3})
 		}
 
 		initial, _ := clt.Session()
 		initialName, _ := initial.Name()
-
+		if initialName != "test-reset2" {
+			t.Error(testutil.ErrorNotEqual[string]{Actual: initialName, Expected: "test-reset2"})
+		}
 		err = run("-S", srv.SocketPath, "-c", configFile, "--combineProjects", "false", "reset")
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		sessions, _ = srv.ListSessions()
-		if len(origSessions)+3 != len(sessions) {
-			t.Error("Should two new session + control")
+		if len(sessions) != len(origSessions)+3 {
+			t.Error(testutil.ErrorNotEqual[int]{Actual: len(sessions), Expected: len(origSessions) + 3})
 		}
 		after, _ := clt.Session()
-		afterName, _ := after.Name()
-
-		if initial.Id == after.Id {
-			t.Error("Shouldve reset the session")
+		if after.Id == initial.Id {
+			t.Error(testutil.ErrorEqual[tmux.SessionId]{Actual: after.Id, Expected: initial.Id})
 		}
-
-		if initialName != "test-reset2" || initialName != afterName {
-			t.Error("Should be test-reset2")
+		afterName, _ := after.Name()
+		if afterName != "test-reset2" {
+			t.Error(testutil.ErrorNotEqual[string]{Actual: afterName, Expected: "test-reset2"})
 		}
 	})
 	if len(out) != 0 {
