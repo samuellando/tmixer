@@ -11,7 +11,6 @@ import (
 
 	"samuellando.com/tmixer/internal/log"
 	"samuellando.com/tmixer/internal/testutil"
-	"samuellando.com/tmixer/internal/tmux"
 )
 
 func TestLogs(t *testing.T) {
@@ -156,7 +155,7 @@ projects:
 		session, _ := clt.Session()
 		name, _ := session.Name()
 		if name != "test-switch" {
-			t.Error("Wrong session")
+			t.Error("Expected session name to be test-switch")
 		}
 	})
 	if len(out) != 0 {
@@ -191,7 +190,7 @@ projects:
 		}
 
 		sessions, _ := srv.ListSessions()
-		if len(origSessions)+2 != len(sessions) {
+		if len(sessions) != len(origSessions)+2 {
 			t.Error("Should have one new session + control")
 		}
 
@@ -203,13 +202,13 @@ projects:
 		}
 
 		sessions, _ = srv.ListSessions()
-		if len(origSessions)+2 != len(sessions) {
-			t.Error("Should one nes session + control")
+		if len(sessions) != len(origSessions)+2 {
+			t.Error("Should have one new session + control")
 		}
-		after, _ := clt.Session()
 
+		after, _ := clt.Session()
 		if initial.Id == after.Id {
-			t.Error("Shouldve reset the session")
+			t.Error("Should've reset the session")
 		}
 
 	})
@@ -253,16 +252,13 @@ projects:
 
 		sessions, _ := srv.ListSessions()
 		if len(sessions) != len(origSessions)+3 {
-			t.Error(testutil.ErrorNotEqual[int]{
-				Actual:   len(sessions),
-				Expected: len(origSessions) + 3,
-			})
+			t.Error("Expected session count to increase by 3")
 		}
 
 		initial, _ := clt.Session()
 		initialName, _ := initial.Name()
 		if initialName != "test-reset2" {
-			t.Error(testutil.ErrorNotEqual[string]{Actual: initialName, Expected: "test-reset2"})
+			t.Error("Expected active session name to be test-reset2")
 		}
 		err = run("-S", srv.SocketPath, "-c", configFile, "--combineProjects", "false", "reset")
 		if err != nil {
@@ -271,19 +267,19 @@ projects:
 
 		sessions, _ = srv.ListSessions()
 		if len(sessions) != len(origSessions)+3 {
-			t.Error(testutil.ErrorNotEqual[int]{Actual: len(sessions), Expected: len(origSessions) + 3})
+			t.Error("Expected session count to increase by 3")
 		}
 		after, _ := clt.Session()
 		if after.Id == initial.Id {
-			t.Error(testutil.ErrorEqual[tmux.SessionId]{Actual: after.Id, Expected: initial.Id})
+			t.Error("Expected session to be reset")
 		}
 		afterName, _ := after.Name()
 		if afterName != "test-reset2" {
-			t.Error(testutil.ErrorNotEqual[string]{Actual: afterName, Expected: "test-reset2"})
+			t.Error("Expected session name to remain test-reset2")
 		}
 	})
 	if out != "" {
-		t.Error(testutil.ErrorNotEqual[string]{Actual: out, Expected: ""})
+		t.Error("Should produce no output")
 	}
 }
 
@@ -313,7 +309,7 @@ projects:
 
 		sessions, _ := srv.ListSessions()
 
-		if len(origSessions)+2 != len(sessions) {
+		if len(sessions) != len(origSessions)+2 {
 			t.Error("Should have one new session")
 		}
 
@@ -323,10 +319,9 @@ projects:
 		}
 
 		sessions, _ = srv.ListSessions()
-		if len(origSessions)+1 != len(sessions) {
-			t.Error("Should have original sessions")
+		if len(sessions) != len(origSessions)+1 {
+			t.Error("Should have one new session")
 		}
-
 	})
 	if len(out) != 0 {
 		t.Error("Should produce no output")
@@ -366,10 +361,7 @@ projects:
 
 		sessions, _ := srv.ListSessions()
 		if len(sessions) != len(origSessions)+3 {
-			t.Error(testutil.ErrorNotEqual[int]{
-				Actual:   len(sessions),
-				Expected: len(origSessions) + 3,
-			})
+			t.Error("Expected session count to increase by 3")
 		}
 
 		time.Sleep(2 * time.Second)
@@ -386,8 +378,8 @@ projects:
 		}
 
 		sessions, _ = srv.ListSessions()
-		if len(origSessions) != len(sessions) {
-			t.Error("Should have killed the unattached sessions")
+		if len(sessions) != len(origSessions) {
+			t.Error("Should have killed the unattached session")
 		}
 	})
 }
