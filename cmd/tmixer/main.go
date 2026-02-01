@@ -27,18 +27,15 @@ func main() {
 	}
 }
 
-var cleanupFuncs = []func() error{}
-
-func cleanup() {
-	for _, f := range cleanupFuncs {
-		if f != nil {
-			f()
-		}
-	}
-}
-
 func run(args ...string) error {
-	defer cleanup()
+	cleanupFuncs := []func() error{}
+	defer func() {
+		for _, f := range cleanupFuncs {
+			if f != nil {
+				f()
+			}
+		}
+	}()
 	ctx := context.Background()
 	ctx = log.InitializeWideEvent(ctx, &log.LoggerOptions{Level: log.LEVEL_INFO})
 	config := config.New()
@@ -74,7 +71,7 @@ func run(args ...string) error {
 		return err
 	}
 
-	err = runTmixer(ctx, args, config)
+	err = runTmixer(ctx, args, config, &cleanupFuncs)
 	if err != nil {
 		fmt.Println(err)
 		logger.Error(ctx, err)
@@ -85,7 +82,7 @@ func run(args ...string) error {
 	return nil
 }
 
-func runTmixer(ctx context.Context, args []string, config *config.Config) error {
+func runTmixer(ctx context.Context, args []string, config *config.Config, cleanupFuncs *[]func() error) error {
 	type runEvent struct {
 		Command   string           `json:"command"`
 		Selection *project.Project `json:"selection"`
@@ -126,7 +123,7 @@ func runTmixer(ctx context.Context, args []string, config *config.Config) error 
 	var selection *project.Project
 	if len(args) >= 2 {
 		for _, p := range projects {
-			if strings.HasPrefix(p.Name, args[1]) {
+			if p.Name == args[1] {
 				selection = p
 				break
 			}
@@ -174,10 +171,10 @@ func runTmixer(ctx context.Context, args []string, config *config.Config) error 
 		_, err = selection.Switch(ctx)
 	case "kill":
 		cleanup, err = selection.Kill(ctx)
-		cleanupFuncs = append(cleanupFuncs, cleanup)
+		*cleanupFuncs = append(*cleanupFuncs, cleanup)
 	case "reset":
 		_, cleanup, err = selection.Reset(ctx)
-		cleanupFuncs = append(cleanupFuncs, cleanup)
+		*cleanupFuncs = append(*cleanupFuncs, cleanup)
 	case "notify-switch":
 		err = selection.RunSwitchCommands(ctx)
 	default:

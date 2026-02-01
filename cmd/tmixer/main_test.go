@@ -251,12 +251,12 @@ projects:
 			t.Fatal(err)
 		}
 
-		time.Sleep(7 * time.Second)
-
 		sessions, _ := srv.ListSessions()
-		sessions, _ = srv.ListSessions()
 		if len(sessions) != len(origSessions)+3 {
-			t.Error(testutil.ErrorNotEqual[int]{Actual: len(sessions), Expected: len(origSessions) + 3})
+			t.Error(testutil.ErrorNotEqual[int]{
+				Actual:   len(sessions),
+				Expected: len(origSessions) + 3,
+			})
 		}
 
 		initial, _ := clt.Session()
@@ -282,8 +282,8 @@ projects:
 			t.Error(testutil.ErrorNotEqual[string]{Actual: afterName, Expected: "test-reset2"})
 		}
 	})
-	if len(out) != 0 {
-		t.Error("Should produce no output")
+	if out != "" {
+		t.Error(testutil.ErrorNotEqual[string]{Actual: out, Expected: ""})
 	}
 }
 
@@ -364,14 +364,23 @@ projects:
 			t.Fatal(err)
 		}
 
-		time.Sleep(7 * time.Second)
 		sessions, _ := srv.ListSessions()
-		if len(origSessions)+3 != len(sessions) {
-			t.Error("Should have two new session + control")
+		if len(sessions) != len(origSessions)+3 {
+			t.Error(testutil.ErrorNotEqual[int]{
+				Actual:   len(sessions),
+				Expected: len(origSessions) + 3,
+			})
 		}
 
+		time.Sleep(2 * time.Second)
+
 		// Should kill the original sessiopn
-		err = run("-S", srv.SocketPath, "-c", configFile, "--combineProjects", "false", "--projectTtl", "1s", "list")
+		err = run(
+			"-S", srv.SocketPath, "-c", configFile,
+			"--combineProjects", "false",
+			"--projectTtl", "1s",
+			"list",
+		)
 		if err != nil {
 			t.Fatal(err)
 		}

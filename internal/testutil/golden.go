@@ -10,11 +10,6 @@ import (
 )
 
 func CaptureStdout(f func()) string {
-	// Backup the original stdout
-	oldStdout := os.Stdout
-	defer func() {
-		os.Stdout = oldStdout // Restore the original stdout after the test
-	}()
 	// Create a new read-write pipe
 	r, w, _ := os.Pipe()
 	// Redirect os.Stdout to the write end of the pipe
