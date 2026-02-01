@@ -20,18 +20,22 @@ import (
 
 var ERR_NO_SELECTION = errors.New("No selection made")
 
-var cleanupFuncs = []func() error{}
-
 func main() {
-	run(os.Args)
-	for _, f := range cleanupFuncs {
-		if f != nil {
-			f()
-		}
+	err := run(os.Args[1:]...)
+	if err != nil {
+		os.Exit(1)
 	}
 }
 
-func run(args []string) {
+func run(args ...string) error {
+	cleanupFuncs := []func() error{}
+	defer func() {
+		for _, f := range cleanupFuncs {
+			if f != nil {
+				f()
+			}
+		}
+	}()
 	ctx := context.Background()
 	ctx = log.InitializeWideEvent(ctx, &log.LoggerOptions{Level: log.LEVEL_INFO})
 	config := config.New()
@@ -40,12 +44,12 @@ func run(args []string) {
 		fmt.Println(err)
 		fmt.Println()
 		displayHelp()
-		os.Exit(1)
+		return err
 	}
 	logger, files, err := setupLogging(ctx, config)
 	if err != nil {
 		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 	defer func() {
 		for _, f := range files {
@@ -53,10 +57,10 @@ func run(args []string) {
 		}
 	}()
 	// Finally run
-	if OPTION_DISPLAY_HELP {
+	if config.DisplayHelp {
 		displayHelp()
 		logger.Info(ctx)
-		os.Exit(0)
+		return nil
 	}
 	// Parse the config files, and rerun the parse args.
 	config.LoadFiles(ctx)
@@ -64,21 +68,21 @@ func run(args []string) {
 	if err != nil {
 		fmt.Println(err)
 		logger.Error(ctx, err)
-		os.Exit(1)
-		os.Exit(1)
+		return err
 	}
 
-	err = runTmixer(ctx, args, config)
+	err = runTmixer(ctx, args, config, &cleanupFuncs)
 	if err != nil {
 		fmt.Println(err)
 		logger.Error(ctx, err)
-		os.Exit(1)
+		return err
 	} else {
 		logger.Info(ctx)
 	}
+	return nil
 }
 
-func runTmixer(ctx context.Context, args []string, config *config.Config) error {
+func runTmixer(ctx context.Context, args []string, config *config.Config, cleanupFuncs *[]func() error) error {
 	type runEvent struct {
 		Command   string           `json:"command"`
 		Selection *project.Project `json:"selection"`
@@ -97,10 +101,15 @@ func runTmixer(ctx context.Context, args []string, config *config.Config) error 
 			return nil
 		}
 	}
-	tmux := tmux.Tmux(ctx)
-	tmux.StartControlMode()
-	defer tmux.StopControlMode()
-	projects, err := project.List(ctx, tmux, config)
+	var srv *tmux.Server
+	if config.TmuxSocketPath != nil {
+		srv = tmux.Tmux(ctx, *config.TmuxSocketPath)
+	} else {
+		srv = tmux.Tmux(ctx)
+	}
+	srv.StartControlMode()
+	defer srv.StopControlMode()
+	projects, err := project.List(ctx, srv, config)
 	if err != nil {
 		return err
 	}
@@ -108,18 +117,19 @@ func runTmixer(ctx context.Context, args []string, config *config.Config) error 
 	if err != nil {
 		return err
 	}
+	if command == "list" {
+		return fzf.DisplayProjects(ctx, projects, os.Stdout)
+	}
 	var selection *project.Project
 	if len(args) >= 2 {
 		for _, p := range projects {
-			if strings.HasPrefix(p.Name, args[1]) {
+			if p.Name == args[1] {
 				selection = p
 				break
 			}
 		}
 	} else {
 		switch command {
-		case "list":
-			return fzf.DisplayProjects(ctx, projects, os.Stdout)
 		case "start":
 			if config.DefaultProject != nil {
 				for _, p := range projects {
@@ -149,7 +159,7 @@ func runTmixer(ctx context.Context, args []string, config *config.Config) error 
 		event.Errors = append(event.Errors, ERR_NO_SELECTION.Error())
 		return ERR_NO_SELECTION
 	}
-	err = disableHooks(tmux)
+	err = disableHooks(srv)
 	if err != nil {
 		return err
 	}
@@ -161,10 +171,10 @@ func runTmixer(ctx context.Context, args []string, config *config.Config) error 
 		_, err = selection.Switch(ctx)
 	case "kill":
 		cleanup, err = selection.Kill(ctx)
-		cleanupFuncs = append(cleanupFuncs, cleanup)
+		*cleanupFuncs = append(*cleanupFuncs, cleanup)
 	case "reset":
 		_, cleanup, err = selection.Reset(ctx)
-		cleanupFuncs = append(cleanupFuncs, cleanup)
+		*cleanupFuncs = append(*cleanupFuncs, cleanup)
 	case "notify-switch":
 		err = selection.RunSwitchCommands(ctx)
 	default:
@@ -173,7 +183,7 @@ func runTmixer(ctx context.Context, args []string, config *config.Config) error 
 	if err != nil {
 		return err
 	}
-	err = setupHooks(tmux)
+	err = setupHooks(srv)
 	return err
 }
 
@@ -246,7 +256,6 @@ func setupLogging(ctx context.Context, config *config.Config) (*log.Logger, []*o
 	if f != nil {
 		logger.AddSink(f)
 		files = append(files, f)
-	} else {
 	}
 
 	if config.LogFile != nil {
