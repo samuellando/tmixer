@@ -10,13 +10,15 @@
 
 tmixer is a feature rich and speedy [tmux](https://github.com/tmux/tmux) sessionier written in go.
 
-- tmixer allows you to configure your projects:
-    - In specific directories or sub directories
-    - With specific windows and panes to create at startup
-    - With switching commands to run every time you switch to the project
-- tmixer then indexes all your projects on your system, and allows you to quickly switch between tmux sessions created for them
-- tmixer is fast
-    - It communicates with tmux using control mode, using streams instead of spawning a new process for each command.
+- tmixer indexes all the projects on your system, and allows you to quickly switch between tmux sessions created for them
+- tmixer has powerful per-project configurations for:
+    - Automatically spawning tmux window and pane layouts at startup, with specific commands to execute on each.
+    - Commands that should be automatically executed every time the project is switched to.
+    - And more..
+- In addition to basing projects on specific directories, tmixer can also import projects from:
+    - Sub directories of a specific parent directory, for example ~/Projects will import all the projects in that directory
+    - Official importers such as githud, gitlab, ect. (Comming soon)
+- tmixer is fast. It communicates with tmux using control mode, using streams instead of spawning a new process for each command.
 
 ## Dependencies
 
@@ -25,35 +27,53 @@ tmixer is a feature rich and speedy [tmux](https://github.com/tmux/tmux) session
 
 ## Installation
 
-Since tmixer is still in early development, clone the repository and run `make install`
+Since tmixer is still in early development, clone the repository and run `make install`.
 
-## Usage
+Once the project has reached an official stable release some more installation
+options will be made avaialble.
 
-After installing tmixer just add the following to you tmux.config:
-```
-bind s display-popup -E "tmixer"
-```
+## Quickstart
 
-Now hitting `leader - s` will open a fzf window listing all your projects, both with active 
+1. Add the following to your tmux.config:
+    ```
+    bind s display-popup -E "tmixer" # Open an fzf picker of all the projects
+    bind r run-shell "tmixer reset"  # Reset the currently attached project
+    ```
+
+2. Add the following to `~/.tmixer.yml` or `~/.config/tmixer/config.yml`
+    ```yml
+    defaultProject: home
+
+    projects:
+      home:
+        directory: "~/"
+
+      bin:
+        directory: "~/bin"
+
+      projects:
+        directory: "~/Projects"
+        subDirectories: true # Will list all projects within this directory
+
+        # See the configuration section on how to add windows and panes
+    ```
+
+3. Run `tmixer start` This will open tmux in your default project.
+
+4. Hitting `leader - s` will open a fzf window listing all your projects, both with active 
 sessions and without. 
+    - Within this window, you can search for the project you want and press enter to start/switch to it.
 
-Within this window, you can search for the project you want and press enter to switch to it.
+    - There are also some extra keybindings in this window:
 
-There are also some extra keybindings in this window:
+        - `ctrl-k` will kill the active highlighted session with `tmixer kill`
+        - `crtl-r` will call `tmixer reset` on the highlighted project
+        - `crtl-s` will start the highlighted project with `tmixer start` but not switch to it
 
-- `ctrl-k` will kill the active highlighted session with `tmixer kill`
-- `crtl-r` will call `tmixer reset` on the highlighted project
-- `crtl-s` will start the highlighted project with `tmixer start` but not switch to it
+5. Hitting `leader - r` will reset the currently attached project. Killing the sesison,
+and recreating it will all it's configured windows and panes.
 
-
-Another useful thing to add your tmux config is the following
-```
-bind r run-shell "tmixer reset"
-````
-
-This will reset the currently attached project when pressing `leader-r`
-
-### tmixer command
+## tmixer command
 
 While the primary interface with tmixer will be the popup window configured above,
 there is also a CLI.
@@ -90,6 +110,29 @@ reset
 
 ## Configuration
 
+### Summary of all configuration options
+| level   | yaml option        | flag                       | environment variable        | description                                                                                             | default vlaue  |
+| ---     | ---                | ---                        | ---                         | ---                                                                                                     | ---            |
+| global  | `defaultProject`   | `--defaultProject`         | `TMIXER_DEFAULT_PROJECT`    | The default project to open at startup                                                                  |                |
+| global  | `ttl`              | `--projectTtl`             | `TMIXER_PROJECT_TTL`        | How long before a project with no activity is automatically killed (example `24h`)                      |                |
+| global  | `combineProjects`  | `--combineProjects`        | `TMIXER_COMBINE_PROJECTS`   | Wheter the list of projects should be overriden or combined when multiple config files are present      | `true`         |
+| global  | `logFile`          | `--logFile`                | `TMIXER_LOG_FILE`           | Additional log file in addition to `~/.local/state/tmixer/logs/`                                        |                |
+| global  | `logLevel`         | `--logLevel`               | `TMIXER_LOG_LEVEL`          | The log level, `INFO` or `DEBUG`                                                                        | `INFO`         |
+| global  | `logRetentionDays` | `--logRetentionDays`       | `TMIXER_LOG_RETENTION_DAYS` | How many days of logs to keep in `~/.local/state/tmixer/logs/`                                          | `7`            |
+| global  | `tmuxSocketPath`   | `--tmuxSocketPath` or `-S` | `TMIXER_SOCKET_PATH`        | What tmux socket to use, equivalent to the tmux `-S` flag                                               | `tmux default` |
+| global  | `projects`         |                            |                             | A list of project configurations                                                                        |                |
+| global  |                    | `--config` or `-c`         | `TMIXER_CONFIG`             | an additional config file to parse after `~/.config/tmixer/config.yml` and `~/.tmixer.yml`              |                |
+| project | `name`             |                            |                             | The name of the project                                                                                 |                |
+| project | `diectory`         |                            |                             | The directory of the project                                                                            |                |
+| project | `subDirectories`   |                            |                             | If true, the subdirectories will be loaded as individual projects with names `[parent_name]--[sub_dir]` | `false`        |
+| project | `windows`          |                            |                             | A list of window configurations                                                                         |                |
+| project | `switchCommands`   |                            |                             | A list commands (strings) to run every time this project is switched to                                 |                |
+| window  | `name`             |                            |                             | The name of the window, will display in tmux status bar                                                 |                |
+| window  | `command`          |                            |                             | The startup command to execute on the first pane of this window, shorthand for adding a pane            |                |
+| window  | `panes`            |                            |                             | A list of pane configurations                                                                           |                |
+| pane    | `command`          |                            |                             | The startup command for this pane                                                                       |                |
+| pane    | `split`            |                            |                             | How to split the previously defined pane when spliting this pane  (`vertical` or `horizontal`)          | `horizontal`   |
+
 The tmixer configuration is where you specify all your projects, as well as some 
 other global options.
 
@@ -98,22 +141,23 @@ config files passed to the command line, and finally a local `.tmixer.yml` file
 in the project directory.
 
 Projects from all the config files will be combined unless the `combineProjects` 
-is set to `false`. Global options will be overriden in the following order 
+is set to `false`. Global options will be overridden in the following order 
 `configs passed to command line` overrides `environment variables` overrides `~/.tmixer.yml` overrides `~/.config/tmixer/config.yml`
 
-Here is an example configuration:
+### Example configuration
 
 ```yml
 defaultProject: projects--dots
+ttl: 24h
 
 projects:
-  home:
+  - name: home
     directory: "~/"
 
-  bin:
+  - name: bin
     directory: "~/bin"
 
-  projects:
+  - name: projects
     directory: "~/Projects"
     subDirectories: true
 
@@ -124,17 +168,16 @@ projects:
       - name: "shell"
 
       - name: logs 
-        command: "echo hello"
         panes:
-          - command: "tail -f ~/.tmixer.yml"
-          - command: "ls ~/Documents"
+          - command: "tail -f ./logs.out"
+          - command: "tail -f ./err.out"
             split: "vert"
 
     switchCommands:
-      - "ls"
+      - "ln -sfn /opt/corp/sys/usr ."
 ```
 
-And here are all the command line flags and their equivalent environment variables:
+### Command line flags and environment variables
 
 ```
 --combineProjects
