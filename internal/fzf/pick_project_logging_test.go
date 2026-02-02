@@ -20,8 +20,9 @@ func TestPickProjectEventFields(t *testing.T) {
 	// Create a config with a project and use --filter for non-interactive selection
 	cfg := &config.Config{
 		FzfFlags: []string{"--filter=test-project"},
-		Projects: map[string]*config.ProjectConfig{
-			"test-project": {
+		Projects: []*config.ProjectConfig{
+			{
+				Name:      "test-project",
 				Directory: "/tmp/test",
 			},
 		},
@@ -97,8 +98,9 @@ func TestPickProjectEventWithError(t *testing.T) {
 	// Create a config with --filter for a non-existent project
 	cfg := &config.Config{
 		FzfFlags: []string{"--filter=nonexistent-project"},
-		Projects: map[string]*config.ProjectConfig{
-			"test-project": {
+		Projects: []*config.ProjectConfig{
+			{
+				Name:      "test-project",
 				Directory: "/tmp/test",
 			},
 		},

@@ -69,30 +69,41 @@ var testWindowConfigs = []config.WindowConfig{
 var switchCommands = []string{"touch one-$(date +%s%N)", "touch two-$(date +%s%N)"}
 
 var testConfig = &config.Config{
-	Projects: map[string]*config.ProjectConfig{
-		"inactive": {},
-		"inactive-windows": {
+	Projects: []*config.ProjectConfig{
+		{
+			Name: "inactive",
+		},
+		{
+			Name:    "inactive-windows",
 			Windows: testWindowConfigs,
 		},
-		"inactive-switch": {
+		{
+			Name:           "inactive-switch",
 			SwitchCommands: switchCommands,
 		},
-		"inactive-windows-switch": {
+		{
+			Name:           "inactive-windows-switch",
 			Windows:        testWindowConfigs,
 			SwitchCommands: switchCommands,
 		},
-		"active": {},
-		"active-windows": {
+		{
+			Name: "active",
+		},
+		{
+			Name:    "active-windows",
 			Windows: testWindowConfigs,
 		},
-		"active-switch": {
+		{
+			Name:           "active-switch",
 			SwitchCommands: switchCommands,
 		},
-		"active-windows-switch": {
+		{
+			Name:           "active-windows-switch",
 			Windows:        testWindowConfigs,
 			SwitchCommands: switchCommands,
 		},
-		"attached-switch": {
+		{
+			Name:           "attached-switch",
 			SwitchCommands: switchCommands,
 		},
 	},
@@ -141,12 +152,12 @@ func setupTestProject(t *testing.T, ctx context.Context, project *Project, srv *
 
 func getAllTestCases() []*projectTestCase {
 	testCases := make([]*projectTestCase, 0)
-	for name, pc := range testConfig.Projects {
+	for _, pc := range testConfig.Projects {
 		tc := projectTestCase{}
 		// Make a copy of the config to avoid race conditions in parallel tests
 		configCopy := *pc
 		p := Project{
-			Name:       name,
+			Name:       pc.Name,
 			Config:     &configCopy,
 			fullConfig: testConfig,
 		}
@@ -733,8 +744,8 @@ func TestProjectKillAttachedNoProjects(t *testing.T) {
 		}
 		// Set the default project
 		attached.fullConfig = &config.Config{
-			Projects: map[string]*config.ProjectConfig{
-				attached.Name: attached.Config,
+			Projects: []*config.ProjectConfig{
+				attached.Config,
 			},
 		}
 		cleanup, err := attached.Kill(ctx)

@@ -99,9 +99,9 @@ func getDuplicateNames(projects []*Project) []string {
 // List all projects that are bare ie. don't have any sort of recusion like subdirs.
 func listBareProjects(config *config.Config) []*Project {
 	projects := make([]*Project, 0)
-	for name, projectConfig := range config.Projects {
+	for _, projectConfig := range config.Projects {
 		if !projectConfig.SubDirectories {
-			project := &Project{Name: name, Config: projectConfig}
+			project := &Project{Name: projectConfig.Name, Config: projectConfig}
 			projects = append(projects, project)
 		}
 	}
@@ -110,7 +110,7 @@ func listBareProjects(config *config.Config) []*Project {
 
 func listSubDirProjects(c *config.Config) ([]*Project, error) {
 	projects := make([]*Project, 0)
-	for name, projectConfig := range c.Projects {
+	for _, projectConfig := range c.Projects {
 		if projectConfig.SubDirectories {
 			dirEntries, err := os.ReadDir(projectConfig.Directory)
 			if err != nil {
@@ -118,7 +118,7 @@ func listSubDirProjects(c *config.Config) ([]*Project, error) {
 			}
 			for _, f := range dirEntries {
 				if f.IsDir() {
-					subName := fmt.Sprintf("%s--%s", name, f.Name())
+					subName := fmt.Sprintf("%s--%s", projectConfig.Name, f.Name())
 					project := &Project{Name: subName, Config: &config.ProjectConfig{
 						Directory:      filepath.Join(projectConfig.Directory, f.Name()),
 						SubDirectories: false,

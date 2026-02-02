@@ -20,8 +20,9 @@ func TestDisplayProjectsEventFields(t *testing.T) {
 
 	// Create a simple config with one project
 	cfg := &config.Config{
-		Projects: map[string]*config.ProjectConfig{
-			"test-project": {
+		Projects: []*config.ProjectConfig{
+			{
+				Name:      "test-project",
 				Directory: "/tmp/test",
 			},
 		},

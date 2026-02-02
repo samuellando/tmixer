@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,20 +13,21 @@ import (
 )
 
 type Config struct {
-	DefaultProject   *string                   `yaml:"defaultProject"`
-	LogFile          *string                   `yaml:"logFile"`
-	Ttl              *string                   `yaml:"ttl"`
-	LogLevel         int                       `yaml:"logLevel"`
-	LogRetentionDays *int                      `yaml:"logRetentionDays"`
-	FzfFlags         []string                  `yaml:"fzfFlags"`
-	TmuxSocketPath   *string                   `yaml:"TmuxSocketPath"`
-	ConfigFiles      []string                  `yaml:"configFiles"`
-	CombineProjects  bool                      `yaml:"combineProjects"`
-	Projects         map[string]*ProjectConfig `yaml:"projects"`
-	DisplayHelp      bool                      `yaml:"displayHelp"`
+	DefaultProject   *string          `yaml:"defaultProject"`
+	LogFile          *string          `yaml:"logFile"`
+	Ttl              *string          `yaml:"ttl"`
+	LogLevel         int              `yaml:"logLevel"`
+	LogRetentionDays *int             `yaml:"logRetentionDays"`
+	FzfFlags         []string         `yaml:"fzfFlags"`
+	TmuxSocketPath   *string          `yaml:"TmuxSocketPath"`
+	ConfigFiles      []string         `yaml:"configFiles"`
+	CombineProjects  bool             `yaml:"combineProjects"`
+	Projects         []*ProjectConfig `yaml:"projects"`
+	DisplayHelp      bool             `yaml:"displayHelp"`
 }
 
 type ProjectConfig struct {
+	Name           string         `yaml:"name"`
 	Directory      string         `yaml:"directory"`
 	SubDirectories bool           `yaml:"subDirectories"`
 	Windows        []WindowConfig `yaml:"windows"`
@@ -60,7 +60,7 @@ func New() *Config {
 		},
 		ConfigFiles:     []string{"~/.config/tmixer/config.yml", "~/.tmixer.yml"},
 		CombineProjects: true,
-		Projects:        make(map[string]*ProjectConfig),
+		Projects:        make([]*ProjectConfig, 0),
 	}
 }
 
@@ -73,7 +73,7 @@ func (config *Config) LoadFiles(ctx context.Context) error {
 	finish := log.Track(ctx, "configLoadEvent", event)
 	defer finish()
 
-	allProjects := make([]map[string]*ProjectConfig, 0)
+	allProjects := make([][]*ProjectConfig, 0)
 	var errs error
 	for _, f := range config.ConfigFiles {
 		path, err := absPath(f)
@@ -97,9 +97,9 @@ func (config *Config) LoadFiles(ctx context.Context) error {
 		allProjects = append(allProjects, config.Projects)
 	}
 	if config.CombineProjects {
-		resultProjects := make(map[string]*ProjectConfig)
+		resultProjects := make([]*ProjectConfig, 0)
 		for _, projects := range allProjects {
-			maps.Copy(resultProjects, projects)
+			resultProjects = append(resultProjects, projects...)
 		}
 		config.Projects = resultProjects
 	}
@@ -112,7 +112,7 @@ func (config *Config) LoadFiles(ctx context.Context) error {
 	return errs
 }
 
-func convertToAbsolutePaths(projects map[string]*ProjectConfig) error {
+func convertToAbsolutePaths(projects []*ProjectConfig) error {
 	for _, proj := range projects {
 		path, err := absPath(proj.Directory)
 		if err != nil {
