@@ -58,8 +58,9 @@ func getAllListTestCases() map[string]func(*testing.T) listTestCase {
 		"one config": func(t *testing.T) listTestCase {
 			return listTestCase{
 				config: &config.Config{
-					Projects: map[string]*config.ProjectConfig{
-						"bin": {
+					Projects: []*config.ProjectConfig{
+						{
+							Name:      "bin",
 							Directory: "/home/test/bin",
 						},
 					},
@@ -72,8 +73,9 @@ func getAllListTestCases() map[string]func(*testing.T) listTestCase {
 			createProjects(t, dir)
 			return listTestCase{
 				config: &config.Config{
-					Projects: map[string]*config.ProjectConfig{
-						"projects": {
+					Projects: []*config.ProjectConfig{
+						{
+							Name:           "projects",
 							Directory:      dir,
 							SubDirectories: true,
 						},
@@ -99,11 +101,13 @@ func getAllListTestCases() map[string]func(*testing.T) listTestCase {
 			createProjects(t, dir)
 			return listTestCase{
 				config: &config.Config{
-					Projects: map[string]*config.ProjectConfig{
-						"bin": {
+					Projects: []*config.ProjectConfig{
+						{
+							Name:      "bin",
 							Directory: "/home/test/bin",
 						},
-						"projects": {
+						{
+							Name:           "projects",
 							Directory:      dir,
 							SubDirectories: true,
 						},
@@ -236,11 +240,13 @@ func TestAmbiguousNames(t *testing.T) {
 		os.Mkdir(filepath.Join(dir, strconv.Itoa(i)), 0o700)
 	}
 	config := &config.Config{
-		Projects: map[string]*config.ProjectConfig{
-			"projects--5": {
+		Projects: []*config.ProjectConfig{
+			{
+				Name:      "projects--5",
 				Directory: "/home/test/bin",
 			},
-			"projects": {
+			{
+				Name:           "projects",
 				Directory:      dir,
 				SubDirectories: true,
 			},
@@ -287,11 +293,13 @@ func TestListLogs(t *testing.T) {
 		os.Mkdir(filepath.Join(dir, strconv.Itoa(i)), 0o700)
 	}
 	config := &config.Config{
-		Projects: map[string]*config.ProjectConfig{
-			"projects--5": {
+		Projects: []*config.ProjectConfig{
+			{
+				Name:      "projects--5",
 				Directory: "/home/test/bin",
 			},
-			"projects": {
+			{
+				Name:           "projects",
 				Directory:      dir,
 				SubDirectories: true,
 			},
@@ -327,11 +335,13 @@ func TestListLogsProjectConfigs(t *testing.T) {
 	validDir := t.TempDir()
 	invalidDir := t.TempDir()
 	config := &config.Config{
-		Projects: map[string]*config.ProjectConfig{
-			"valid-project": {
+		Projects: []*config.ProjectConfig{
+			{
+				Name:      "valid-project",
 				Directory: validDir,
 			},
-			"invalid-project": {
+			{
+				Name:      "invalid-project",
 				Directory: invalidDir,
 			},
 		},
@@ -411,11 +421,13 @@ func BenchmarkList(b *testing.B) {
 		os.Mkdir(filepath.Join(dir, strconv.Itoa(i)), 0o700)
 	}
 	config := &config.Config{
-		Projects: map[string]*config.ProjectConfig{
-			"bin": {
+		Projects: []*config.ProjectConfig{
+			{
+				Name:      "bin",
 				Directory: "/home/test/bin",
 			},
-			"projects": {
+			{
+				Name:           "projects",
 				Directory:      dir,
 				SubDirectories: true,
 			},
@@ -505,11 +517,13 @@ func BenchmarkListControlMode(b *testing.B) {
 		os.Mkdir(filepath.Join(dir, strconv.Itoa(i)), 0o700)
 	}
 	config := &config.Config{
-		Projects: map[string]*config.ProjectConfig{
-			"bin": {
+		Projects: []*config.ProjectConfig{
+			{
+				Name:      "bin",
 				Directory: "/home/test/bin",
 			},
-			"projects": {
+			{
+				Name:           "projects",
 				Directory:      dir,
 				SubDirectories: true,
 			},

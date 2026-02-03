@@ -88,7 +88,7 @@ func TestDisplayHelp(t *testing.T) {
 func TestLoadConfig(t *testing.T) {
 	config := `
 projects:
-  test-load-config:
+  - name: test-load-config
     directory: "/tmp"
 `
 	configFile := filepath.Join(t.TempDir(), "config.yml")
@@ -111,9 +111,9 @@ projects:
 func TestList(t *testing.T) {
 	config := `
 projects:
-  test-list1:
+  - name: test-list1
     directory: "/tmp"
-  test-list2:
+  - name: test-list2
     directory: "/tmp"
 `
 	configFile := filepath.Join(t.TempDir(), "config.yml")
@@ -133,7 +133,7 @@ projects:
 func TestSwitch(t *testing.T) {
 	config := `
 projects:
-  test-switch:
+  - name: test-switch
     directory: "/tmp"
 `
 	configFile := filepath.Join(t.TempDir(), "config.yml")
@@ -166,7 +166,7 @@ projects:
 func TestReset(t *testing.T) {
 	config := `
 projects:
-  test-reset:
+  - name: test-reset
     directory: "/tmp"
 `
 	configFile := filepath.Join(t.TempDir(), "config.yml")
@@ -221,9 +221,9 @@ func TestResetCurrent(t *testing.T) {
 	t.Parallel()
 	config := `
 projects:
-  test-reset:
+  - name: test-reset
     directory: "/tmp"
-  test-reset2:
+  - name: test-reset2
     directory: "/tmp"
 `
 	configFile := filepath.Join(t.TempDir(), "config.yml")
@@ -286,7 +286,7 @@ projects:
 func TestKill(t *testing.T) {
 	config := `
 projects:
-  test-kill:
+  - name: test-kill
     directory: "/tmp"
 `
 	configFile := filepath.Join(t.TempDir(), "config.yml")
@@ -332,9 +332,9 @@ func TestProjectTtl(t *testing.T) {
 	t.Parallel()
 	config := `
 projects:
-  test-ttl:
+  - name: test-ttl
     directory: "/tmp"
-  test-ttl2:
+  - name: test-ttl2
     directory: "/tmp"
 `
 	configFile := filepath.Join(t.TempDir(), "config.yml")

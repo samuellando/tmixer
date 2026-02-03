@@ -21,7 +21,7 @@ func TestConfigLoadEventFields(t *testing.T) {
 	configContent := `
 defaultProject: test
 projects:
-  test:
+  - name: test
     directory: /tmp/test
 `
 	err := os.WriteFile(configFile, []byte(configContent), 0644)

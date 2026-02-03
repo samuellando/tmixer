@@ -21,23 +21,29 @@ func TestDisplayProjects(t *testing.T) {
 	f := testutil.SetupTestClient(tmux, s)
 	defer f.Close()
 	config := &config.Config{
-		Projects: map[string]*config.ProjectConfig{
-			"dogs": {
+		Projects: []*config.ProjectConfig{
+			{
+				Name:      "dogs",
 				Directory: "/home/test/bin1",
 			},
-			"bin": {
+			{
+				Name:      "bin",
 				Directory: "/home/test/bin2",
 			},
-			"cats": {
+			{
+				Name:      "cats",
 				Directory: "/home/test/bin3",
 			},
-			"dog": {
+			{
+				Name:      "dog",
 				Directory: "/home/test/bin4",
 			},
-			"zzz": {
+			{
+				Name:      "zzz",
 				Directory: "/home/test/bin5",
 			},
-			"cat": {
+			{
+				Name:      "cat",
 				Directory: "/home/test/bin6",
 			},
 		},
