@@ -54,6 +54,7 @@ func New() *Config {
 		LogRetentionDays: &logRetentionDays,
 		FzfFlags: []string{
 			"--ansi",
+			"--no-tty-default",
 			"--bind", "ctrl-k:execute(tmixer kill {2})+reload(tmixer list)",
 			"--bind", "ctrl-r:execute(tmixer reset {2})+reload(tmixer list)",
 			"--bind", "ctrl-s:execute(tmixer start {2})+reload(tmixer list)",

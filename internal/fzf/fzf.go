@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"sort"
 	"strings"
@@ -27,6 +28,7 @@ func PickProject(ctx context.Context, config *config.Config, projects []*project
 	projects = make([]*project.Project, len(input))
 	copy(projects, input)
 	cmd := exec.Command("fzf", config.FzfFlags...)
+	cmd.Stderr = os.Stdout
 	event.Args = cmd.Args
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -43,7 +45,7 @@ func PickProject(ctx context.Context, config *config.Config, projects []*project
 		}
 		result <- err
 	}()
-	out, err := cmd.CombinedOutput()
+	out, err := cmd.Output()
 	if err != nil {
 		err := fmt.Errorf("fzf command error: %w %s", err, string(out))
 		event.Errors = append(event.Errors, err.Error())
