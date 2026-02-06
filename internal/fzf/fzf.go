@@ -6,9 +6,13 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"sort"
 	"strings"
+	"syscall"
 
+	"github.com/creack/pty"
+	"golang.org/x/term"
 	"samuellando.com/tmixer/internal/config"
 	"samuellando.com/tmixer/internal/log"
 	"samuellando.com/tmixer/internal/project"
@@ -27,27 +31,73 @@ func PickProject(ctx context.Context, config *config.Config, projects []*project
 	input := projects
 	projects = make([]*project.Project, len(input))
 	copy(projects, input)
+
 	cmd := exec.Command("fzf", config.FzfFlags...)
-	cmd.Stderr = os.Stdout
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setsid:  true,
+		Setctty: false,
+	}
 	event.Args = cmd.Args
-	stdin, err := cmd.StdinPipe()
+
+	ptmx, tty, err := pty.Open()
 	if err != nil {
-		err := fmt.Errorf("while opening stdin pipe to fzf: %w", err)
+		err := fmt.Errorf("while opening pty for fzf: %w", err)
 		event.Errors = append(event.Errors, err.Error())
+		fmt.Println(err)
 		return nil, err
 	}
+	defer ptmx.Close()
+	defer tty.Close()
+
+	inPipe, _ := cmd.StdinPipe()
+	outPipe, _ := cmd.StdoutPipe()
+	cmd.Stderr = tty
+
+	err = cmd.Start()
+	if err != nil {
+		fmt.Print(">>>", err)
+		return nil, err
+	}
+
+	fd := int(os.Stdin.Fd())
+	oldState, err := term.MakeRaw(fd)
+	if err != nil {
+		return nil, err
+	}
+	defer term.Restore(fd, oldState)
+	go io.Copy(ptmx, os.Stdin)
+	go io.Copy(os.Stdout, ptmx)
+
 	result := make(chan error)
 	go func() {
-		err := DisplayProjects(ctx, projects, stdin)
-		stdin.Close()
+		err := DisplayProjects(ctx, projects, inPipe)
+		inPipe.Close()
 		if err != nil {
 			event.Errors = append(event.Errors, err.Error())
 		}
 		result <- err
 	}()
-	out, err := cmd.Output()
+
+	resize := func() {
+		ws, err := pty.GetsizeFull(os.Stdin)
+		if err == nil {
+			_ = pty.Setsize(ptmx, ws)
+		}
+	}
+	resize()
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, syscall.SIGWINCH)
+	go func() {
+		for range ch {
+			resize()
+		}
+	}()
+
+	out, err := io.ReadAll(outPipe)
+
+	err = cmd.Wait()
 	if err != nil {
-		err := fmt.Errorf("fzf command error: %w %s", err, string(out))
+		err := fmt.Errorf("fzf command error: %w %s", err)
 		event.Errors = append(event.Errors, err.Error())
 		return nil, err
 	}
@@ -55,6 +105,7 @@ func PickProject(ctx context.Context, config *config.Config, projects []*project
 		event.Errors = append(event.Errors, err.Error())
 		return nil, err
 	}
+
 	event.Output = string(out)
 	selected, err := parseOutput(string(out))
 	if err != nil {
@@ -62,11 +113,13 @@ func PickProject(ctx context.Context, config *config.Config, projects []*project
 		return nil, err
 	}
 	event.ParsedOutput = string(selected)
+	fmt.Println(selected)
 	for _, project := range projects {
 		if project.Name == selected {
 			return project, nil
 		}
 	}
+
 	return nil, fmt.Errorf("No project selected")
 }
 
