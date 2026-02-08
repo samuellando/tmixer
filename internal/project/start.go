@@ -90,7 +90,7 @@ func (p *Project) createWindows(s *tmux.Session) error {
 }
 
 func createPanes(w *tmux.Window, config config.WindowConfig) error {
-	if config.Command == nil && len(config.Panes) == 0 {
+	if len(config.Command) == 0 && len(config.Panes) == 0 {
 		return nil
 	}
 	panes, err := w.Panes()
@@ -100,9 +100,9 @@ func createPanes(w *tmux.Window, config config.WindowConfig) error {
 	firstPane := panes[0]
 	// If the window has a command, we need to run that command, and keep the pane
 	keepalive := false
-	if config.Command != nil {
+	if len(config.Command) > 0 {
 		keepalive = true
-		err = firstPane.SendKeys(*config.Command)
+		err = firstPane.SendCommand(config.Command)
 		if err != nil {
 			return fmt.Errorf("when creating window, sending command: %w", err)
 		}
@@ -121,8 +121,8 @@ func createPanes(w *tmux.Window, config config.WindowConfig) error {
 				return fmt.Errorf("when creating pane: %w", err)
 			}
 		}
-		if pane.Command != nil {
-			err = p.SendKeys(*pane.Command)
+		if len(pane.Command) > 0 {
+			err = p.SendCommand(pane.Command)
 			if err != nil {
 				return fmt.Errorf("when creating pane, sending command: %w", err)
 			}

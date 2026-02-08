@@ -74,6 +74,19 @@ func (p *Pane) SendKeys(keys string) error {
 	return err
 }
 
+func (p *Pane) SendCommand(command []string) error {
+	cmd := p.server.command("send-keys").withTargetPane(p)
+	for i, arg := range command {
+		cmd = cmd.withArgument(arg)
+		if i < len(command)-1 {
+			cmd = cmd.withArgument(" ")
+		}
+	}
+	cmd = cmd.withArgument("enter")
+	_, err := cmd.run()
+	return err
+}
+
 func (p *Pane) Capture() ([]string, error) {
 	return p.server.command("capture-pane").withFlag("-p").withFlag("-e").withTargetPane(p).run()
 }

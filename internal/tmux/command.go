@@ -132,6 +132,7 @@ func (c cmd) internalArguments() []string {
 	}
 	for _, arg := range c.arguments {
 		arg = strings.ReplaceAll(arg, "\\", "\\\\")
+		arg = strings.ReplaceAll(arg, "\"", "\\\"")
 		args = append(args, fmt.Sprintf("\"%s\"", arg))
 	}
 	return args
