@@ -57,4 +57,3 @@ func (p *Project) RunSwitchCommands(ctx context.Context) error {
 	}
 	return nil
 }
-

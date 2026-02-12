@@ -2,8 +2,8 @@ package project
 
 import (
 	"context"
-	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -19,8 +19,8 @@ func stringPointer(s string) *string {
 var pane_counts = []int{1, 4, 3}
 var primes = []int{471193, 842887, 5197, 316219}
 
-func primeCommand(i, j int) *string {
-	return stringPointer(fmt.Sprintf("expr %d \\* %d", primes[i], primes[j]))
+func primeCommand(i, j int) []string {
+	return []string{"expr", strconv.Itoa(primes[i]), "\\*", strconv.Itoa(primes[j])}
 }
 
 var testWindowConfigs = []config.WindowConfig{
@@ -63,7 +63,7 @@ var testWindowConfigs = []config.WindowConfig{
 	},
 }
 
-var switchCommands = []string{"touch one-$(date +%s%N)", "touch two-$(date +%s%N)"}
+var switchCommands = [][]string{{"touch", "one-$(date +%s%N)"}, {"touch", "two-$(date +%s%N)"}}
 
 var testConfig = &config.Config{
 	Projects: []*config.ProjectConfig{

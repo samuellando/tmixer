@@ -349,9 +349,9 @@ func TestListLogsProjectConfigs(t *testing.T) {
 
 	validContent := `windows:
   - name: overridden-terminal
-    command: overridden-bash
+    command: ["overridden-bash"]
 switchCommands:
-  - overridden-pwd`
+  - ["overridden-pwd"]`
 	if err := os.WriteFile(filepath.Join(validDir, ".tmixer.yml"), []byte(validContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -463,9 +463,9 @@ func TestProjectSpecificConfigs(t *testing.T) {
 		overriddenProjects := make(map[string]bool)
 		content := `windows:
   - name: overridden-terminal
-    command: overridden-bash
+    command: ["overridden-bash"]
 switchCommands:
-  - overridden-pwd`
+  - ["overridden-pwd"]`
 		index := 0
 		for _, project := range initialProjects {
 			if project.Config == nil {
@@ -501,7 +501,7 @@ switchCommands:
 				if len(project.Config.Windows) != 1 || project.Config.Windows[0].Name != "overridden-terminal" {
 					t.Errorf("Project %s should have been overridden but has windows: %v", project.Name, project.Config.Windows)
 				}
-				if len(project.Config.SwitchCommands) != 1 || project.Config.SwitchCommands[0] != "overridden-pwd" {
+				if len(project.Config.SwitchCommands) != 1 || project.Config.SwitchCommands[0][0] != "overridden-pwd" {
 					t.Errorf("Project %s should have been overridden but has switch commands: %v", project.Name, project.Config.SwitchCommands)
 				}
 			}
