@@ -137,6 +137,30 @@ func TestSendKeysAndCapture(t *testing.T) {
 	})
 }
 
+func TestSendCommandAndCapture(t *testing.T) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+		sessions, _ := srv.ListSessions()
+		s := sessions[0]
+		windows, _ := s.Windows()
+		w := windows[0]
+		panes, _ := w.Panes()
+		p := panes[0]
+		time.Sleep(2 * time.Second)
+		p.SendCommand([]string{"bash", "-c", "\"expr 12 \\* 88\""})
+		time.Sleep(2 * time.Second)
+		out, _ := p.Capture()
+		found := false
+		for _, line := range out {
+			if strings.Contains(line, "1056") {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatal("Command did not run!")
+		}
+	})
+}
+
 func TestPaneOptions(t *testing.T) {
 	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		name := "test_sess_name"
