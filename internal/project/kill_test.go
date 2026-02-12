@@ -99,7 +99,7 @@ func TestProjectKillAttachedLastActive(t *testing.T) {
 					t.Error(err)
 				}
 				lastActive = tc.project
-				time.Sleep(time.Second)
+				time.Sleep(5 * time.Second)
 			}
 		}
 		cleanup, err := attached.Kill(ctx)
