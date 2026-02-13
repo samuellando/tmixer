@@ -14,7 +14,7 @@ func (p *Project) RunSwitchCommands(ctx context.Context) error {
 	type projecRunSwitchCommandsEvent struct {
 		Name      string         `json:"name"`
 		SessionId tmux.SessionId `json:"sessionId,omitempty"`
-		Commands  []string       `json:"commands,omitempty"`
+		Commands  [][]string     `json:"commands,omitempty"`
 		Errors    []string       `json:"errors,omitempty"`
 	}
 	event := &projecRunSwitchCommandsEvent{Name: p.Name}
@@ -48,7 +48,8 @@ func (p *Project) RunSwitchCommands(ctx context.Context) error {
 			return fmt.Errorf("when splitting command pane: %w", err)
 		}
 		event.Commands = append(event.Commands, cmd)
-		err = cmdPane.SendKeys(cmd + "&& exit")
+		cmdCopy := append([]string(nil), cmd...)
+		err = cmdPane.SendCommand(append(cmdCopy, "&&", "exit"))
 		if err != nil {
 			event.Errors = append(event.Errors, err.Error())
 			return fmt.Errorf("when sending command to pane: %w", err)

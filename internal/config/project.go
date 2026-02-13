@@ -31,18 +31,18 @@ type ProjectConfig struct {
 	Directory      string         `yaml:"directory"`
 	SubDirectories bool           `yaml:"subDirectories"`
 	Windows        []WindowConfig `yaml:"windows"`
-	SwitchCommands []string       `yaml:"switchCommands"`
+	SwitchCommands [][]string     `yaml:"switchCommands"`
 }
 
 type WindowConfig struct {
 	Name    string       `yaml:"name"`
-	Command *string      `yaml:"command"`
+	Command []string     `yaml:"command"`
 	Panes   []PaneConfig `yaml:"panes"`
 }
 
 type PaneConfig struct {
-	Command *string `yaml:"command"`
-	Split   *string `yaml:"split"`
+	Command []string `yaml:"command"`
+	Split   *string  `yaml:"split"`
 }
 
 func New() *Config {
