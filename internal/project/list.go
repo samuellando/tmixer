@@ -170,9 +170,18 @@ func loadProjectConfigs(ctx context.Context, projects []*Project) {
 	finish := log.Track(ctx, "loadProjectConfigsEvent", event)
 	defer finish()
 
+	home, err := os.UserHomeDir()
+	if err != nil {
+		event.Errors = append(event.Errors, fmt.Sprintf("Failed to get user home dir: %v", err))
+	}
+
 	for _, project := range projects {
 		// Skip orphaned sessions that don't have a config
 		if project.Config == nil {
+			continue
+		}
+		// Skip home directory since the file would overlap with the global config
+		if project.Config.Directory == home {
 			continue
 		}
 

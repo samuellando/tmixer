@@ -510,6 +510,75 @@ switchCommands:
 	})
 }
 
+func TestProjectSpecificConfigsSkipsHomeDirectory(t *testing.T) {
+	tmpHome := t.TempDir()
+	validDir := t.TempDir()
+	t.Setenv("HOME", tmpHome)
+
+	config := &config.Config{
+		Projects: []*config.ProjectConfig{
+			{
+				Name:      "home-project",
+				Directory: tmpHome,
+			},
+			{
+				Name:      "valid-project",
+				Directory: validDir,
+			},
+		},
+	}
+
+	content := `windows:
+  - name: overridden-terminal
+    command: ["overridden-bash"]
+switchCommands:
+  - ["overridden-pwd"]`
+	if err := os.WriteFile(filepath.Join(tmpHome, ".tmixer.yml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(validDir, ".tmixer.yml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+		projects, err := List(ctx, srv, config)
+		if err != nil {
+			t.Error(err)
+		}
+		var homeProject *Project
+		var validProject *Project
+		for _, project := range projects {
+			switch project.Name {
+			case "home-project":
+				homeProject = project
+			case "valid-project":
+				validProject = project
+			}
+		}
+		if homeProject == nil {
+			t.Fatal("home-project not listed")
+		}
+		if validProject == nil {
+			t.Fatal("valid-project not listed")
+		}
+		if homeProject.Config == nil || validProject.Config == nil {
+			t.Fatal("expected project configs to be present")
+		}
+		if len(homeProject.Config.Windows) == 1 {
+			t.Error("home-project should not be overridden by home .tmixer.yml")
+		}
+		if len(homeProject.Config.SwitchCommands) == 1 {
+			t.Error("home-project should not be overridden by home .tmixer.yml")
+		}
+		if len(validProject.Config.Windows) != 1 || validProject.Config.Windows[0].Name != "overridden-terminal" {
+			t.Errorf("valid-project should have overridden windows, got %v", validProject.Config.Windows)
+		}
+		if len(validProject.Config.SwitchCommands) != 1 || validProject.Config.SwitchCommands[0][0] != "overridden-pwd" {
+			t.Errorf("valid-project should have overridden switch commands, got %v", validProject.Config.SwitchCommands)
+		}
+	})
+}
+
 func BenchmarkListControlMode(b *testing.B) {
 	dir := b.TempDir()
 	n := 100
