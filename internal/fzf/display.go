@@ -6,16 +6,6 @@ import (
 	"io"
 	"sort"
 
-	"os"
-	"os/exec"
-	"os/signal"
-	"sort"
-	"strings"
-	"syscall"
-
-	"github.com/creack/pty"
-	"golang.org/x/term"
-	"samuellando.com/tmixer/internal/config"
 	"samuellando.com/tmixer/internal/log"
 	"samuellando.com/tmixer/internal/project"
 )
