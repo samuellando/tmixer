@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"samuellando.com/tmixer/internal/config"
+	"samuellando.com/tmixer/internal/testutil"
 	"samuellando.com/tmixer/internal/tmux"
 )
 
@@ -79,6 +81,36 @@ func TestProjectReset(t *testing.T) {
 		}
 		if len(initialSessions) != len(finalSessions) {
 			t.Error("Number of sessions before and after should match")
+		}
+	})
+}
+
+func TestProjectReset_NoConfig(t *testing.T) {
+	t.Parallel()
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+		p := &Project{
+			Name:       "reset-no-config",
+			Config:     nil,
+			fullConfig: &config.Config{},
+			server:     srv,
+		}
+		res, cleanup, resetErr := p.Reset(ctx)
+		if resetErr == nil {
+			t.Error("Expected reset error when config is missing")
+		}
+		if res != nil {
+			t.Error("Expected no session on reset error")
+		}
+		if cleanup == nil {
+			t.Fatal("Expected cleanup function even on error")
+		}
+		cleanupErr := cleanup()
+		if cleanupErr != nil {
+			t.Error(cleanupErr)
+		}
+		expected := fmt.Sprintf("Session %s has no project config to reset to", p.Name)
+		if resetErr != nil && resetErr.Error() != expected {
+			t.Errorf("Expected error %q got %q", expected, resetErr.Error())
 		}
 	})
 }
