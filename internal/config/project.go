@@ -19,7 +19,7 @@ type Config struct {
 	LogLevel         int              `yaml:"logLevel"`
 	LogRetentionDays *int             `yaml:"logRetentionDays"`
 	FzfFlags         []string         `yaml:"fzfFlags"`
-	TmuxSocketPath   *string          `yaml:"TmuxSocketPath"`
+	TmuxSocketPath   *string          `yaml:"tmuxSocketPath"`
 	ConfigFiles      []string         `yaml:"configFiles"`
 	CombineProjects  bool             `yaml:"combineProjects"`
 	Projects         []*ProjectConfig `yaml:"projects"`
@@ -84,12 +84,16 @@ func (config *Config) LoadFiles(ctx context.Context) error {
 		}
 		bytes, err := os.ReadFile(path)
 		if err != nil {
-			errs = errors.Join(errs, err)
+			// The file not existing is not a critical error
+			if !os.IsNotExist(err) {
+				errs = errors.Join(errs, err)
+			}
 			event.Errors = append(event.Errors, err.Error())
 			continue
 		}
 		err = yaml.Unmarshal(bytes, config)
 		if err != nil {
+			err = fmt.Errorf("While parsing %s: %w", path, err)
 			errs = errors.Join(errs, err)
 			event.Errors = append(event.Errors, err.Error())
 			continue

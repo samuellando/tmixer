@@ -28,16 +28,12 @@ func main() {
 }
 
 func run(args ...string) error {
-	cleanupFuncs := []func() error{}
-	defer func() {
-		for _, f := range cleanupFuncs {
-			if f != nil {
-				f()
-			}
-		}
-	}()
+	session := newSession()
+	defer session.close()
+	// init the logging event
 	ctx := context.Background()
 	ctx = log.InitializeWideEvent(ctx, &log.LoggerOptions{Level: log.LEVEL_INFO})
+	// Parse the arguments before seetting up logging in case there's a extra log file
 	config := config.New()
 	_, err := flags.ParseArgs(ctx, args, FLAGS, config)
 	if err != nil {
@@ -46,6 +42,7 @@ func run(args ...string) error {
 		displayHelp()
 		return err
 	}
+	// Set up the logging
 	logger, files, err := setupLogging(ctx, config)
 	if err != nil {
 		fmt.Println(err)
@@ -56,24 +53,16 @@ func run(args ...string) error {
 			f.Close()
 		}
 	}()
-	// Finally run
+	// --help flag
 	if config.DisplayHelp {
 		displayHelp()
 		logger.Info(ctx)
 		return nil
 	}
-	// Parse the config files, and rerun the parse args.
-	config.LoadFiles(ctx)
-	args, err = flags.ParseArgs(ctx, args, FLAGS, config)
+	// And run, and output the logs
+	err = runTmixer(ctx, args, config, session)
 	if err != nil {
-		fmt.Println(err)
-		logger.Error(ctx, err)
-		return err
-	}
-
-	err = runTmixer(ctx, args, config, &cleanupFuncs)
-	if err != nil {
-		fmt.Println(err)
+		fmt.Fprintln(os.Stderr, err)
 		logger.Error(ctx, err)
 		return err
 	} else {
@@ -82,7 +71,7 @@ func run(args ...string) error {
 	return nil
 }
 
-func runTmixer(ctx context.Context, args []string, config *config.Config, cleanupFuncs *[]func() error) error {
+func runTmixer(ctx context.Context, args []string, config *config.Config, session *session) error {
 	type runEvent struct {
 		Command   string           `json:"command"`
 		Selection *project.Project `json:"selection"`
@@ -91,35 +80,64 @@ func runTmixer(ctx context.Context, args []string, config *config.Config, cleanu
 	event := &runEvent{}
 	finish := log.Track(ctx, "runEvent", event)
 	defer finish()
-	command := "switch"
-	if len(args) >= 1 {
-		command = args[0]
+	// Parse the config files, and the args
+	err := config.LoadFiles(ctx)
+	if err != nil {
+		event.Errors = append(event.Errors, err.Error())
 	}
-	event.Command = command
-	if command == "notify-switch" {
-		if len(args) < 2 || args[1] == tmux.CONTROL_SESSION_NAME {
-			return nil
-		}
+	args, err = flags.ParseArgs(ctx, args, FLAGS, config)
+	if err != nil {
+		event.Errors = append(event.Errors, err.Error())
 	}
+	// Start the tmux server
 	var srv *tmux.Server
 	if config.TmuxSocketPath != nil {
 		srv = tmux.Tmux(ctx, *config.TmuxSocketPath)
 	} else {
 		srv = tmux.Tmux(ctx)
 	}
-	srv.StartControlMode()
-	defer srv.StopControlMode()
+	err = srv.StartControlMode()
+	if err != nil {
+		event.Errors = append(event.Errors, err.Error())
+	} else {
+		defer srv.StopControlMode()
+	}
+	// Critical parsing errors for configs should be displayed
+	if len(event.Errors) != 0 {
+		errs := strings.Join(event.Errors, ", ")
+		err := srv.DisplayMessage(errs)
+		if err != nil {
+			errs = ", " + err.Error()
+		}
+		return errors.New(errs)
+	}
+	// Determine the command
+	command := "switch"
+	if len(args) >= 1 {
+		command = args[0]
+	}
+	// We should ignore switch notifications on the control mode session
+	event.Command = command
+	if command == "notify-switch" {
+		if len(args) < 2 || args[1] == tmux.CONTROL_SESSION_NAME {
+			return nil
+		}
+	}
+	// Now load all the projects
 	projects, err := project.List(ctx, srv, config)
 	if err != nil {
 		return err
 	}
+	// Cleanup any projects that have passed the ttl
 	err = cleanupStaleProjects(ctx, projects)
 	if err != nil {
 		return err
 	}
+	// Run any command that requires no selection
 	if command == "list" {
 		return fzf.DisplayProjects(ctx, projects, os.Stdout)
 	}
+	// Determine the selection
 	var selection *project.Project
 	if len(args) >= 2 {
 		for _, p := range projects {
@@ -159,6 +177,7 @@ func runTmixer(ctx context.Context, args []string, config *config.Config, cleanu
 		event.Errors = append(event.Errors, ERR_NO_SELECTION.Error())
 		return ERR_NO_SELECTION
 	}
+	// Execute the commend
 	err = disableHooks(srv)
 	if err != nil {
 		return err
@@ -171,20 +190,23 @@ func runTmixer(ctx context.Context, args []string, config *config.Config, cleanu
 		_, err = selection.Switch(ctx)
 	case "kill":
 		cleanup, err = selection.Kill(ctx)
-		*cleanupFuncs = append(*cleanupFuncs, cleanup)
+		session.addCleanup(cleanup)
 	case "reset":
 		_, cleanup, err = selection.Reset(ctx)
-		*cleanupFuncs = append(*cleanupFuncs, cleanup)
+		session.addCleanup(cleanup)
 	case "notify-switch":
 		err = selection.RunSwitchCommands(ctx)
 	default:
 		err = fmt.Errorf("Command not recognized: %s", command)
 	}
 	if err != nil {
+		err = srv.DisplayMessage(err.Error())
+		if err != nil {
+			errors.Join(err, err)
+		}
 		return err
 	}
-	err = setupHooks(srv)
-	return err
+	return setupHooks(srv)
 }
 
 func startClient(ctx context.Context, p *project.Project) error {
