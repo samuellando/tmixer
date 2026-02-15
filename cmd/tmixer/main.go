@@ -19,6 +19,8 @@ import (
 )
 
 var ERR_NO_SELECTION = errors.New("No selection made")
+var ERR_PROJECT_NOT_FOUND = errors.New("Project not found")
+var ERR_COMMAND_NOT_RECONIZED = errors.New("Command not recognized")
 
 func main() {
 	err := run(os.Args[1:]...)
@@ -28,25 +30,22 @@ func main() {
 }
 
 func run(args ...string) error {
-	cleanupFuncs := []func() error{}
-	defer func() {
-		for _, f := range cleanupFuncs {
-			if f != nil {
-				f()
-			}
-		}
-	}()
+	session := newSession()
+	defer session.close()
+	// init the logging event
 	ctx := context.Background()
 	ctx = log.InitializeWideEvent(ctx, &log.LoggerOptions{Level: log.LEVEL_INFO})
-	config := config.New()
-	_, err := flags.ParseArgs(ctx, args, FLAGS, config)
+	// Parse the arguments before seetting up logging in case there's a extra log file
+	session.config = config.New()
+	_, err := flags.ParseArgs(ctx, args, FLAGS, session.config)
 	if err != nil {
 		fmt.Println(err)
 		fmt.Println()
 		displayHelp()
 		return err
 	}
-	logger, files, err := setupLogging(ctx, config)
+	// Set up the logging
+	logger, files, err := setupLogging(ctx, session.config)
 	if err != nil {
 		fmt.Println(err)
 		return err
@@ -56,24 +55,16 @@ func run(args ...string) error {
 			f.Close()
 		}
 	}()
-	// Finally run
-	if config.DisplayHelp {
+	// --help flag
+	if session.config.DisplayHelp {
 		displayHelp()
 		logger.Info(ctx)
 		return nil
 	}
-	// Parse the config files, and rerun the parse args.
-	config.LoadFiles(ctx)
-	args, err = flags.ParseArgs(ctx, args, FLAGS, config)
+	// And run, and output the logs
+	err = runTmixer(ctx, args, session)
 	if err != nil {
-		fmt.Println(err)
-		logger.Error(ctx, err)
-		return err
-	}
-
-	err = runTmixer(ctx, args, config, &cleanupFuncs)
-	if err != nil {
-		fmt.Println(err)
+		fmt.Fprintln(os.Stderr, err)
 		logger.Error(ctx, err)
 		return err
 	} else {
@@ -82,7 +73,7 @@ func run(args ...string) error {
 	return nil
 }
 
-func runTmixer(ctx context.Context, args []string, config *config.Config, cleanupFuncs *[]func() error) error {
+func runTmixer(ctx context.Context, args []string, session *session) error {
 	type runEvent struct {
 		Command   string           `json:"command"`
 		Selection *project.Project `json:"selection"`
@@ -91,100 +82,200 @@ func runTmixer(ctx context.Context, args []string, config *config.Config, cleanu
 	event := &runEvent{}
 	finish := log.Track(ctx, "runEvent", event)
 	defer finish()
+	// Parse the config files, and the args, again
+	err := session.config.LoadFiles(ctx)
+	if err != nil {
+		event.Errors = append(event.Errors, err.Error())
+	}
+	args, err = flags.ParseArgs(ctx, args, FLAGS, session.config)
+	if err != nil {
+		event.Errors = append(event.Errors, err.Error())
+	}
+	srv, err := startTmuxServer(ctx, session)
+	if err != nil {
+		event.Errors = append(event.Errors, err.Error())
+	}
+	// If any error occured before this point we should display it
+	if len(event.Errors) != 0 {
+		errs := strings.Join(event.Errors, ", ")
+		err := srv.DisplayMessage(errs)
+		if err != nil {
+			errs = ", " + err.Error()
+		}
+		return errors.New(errs)
+	}
+	// Determine the command
 	command := "switch"
 	if len(args) >= 1 {
 		command = args[0]
 	}
 	event.Command = command
+	// We should ignore switch notifications on the control mode session
 	if command == "notify-switch" {
 		if len(args) < 2 || args[1] == tmux.CONTROL_SESSION_NAME {
 			return nil
 		}
 	}
-	var srv *tmux.Server
-	if config.TmuxSocketPath != nil {
-		srv = tmux.Tmux(ctx, *config.TmuxSocketPath)
-	} else {
-		srv = tmux.Tmux(ctx)
-	}
-	srv.StartControlMode()
-	defer srv.StopControlMode()
-	projects, err := project.List(ctx, srv, config)
+	// Now load all the projects
+	session.projects, err = project.List(ctx, srv, session.config)
 	if err != nil {
 		return err
 	}
-	err = cleanupStaleProjects(ctx, projects)
+	// Cleanup any projects that have passed the ttl
+	err = cleanupStaleProjects(ctx, session.projects)
 	if err != nil {
 		return err
 	}
-	if command == "list" {
-		return fzf.DisplayProjects(ctx, projects, os.Stdout)
-	}
-	var selection *project.Project
+	// Finally run the command
+	var query string = ""
 	if len(args) >= 2 {
-		for _, p := range projects {
-			if p.Name == args[1] {
-				selection = p
-				break
-			}
-		}
-	} else {
-		switch command {
-		case "start":
-			if config.DefaultProject != nil {
-				for _, p := range projects {
-					if strings.HasPrefix(p.Name, *config.DefaultProject) {
-						selection = p
-						break
-					}
-				}
-			}
-		case "reset":
-			for _, p := range projects {
-				status, err := p.Status()
-				if err != nil {
-					return fmt.Errorf("while getting project status for reset: %w", err)
-				}
-				if status == project.PROJECT_STATUS_ATTACHED {
-					selection = p
-					break
-				}
-			}
-		default:
-			selection, _ = fzf.PickProject(ctx, config, projects)
-		}
-	}
-	event.Selection = selection
-	if selection == nil {
-		event.Errors = append(event.Errors, ERR_NO_SELECTION.Error())
-		return ERR_NO_SELECTION
+		query = args[1]
 	}
 	err = disableHooks(srv)
 	if err != nil {
 		return err
 	}
-	var cleanup func() error
-	switch command {
-	case "start":
-		err = startClient(ctx, selection)
-	case "switch":
-		_, err = selection.Switch(ctx)
-	case "kill":
-		cleanup, err = selection.Kill(ctx)
-		*cleanupFuncs = append(*cleanupFuncs, cleanup)
-	case "reset":
-		_, cleanup, err = selection.Reset(ctx)
-		*cleanupFuncs = append(*cleanupFuncs, cleanup)
-	case "notify-switch":
-		err = selection.RunSwitchCommands(ctx)
-	default:
-		err = fmt.Errorf("Command not recognized: %s", command)
-	}
+	err = executeCommand(ctx, command, query, session)
 	if err != nil {
+		if err != ERR_NO_SELECTION {
+			derr := srv.DisplayMessage(err.Error())
+			if derr != nil {
+				errors.Join(derr, err)
+			}
+		}
 		return err
 	}
-	err = setupHooks(srv)
+	return setupHooks(srv)
+}
+
+func executeCommand(ctx context.Context, command, query string, session *session) error {
+	switch command {
+	// Internal (undocumented) commands
+	case "list":
+		return list(ctx, session)
+	case "notify-switch":
+		return notifySwitch(ctx, query, session)
+	case "start":
+		return start(ctx, query, session)
+	case "switch":
+		return swtch(ctx, query, session)
+	case "kill":
+		return kill(ctx, query, session)
+	case "reset":
+		return reset(ctx, query, session)
+	default:
+		return ERR_COMMAND_NOT_RECONIZED
+	}
+}
+
+func list(ctx context.Context, session *session) error {
+	return fzf.DisplayProjects(ctx, session.projects, os.Stdout)
+}
+
+func notifySwitch(ctx context.Context, query string, session *session) error {
+	if query == "" {
+		return ERR_NO_SELECTION
+	}
+	selection := getProject(query, session)
+	if selection == nil {
+		return ERR_PROJECT_NOT_FOUND
+	}
+	return selection.RunSwitchCommands(ctx)
+}
+
+func start(ctx context.Context, query string, session *session) error {
+	var selection *project.Project
+	if query != "" {
+		selection = getProject(query, session)
+	} else {
+		if session.config.DefaultProject != nil {
+			selection = getProject(*session.config.DefaultProject, session)
+		} else {
+			selection, _ = fzf.PickProject(ctx, session.config, session.projects)
+		}
+	}
+	if selection == nil {
+		return ERR_NO_SELECTION
+	}
+	return startClient(ctx, selection)
+}
+
+func swtch(ctx context.Context, query string, session *session) error {
+	var selection *project.Project
+	if query != "" {
+		selection = getProject(query, session)
+	} else {
+		selection, _ = fzf.PickProject(ctx, session.config, session.projects)
+	}
+	if selection == nil {
+		return ERR_NO_SELECTION
+	}
+	_, err := selection.Switch(ctx)
 	return err
+}
+
+func kill(ctx context.Context, query string, session *session) error {
+	var selection *project.Project
+	if query != "" {
+		selection = getProject(query, session)
+	} else {
+		selection, _ = fzf.PickProject(ctx, session.config, session.projects)
+	}
+	if selection == nil {
+		return ERR_NO_SELECTION
+	}
+	cleanup, err := selection.Kill(ctx)
+	session.addCleanup(cleanup)
+	return err
+}
+
+func reset(ctx context.Context, query string, session *session) error {
+	var selection *project.Project
+	if query != "" {
+		selection = getProject(query, session)
+	} else {
+		for _, p := range session.projects {
+			status, err := p.Status()
+			if err != nil {
+				return fmt.Errorf("while getting project status for reset: %w", err)
+			}
+			if status == project.PROJECT_STATUS_ATTACHED {
+				selection = p
+				break
+			}
+		}
+	}
+	if selection == nil {
+		return ERR_NO_SELECTION
+	}
+	_, cleanup, err := selection.Reset(ctx)
+	session.addCleanup(cleanup)
+	return err
+}
+
+func startTmuxServer(ctx context.Context, session *session) (*tmux.Server, error) {
+	var srv *tmux.Server
+	if session.config.TmuxSocketPath != nil {
+		srv = tmux.Tmux(ctx, *session.config.TmuxSocketPath)
+	} else {
+		srv = tmux.Tmux(ctx)
+	}
+	err := srv.StartControlMode()
+	if err != nil {
+		return srv, err
+	} else {
+		session.addCleanup(srv.StopControlMode)
+	}
+	return srv, nil
+}
+
+func getProject(query string, session *session) *project.Project {
+	for _, p := range session.projects {
+		if p.Name == query {
+			return p
+		}
+	}
+	return nil
 }
 
 func startClient(ctx context.Context, p *project.Project) error {

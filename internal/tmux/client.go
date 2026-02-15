@@ -75,3 +75,12 @@ func (c *Client) Session() (*Session, error) {
 	}
 	return &Session{Id: id, server: c.server}, nil
 }
+
+func (s *Server) DisplayMessage(message string) error {
+	c, err := s.ActiveClient()
+	if err != nil {
+		return err
+	}
+	_, err = s.command("display-message").withTargetClient(c).withArgument(message).run()
+	return err
+}

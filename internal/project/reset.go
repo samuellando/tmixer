@@ -37,6 +37,12 @@ func (p *Project) Reset(ctx context.Context) (*tmux.Session, func() error, error
 
 	cleanup := func() error { return nil }
 
+	if p.Config == nil {
+		err := fmt.Errorf("Session %s has no project config to reset to", p.Name)
+		event.Errors = append(event.Errors, err.Error())
+		return nil, cleanup, err
+	}
+
 	status, err := p.Status()
 	if err != nil {
 		event.Errors = append(event.Errors, err.Error())
