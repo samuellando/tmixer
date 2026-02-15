@@ -2,10 +2,15 @@ package main
 
 import (
 	"errors"
+
+	"samuellando.com/tmixer/internal/config"
+	"samuellando.com/tmixer/internal/project"
 )
 
 type session struct {
 	cleanupFuncs []func() error
+	projects     []*project.Project
+	config       *config.Config
 }
 
 func newSession() *session {
