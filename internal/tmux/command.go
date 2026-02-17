@@ -60,6 +60,10 @@ func (c cmd) withTargetWindow(t *Window) cmd {
 	return c.withFlag("-t", string(t.Id))
 }
 
+func (c cmd) withTargetSessionWindow(s *Session, t *Window) cmd {
+	return c.withFlag("-t", fmt.Sprintf("%s:%s", s.Id, t.Id))
+}
+
 func (c cmd) withTargetPane(t *Pane) cmd {
 	return c.withFlag("-t", string(t.Id))
 }

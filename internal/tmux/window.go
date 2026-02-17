@@ -62,3 +62,8 @@ func (w *Window) Link(s *Session) error {
 	_, err := w.server.command("link-window").withWindow(w).withTargetSession(s).run()
 	return err
 }
+
+func (w *Window) Unlink(s *Session) error {
+	_, err := w.server.command("unlink-window").withTargetSessionWindow(s, w).run()
+	return err
+}
