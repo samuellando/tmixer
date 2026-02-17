@@ -248,7 +248,7 @@ func reset(ctx context.Context, query string, session *session) error {
 	if selection == nil {
 		return ERR_NO_SELECTION
 	}
-	_, cleanup, err := selection.Reset(ctx)
+	cleanup, err := selection.Reset(ctx)
 	session.addCleanup(cleanup)
 	return err
 }

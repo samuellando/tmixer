@@ -20,8 +20,8 @@ func TestProjectReset(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		initialSession, _ := tc.project.Session()
-		res, cleanup, reserr := tc.project.Reset(ctx)
+		session, _ := tc.project.Session()
+		cleanup, reserr := tc.project.Reset(ctx)
 		status, err := tc.project.Status()
 		if err != nil {
 			t.Error(err)
@@ -31,7 +31,7 @@ func TestProjectReset(t *testing.T) {
 			if !errors.Is(reserr, ErrSessionNotFound) {
 				t.Error("Inactive project should return not found error")
 			}
-			if res != nil {
+			if session != nil {
 				t.Error("Should not return a sesison for inactive projects")
 			}
 			err = cleanup()
@@ -45,18 +45,15 @@ func TestProjectReset(t *testing.T) {
 			if status != tc.initialStatus() {
 				t.Error("Status should match original")
 			}
-			if res.Id == tc.session.Id {
-				t.Error("Status should not match original")
+			if session.Id != tc.session.Id {
+				t.Error("Status should match original")
 			}
-			if !srv.HasSession(initialSession) {
+			if srv.HasSession(session) {
 				t.Error("Original session should still be active")
 			}
 			err = cleanup()
 			if err != nil {
 				t.Error(err)
-			}
-			if srv.HasSession(initialSession) {
-				t.Error("Should kill the original session")
 			}
 		case PROJECT_STATUS_ACTIVE:
 			if reserr != nil {
@@ -65,8 +62,8 @@ func TestProjectReset(t *testing.T) {
 			if status != tc.initialStatus() {
 				t.Error("Status should match original")
 			}
-			if res.Id == tc.session.Id {
-				t.Error("Status should not match original")
+			if session.Id != tc.session.Id {
+				t.Error("Status should match original")
 			}
 			err = cleanup()
 			if err != nil {
@@ -94,12 +91,9 @@ func TestProjectReset_NoConfig(t *testing.T) {
 			fullConfig: &config.Config{},
 			server:     srv,
 		}
-		res, cleanup, resetErr := p.Reset(ctx)
+		cleanup, resetErr := p.Reset(ctx)
 		if resetErr == nil {
 			t.Error("Expected reset error when config is missing")
-		}
-		if res != nil {
-			t.Error("Expected no session on reset error")
 		}
 		if cleanup == nil {
 			t.Fatal("Expected cleanup function even on error")
@@ -121,7 +115,8 @@ func TestProjectResetWindowsAndPanes(t *testing.T) {
 		if tc.initialStatus() == PROJECT_STATUS_INACTIVE {
 			return
 		}
-		res, cleanup, err := tc.project.Reset(ctx)
+		session := tc.session
+		cleanup, err := tc.project.Reset(ctx)
 		cleanup()
 		if err != nil {
 			t.Error(err)
@@ -133,7 +128,7 @@ func TestProjectResetWindowsAndPanes(t *testing.T) {
 		for i := 0; ; i++ {
 			<-ticker
 			if strings.Contains(tc.project.Name, "windows") {
-				windows, err := res.Windows()
+				windows, err := session.Windows()
 				if err != nil {
 					t.Error(err)
 				}
@@ -168,7 +163,7 @@ func TestProjectResetWindowsAndPanes(t *testing.T) {
 					}
 				}
 			} else {
-				windows, err := res.Windows()
+				windows, err := session.Windows()
 				if err != nil {
 					t.Error(err)
 				}
@@ -192,7 +187,7 @@ func TestProjectResetCommands(t *testing.T) {
 		if tc.initialStatus() == PROJECT_STATUS_INACTIVE {
 			return
 		}
-		_, cleanup, err := tc.project.Reset(ctx)
+		cleanup, err := tc.project.Reset(ctx)
 		cleanup()
 		if err != nil {
 			t.Error(err)

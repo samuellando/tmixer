@@ -62,31 +62,47 @@ func (p *Project) createWindows(s *tmux.Session) error {
 		return nil
 	}
 	if len(p.Config.Windows) > 0 {
-		for _, windowConfig := range p.Config.Windows {
-			w, err := s.NewWindow(windowConfig.Name)
-			if err != nil {
-				return fmt.Errorf("when creating window: %w", err)
-			}
-			err = createPanes(w, windowConfig)
-			if err != nil {
-				return err
-			}
-		}
-		// Kill the default window.
-		windows, err := s.Windows()
+		err := createWindows(s, p.Config.Windows)
 		if err != nil {
-			return fmt.Errorf("when listing windows: %w", err)
-		}
-		err = windows[0].Kill()
-		if err != nil {
-			return fmt.Errorf("when killing default window: %w", err)
-		}
-		err = windows[1].Select()
-		if err != nil {
-			return fmt.Errorf("when switching to the first window: %w", err)
+			return err
 		}
 	}
 	return nil
+}
+
+func createWindows(s *tmux.Session, windows []config.WindowConfig) error {
+	if len(windows) == 0 {
+		return nil
+	}
+	// Get the original windows
+	originalWindows, err := s.Windows()
+	if err != nil {
+		return fmt.Errorf("When getting session windows: %w", err)
+	}
+	// Create the windows
+	var firstWindow *tmux.Window
+	for _, windowConfig := range windows {
+		w, err := s.NewWindow(windowConfig.Name)
+		if firstWindow == nil {
+			firstWindow = w
+		}
+		if err != nil {
+			return fmt.Errorf("when creating window: %w", err)
+		}
+		err = createPanes(w, windowConfig)
+		if err != nil {
+			return err
+		}
+	}
+	// Kill the original windows
+	for _, w := range originalWindows {
+		err = w.Kill()
+		if err != nil {
+			return fmt.Errorf("When killing original window: %w", err)
+		}
+	}
+	// Select the first window
+	return firstWindow.Select()
 }
 
 func createPanes(w *tmux.Window, config config.WindowConfig) error {
