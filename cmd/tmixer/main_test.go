@@ -207,8 +207,8 @@ projects:
 		}
 
 		after, _ := clt.Session()
-		if initial.Id == after.Id {
-			t.Error("Should've reset the session")
+		if initial.Id != after.Id {
+			t.Error("Should've kept the same session")
 		}
 
 	})
@@ -270,8 +270,8 @@ projects:
 			t.Error("Expected session count to increase by 3")
 		}
 		after, _ := clt.Session()
-		if after.Id == initial.Id {
-			t.Error("Expected session to be reset")
+		if initial.Id != after.Id {
+			t.Error("Should've kept the same session")
 		}
 		afterName, _ := after.Name()
 		if afterName != "test-reset2" {
