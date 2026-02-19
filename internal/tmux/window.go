@@ -1,7 +1,6 @@
 package tmux
 
 import (
-	"errors"
 	"fmt"
 )
 
@@ -39,9 +38,6 @@ func (w *Window) Select() error {
 
 func (w *Window) Name() (string, error) {
 	lines, err := w.server.command("display").withFlag("-p").withTargetWindow(w).withFormat("#{window_name}").run()
-	if len(lines) == 0 {
-		return "", errors.Join(fmt.Errorf("Got no name"), err)
-	}
 	return lines[0], err
 }
 
@@ -60,10 +56,35 @@ func (w *Window) Panes() ([]*Pane, error) {
 
 func (w *Window) Link(s *Session) error {
 	_, err := w.server.command("link-window").withWindow(w).withTargetSession(s).run()
-	return err
+	if err != nil {
+		return err
+	}
+	// Wait for the window to show up
+	return w.waitForLinkState(s, true)
 }
 
 func (w *Window) Unlink(s *Session) error {
 	_, err := w.server.command("unlink-window").withTargetSessionWindow(s, w).run()
-	return err
+	if err != nil {
+		return err
+	}
+	// Wait for the window to be gone
+	return w.waitForLinkState(s, false)
+}
+
+func (w *Window) waitForLinkState(s *Session, expected bool) error {
+	return timeout(func() (bool, error) {
+		windows, err := s.Windows()
+		if err != nil {
+			return false, err
+		}
+		found := false
+		for _, aw := range windows {
+			if aw.Id == w.Id {
+				found = true
+				break
+			}
+		}
+		return found == expected, nil
+	})
 }
