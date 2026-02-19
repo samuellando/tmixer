@@ -14,8 +14,7 @@ import (
 //
 // Returns a cleanup function that the caller must call.
 //
-// Links all current windows to a temp session, unlinks them from the session
-// and recreates them.
+// # Links all current windows to a temp session that is killed in the cleanup
 //
 // When reseting an attached session, the switch commands will be rerun.
 //

@@ -1,6 +1,7 @@
 package tmux
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -38,6 +39,9 @@ func (w *Window) Select() error {
 
 func (w *Window) Name() (string, error) {
 	lines, err := w.server.command("display").withFlag("-p").withTargetWindow(w).withFormat("#{window_name}").run()
+	if len(lines) == 0 {
+		return "", errors.Join(fmt.Errorf("Got no name"), err)
+	}
 	return lines[0], err
 }
 

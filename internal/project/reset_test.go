@@ -48,7 +48,7 @@ func TestProjectReset(t *testing.T) {
 			if session.Id != tc.session.Id {
 				t.Error("Status should match original")
 			}
-			if srv.HasSession(session) {
+			if !srv.HasSession(session) {
 				t.Error("Original session should still be active")
 			}
 			err = cleanup()
