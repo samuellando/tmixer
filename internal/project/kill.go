@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	"samuellando.com/tmixer/internal/log"
 	"samuellando.com/tmixer/internal/tmux"
 )
@@ -108,4 +109,9 @@ func switchToBestProject(ctx context.Context, p *Project) error {
 		}
 	}
 	return nil
+}
+
+func randomlyRename(s *tmux.Session) (string, error) {
+	uuid := uuid.NewString()
+	return uuid, s.Rename(uuid)
 }

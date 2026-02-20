@@ -265,9 +265,9 @@ func TestProjectRunSwitchCommandsLogs(t *testing.T) {
 
 func TestProjectResetLogs(t *testing.T) {
 	runAllLogTestCases(t, func(ctx context.Context, srv *tmux.Server, out *bytes.Buffer, logger *log.Logger, tc *projectTestCase) {
-		initialSession, _ := tc.project.Session()
+		session, _ := tc.project.Session()
 		// Exec
-		session, cleanup, err := tc.project.Reset(ctx)
+		cleanup, err := tc.project.Reset(ctx)
 		cleanup()
 		if err != nil && !errors.Is(err, ErrSessionNotFound) {
 			t.Error(err)
@@ -290,17 +290,17 @@ func TestProjectResetLogs(t *testing.T) {
 		}
 		// field: InitialSessionId
 		if tc.initialStatus() >= PROJECT_STATUS_ACTIVE {
-			initialSessionId := event["initialSessionId"].(string)
-			if initialSessionId != string(initialSession.Id) {
+			initialSessionId := event["sessionId"].(string)
+			if initialSessionId != string(session.Id) {
 				t.Error("Event initial sessionId does not match")
 			}
 		} else {
-			if _, ok := event["initialSessionId"]; ok {
-				t.Error("Shoukld not have an initial session")
+			if _, ok := event["sessionId"]; ok {
+				t.Error("Should not have an initial session")
 			}
 		}
 		// field: TempSessionName
-		if tc.initialStatus() == PROJECT_STATUS_ATTACHED {
+		if tc.initialStatus() > PROJECT_STATUS_INACTIVE {
 			tempSessionName := event["tempSessionName"].(string)
 			if tempSessionName == "" {
 				t.Error("Should return a temp sesison name if used")
@@ -308,28 +308,6 @@ func TestProjectResetLogs(t *testing.T) {
 		} else {
 			if _, ok := event["tempSessionName"]; ok {
 				t.Error("Shoukld not have a temp session")
-			}
-		}
-		// field: ClientId
-		if tc.initialStatus() == PROJECT_STATUS_ATTACHED {
-			clientId := event["clientId"].(string)
-			if clientId == "" {
-				t.Error("Should return a client id if used")
-			}
-		} else {
-			if _, ok := event["clientId"]; ok {
-				t.Error("Should not use a client")
-			}
-		}
-		// field: FinalSessionId
-		if tc.initialStatus() >= PROJECT_STATUS_ACTIVE {
-			finalSessionId := event["finalSessionId"].(string)
-			if finalSessionId != string(session.Id) {
-				t.Error("Final sesison id should match")
-			}
-		} else {
-			if _, ok := event["finalSessionId"]; ok {
-				t.Error("Should not have a final session")
 			}
 		}
 		// field: Errors

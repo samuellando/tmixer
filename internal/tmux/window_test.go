@@ -76,6 +76,25 @@ func TestPanes(t *testing.T) {
 	})
 }
 
+func TestUnlink(t *testing.T) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+		s1, _ := srv.New("test_session")
+		s2, _ := srv.New("test_session2")
+		s1.NewWindow("extra window")
+		windows, _ := s1.Windows()
+		w := windows[0]
+		err := w.Link(s2)
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.Unlink(s1)
+		windows, _ = s1.Windows()
+		if len(windows) != 1 {
+			t.Fatal("Should have 1 windows")
+		}
+	})
+}
+
 func TestLink(t *testing.T) {
 	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		s1, _ := srv.New("test_session")

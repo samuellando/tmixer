@@ -60,5 +60,35 @@ func (w *Window) Panes() ([]*Pane, error) {
 
 func (w *Window) Link(s *Session) error {
 	_, err := w.server.command("link-window").withWindow(w).withTargetSession(s).run()
-	return err
+	if err != nil {
+		return err
+	}
+	// Wait for the window to show up
+	return w.waitForLinkState(s, true)
+}
+
+func (w *Window) Unlink(s *Session) error {
+	_, err := w.server.command("unlink-window").withTargetSessionWindow(s, w).run()
+	if err != nil {
+		return err
+	}
+	// Wait for the window to be gone
+	return w.waitForLinkState(s, false)
+}
+
+func (w *Window) waitForLinkState(s *Session, expected bool) error {
+	return timeout(func() (bool, error) {
+		windows, err := s.Windows()
+		if err != nil {
+			return false, err
+		}
+		found := false
+		for _, aw := range windows {
+			if aw.Id == w.Id {
+				found = true
+				break
+			}
+		}
+		return found == expected, nil
+	})
 }
