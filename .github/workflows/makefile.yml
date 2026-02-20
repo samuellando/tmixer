@@ -6,27 +6,59 @@ on:
   pull_request:
     branches: [ "main" ]
 
+env:
+  TERM: "xterm-256color"
+
 jobs:
-  build:
-
+  fmt:
     runs-on: ubuntu-latest
-    env:
-      TERM: "xterm-256color"
-
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-go@v5
       with:
         go-version: '1.25.4'
+        cache: true
+    - name: Check fmt
+      run: make check-fmt
 
-    - name: Check TERM environment variable
-      run: echo "TERM is set to $TERM"
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version: '1.25.4'
+        cache: true
+    - uses: golangci/golangci-lint-action@v9
 
-    - name: Install dependencies
-      run: sudo apt-get update && sudo apt-get install -y tmux fzf
+  spell:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: streetsidesoftware/cspell-action@v8
+      with:
+        incremental_files_only: false
 
-    - name: Run check
-      run: make check
-
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version: '1.25.4'
+        cache: true
     - name: Run build
       run: make build
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get install -y tmux fzf
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version: '1.25.4'
+        cache: true
+    - name: Run test
+      run: make test-all
