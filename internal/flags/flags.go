@@ -88,7 +88,7 @@ func ParseArgs(ctx context.Context, args []string, flags map[string]Flag, conf *
 					val = flag.Default
 				}
 				if parseErr := flag.ParseInput(val, conf); parseErr != nil {
-					err = errors.Join(err, fmt.Errorf("WHILE PARSING FLAG %s: %w", name, parseErr))
+					err = errors.Join(err, fmt.Errorf("while parsing flag %s: %w", name, parseErr))
 					event.Errors = append(event.Errors, err.Error())
 					return nil, err
 				}
@@ -105,7 +105,7 @@ func ParseArgs(ctx context.Context, args []string, flags map[string]Flag, conf *
 		if !flagSet[name] && flag.EnvironmentVariable != "" {
 			if val, set := os.LookupEnv(flag.EnvironmentVariable); set {
 				if parseErr := flag.ParseInput(val, conf); parseErr != nil {
-					err = errors.Join(err, fmt.Errorf("WHILE PARSING FLAG ENV VAR %s: %w", name, parseErr))
+					err = errors.Join(err, fmt.Errorf("while parsing flag env var %s: %w", name, parseErr))
 					event.Errors = append(event.Errors, err.Error())
 					return nil, err
 				}

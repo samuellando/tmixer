@@ -64,7 +64,7 @@ var FLAGS = map[string]flags.Flag{
 			} else {
 				v, err = strconv.Atoi(s)
 				if err != nil {
-					return fmt.Errorf("WHILE PARSING LOG RETENTION DAYS: %s", err)
+					return fmt.Errorf("while parsing log retention days: %s", err)
 				}
 			}
 			c.LogRetentionDays = &v

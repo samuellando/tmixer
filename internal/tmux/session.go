@@ -11,7 +11,7 @@ type SessionId string
 
 func parseSessionId(s string) (SessionId, error) {
 	if len(s) == 0 || s[0] != '$' {
-		return "", fmt.Errorf("invalid session id: %q", s)
+		return "", fmt.Errorf("INVALID SESSION ID: %q", s)
 	}
 	return SessionId(s), nil
 }

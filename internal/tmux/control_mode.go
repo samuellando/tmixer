@@ -87,7 +87,7 @@ func (srv *Server) StartControlMode() error {
 
 func (srv *Server) StopControlMode() error {
 	if srv.controlModeClient == nil {
-		return fmt.Errorf("controlMode already closed")
+		return fmt.Errorf("CONTROL MODE ALREADY CLOSED")
 	}
 	defer func() {
 		srv.controlModeClient = nil

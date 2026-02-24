@@ -35,7 +35,7 @@ func (p *Project) Reset(ctx context.Context) (func() error, error) {
 	cleanup := func() error { return nil }
 
 	if p.Config == nil {
-		err := fmt.Errorf("Session %s has no project config to reset to", p.Name)
+		err := fmt.Errorf("SESSION %s HAS NO PROJECT CONFIG TO RESET TO", p.Name)
 		event.Errors = append(event.Errors, err.Error())
 		return cleanup, err
 	}

@@ -53,7 +53,7 @@ func (srv *Server) ActiveClient() (*Client, error) {
 	})
 	cId, err := parseClientId(clientInfos[0].id)
 	if err != nil {
-		return nil, fmt.Errorf("invalid client id: %w", err)
+		return nil, fmt.Errorf("INVALID CLIENT ID: %w", err)
 	}
 	return &Client{Id: cId, server: srv}, nil
 }
