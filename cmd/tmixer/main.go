@@ -187,7 +187,7 @@ func notifySwitch(ctx context.Context, query string, session *session) error {
 	return selection.RunSwitchCommands(ctx)
 }
 
-func start(ctx context.Context, srv *tmux.Server, query string, session *session) error {
+func start(ctx context.Context, srv *tmux.Server, query string, session *session) (err error) {
 	var selection *project.Project
 	if query != "" {
 		selection = getProject(query, session)
@@ -195,7 +195,10 @@ func start(ctx context.Context, srv *tmux.Server, query string, session *session
 		if session.config.DefaultProject != nil {
 			selection = getProject(*session.config.DefaultProject, session)
 		} else {
-			selection, _ = fzf.PickProject(ctx, session.config, session.projects)
+			selection, err = fzf.PickProject(ctx, session.config, session.projects)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	if selection == nil {
@@ -204,26 +207,32 @@ func start(ctx context.Context, srv *tmux.Server, query string, session *session
 	return startClient(ctx, srv, selection)
 }
 
-func runSwitch(ctx context.Context, query string, session *session) error {
+func runSwitch(ctx context.Context, query string, session *session) (err error) {
 	var selection *project.Project
 	if query != "" {
 		selection = getProject(query, session)
 	} else {
-		selection, _ = fzf.PickProject(ctx, session.config, session.projects)
+		selection, err = fzf.PickProject(ctx, session.config, session.projects)
+		if err != nil {
+			return err
+		}
 	}
 	if selection == nil {
 		return ErrNoSelection
 	}
-	_, err := selection.Switch(ctx)
+	_, err = selection.Switch(ctx)
 	return err
 }
 
-func kill(ctx context.Context, query string, session *session) error {
+func kill(ctx context.Context, query string, session *session) (err error) {
 	var selection *project.Project
 	if query != "" {
 		selection = getProject(query, session)
 	} else {
-		selection, _ = fzf.PickProject(ctx, session.config, session.projects)
+		selection, err = fzf.PickProject(ctx, session.config, session.projects)
+		if err != nil {
+			return err
+		}
 	}
 	if selection == nil {
 		return ErrNoSelection

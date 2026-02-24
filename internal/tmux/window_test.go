@@ -32,7 +32,10 @@ func TestKill(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		windows, _ = s.Windows()
+		windows, err = s.Windows()
+		if err != nil {
+			t.Error(err)
+		}
 		found = false
 		for _, window := range windows {
 			if window.Id == w.Id {
@@ -106,7 +109,10 @@ func TestUnlink(t *testing.T) {
 		if err := w.Unlink(s1); err != nil {
 			t.Fatal(err)
 		}
-		windows, _ = s1.Windows()
+		windows, err = s1.Windows()
+		if err != nil {
+			t.Error(err)
+		}
 		if len(windows) != 1 {
 			t.Fatal("Should have 1 windows")
 		}
@@ -123,7 +129,10 @@ func TestLink(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		windows, _ = s2.Windows()
+		windows, err = s2.Windows()
+		if err != nil {
+			t.Error(err)
+		}
 		if len(windows) != 2 {
 			t.Fatal("Should have 2 windows")
 		}

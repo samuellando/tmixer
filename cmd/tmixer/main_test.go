@@ -27,7 +27,10 @@ func TestLogs(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		_ = f.Close()
+		err = f.Close()
+		if err != nil {
+			t.Error(err)
+		}
 		socketFile := filepath.Join(t.TempDir(), "tmux.sock")
 		err = run("-S", socketFile, "--help")
 		if err != nil {
@@ -146,7 +149,10 @@ projects:
 		defer testutil.TeardownTestServer(srv)
 		f := testutil.SetupTestClient(srv, nil)
 		defer func() {
-			_ = f.Close()
+			err = f.Close()
+			if err != nil {
+				t.Error(err)
+			}
 		}()
 
 		err = run("-S", srv.SocketPath, "-c", configFile, "--combineProjects", "false", "switch", "test-switch")
@@ -181,7 +187,10 @@ projects:
 		defer testutil.TeardownTestServer(srv)
 		f := testutil.SetupTestClient(srv, nil)
 		defer func() {
-			_ = f.Close()
+			err = f.Close()
+			if err != nil {
+				t.Error(err)
+			}
 		}()
 
 		clt, _ := srv.ActiveClient()
@@ -205,7 +214,10 @@ projects:
 			t.Fatal(err)
 		}
 
-		sessions, _ = srv.ListSessions()
+		sessions, err = srv.ListSessions()
+		if err != nil {
+			t.Error(err)
+		}
 		if len(sessions) != len(origSessions)+2 {
 			t.Error("Should have one new session + control")
 		}
@@ -240,7 +252,10 @@ projects:
 		defer testutil.TeardownTestServer(srv)
 		f := testutil.SetupTestClient(srv, nil)
 		defer func() {
-			_ = f.Close()
+			err = f.Close()
+			if err != nil {
+				t.Error(err)
+			}
 		}()
 
 		clt, _ := srv.ActiveClient()
@@ -271,7 +286,10 @@ projects:
 			t.Fatal(err)
 		}
 
-		sessions, _ = srv.ListSessions()
+		sessions, err = srv.ListSessions()
+		if err != nil {
+			t.Error(err)
+		}
 		if len(sessions) != len(origSessions)+3 {
 			t.Error("Expected session count to increase by 3")
 		}
@@ -305,7 +323,10 @@ projects:
 		defer testutil.TeardownTestServer(srv)
 		f := testutil.SetupTestClient(srv, nil)
 		defer func() {
-			_ = f.Close()
+			err = f.Close()
+			if err != nil {
+				t.Error(err)
+			}
 		}()
 
 		origSessions, _ := srv.ListSessions()
@@ -326,7 +347,10 @@ projects:
 			t.Fatal(err)
 		}
 
-		sessions, _ = srv.ListSessions()
+		sessions, err = srv.ListSessions()
+		if err != nil {
+			t.Error(err)
+		}
 		if len(sessions) != len(origSessions)+1 {
 			t.Error("Should have one new session")
 		}
@@ -355,7 +379,10 @@ projects:
 		defer testutil.TeardownTestServer(srv)
 		f := testutil.SetupTestClient(srv, nil)
 		defer func() {
-			_ = f.Close()
+			err = f.Close()
+			if err != nil {
+				t.Error(err)
+			}
 		}()
 
 		origSessions, _ := srv.ListSessions()
@@ -387,7 +414,10 @@ projects:
 			t.Fatal(err)
 		}
 
-		sessions, _ = srv.ListSessions()
+		sessions, err = srv.ListSessions()
+		if err != nil {
+			t.Error(err)
+		}
 		if len(sessions) != len(origSessions) {
 			t.Error("Should have killed the unattached session")
 		}

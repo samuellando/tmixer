@@ -109,6 +109,9 @@ func (ptx *ptx) setupResize(stdin *os.File) {
 func (ptx *ptx) resize(stdin *os.File) {
 	ws, err := pty.GetsizeFull(stdin)
 	if err == nil {
-		_ = pty.Setsize(ptx.ptmx, ws)
+		err = pty.Setsize(ptx.ptmx, ws)
+		if err != nil {
+			ptx.errors = append(ptx.errors, err)
+		}
 	}
 }

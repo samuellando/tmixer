@@ -20,7 +20,10 @@ func TestDisplayProjects(t *testing.T) {
 	s, _ := tmux.New("test-session")
 	f := testutil.SetupTestClient(tmux, s)
 	defer func() {
-		_ = f.Close()
+		err := f.Close()
+		if err != nil {
+			t.Error(err)
+		}
 	}()
 	config := &config.Config{
 		Projects: []*config.ProjectConfig{

@@ -25,11 +25,17 @@ func TestSplit(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		panes, _ = w.Panes()
+		panes, err = w.Panes()
+		if err != nil {
+			t.Error(err)
+		}
 		if len(panes) != 2 {
 			t.Fatal("Should have two panes")
 		}
-		panes, _ = w.Panes()
+		panes, err = w.Panes()
+		if err != nil {
+			t.Error(err)
+		}
 		found := false
 		for _, pane := range panes {
 			if pane.Id == p2.Id {
@@ -57,11 +63,17 @@ func TestSplitHorizontally(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		panes, _ = w.Panes()
+		panes, err = w.Panes()
+		if err != nil {
+			t.Error(err)
+		}
 		if len(panes) != 2 {
 			t.Fatal("Should have two panes")
 		}
-		panes, _ = w.Panes()
+		panes, err = w.Panes()
+		if err != nil {
+			t.Error(err)
+		}
 		found := false
 		for _, pane := range panes {
 			if pane.Id == p2.Id {
@@ -89,7 +101,10 @@ func TestKillPane(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		panes, _ = w.Panes()
+		panes, err = w.Panes()
+		if err != nil {
+			t.Error(err)
+		}
 		if len(panes) != 2 {
 			t.Fatal("Should have two panes")
 		}
@@ -97,7 +112,10 @@ func TestKillPane(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		panes, _ = w.Panes()
+		panes, err = w.Panes()
+		if err != nil {
+			t.Error(err)
+		}
 		if len(panes) != 1 {
 			t.Fatal("Should have one pane")
 		}
@@ -225,7 +243,10 @@ func TestWorkingDirectory(t *testing.T) {
 		if err := windows[0].Kill(); err != nil {
 			t.Fatal(err)
 		}
-		windows, _ = s.Windows()
+		windows, err = s.Windows()
+		if err != nil {
+			t.Error(err)
+		}
 		if len(windows) != 3 {
 			t.Fatal("Should have 3 windows")
 		}
