@@ -93,7 +93,7 @@ func (config *Config) LoadFiles(ctx context.Context) error {
 		}
 		err = yaml.Unmarshal(bytes, config)
 		if err != nil {
-			err = fmt.Errorf("While parsing %s: %w", path, err)
+			err = fmt.Errorf("WHILE PARSING %s: %w", path, err)
 			errs = errors.Join(errs, err)
 			event.Errors = append(event.Errors, err.Error())
 			continue

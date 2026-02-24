@@ -150,19 +150,19 @@ func (p *Project) LastActivity() (*time.Time, error) {
 	return session.LastActivity()
 }
 
-// Return wheter or not the project's configure time to live has passed
-// Will always return false if an error orrcurs internally, as well as returning the error
+// Return whether or not the project's configure time to live has passed
+// Will always return false if an error occurs internally, as well as returning the error
 func (p *Project) TtlPassed() (bool, error) {
 	if p.fullConfig.Ttl == nil {
 		return false, nil
 	}
 	ttl, err := time.ParseDuration(*p.fullConfig.Ttl)
 	if err != nil {
-		return false, fmt.Errorf("While checking if ttl has passed: %w", err)
+		return false, fmt.Errorf("while checking if ttl has passed: %w", err)
 	}
 	la, err := p.LastActivity()
 	if err != nil {
-		return false, fmt.Errorf("While checking if ttl has passed: %w", err)
+		return false, fmt.Errorf("while checking if ttl has passed: %w", err)
 	}
 	return time.Since(*la) >= ttl, nil
 }

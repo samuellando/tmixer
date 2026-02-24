@@ -2,6 +2,7 @@ package fzf
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -14,7 +15,7 @@ import (
 	"samuellando.com/tmixer/internal/project"
 )
 
-func PickProject(ctx context.Context, config *config.Config, projects []*project.Project) (*project.Project, error) {
+func PickProject(ctx context.Context, config *config.Config, projects []*project.Project) (selection *project.Project, err error) {
 	type pickProjectEvent struct {
 		Args         []string `json:"args"`
 		Output       string   `json:"output"`
@@ -39,10 +40,12 @@ func PickProject(ctx context.Context, config *config.Config, projects []*project
 			event.Errors = append(event.Errors, err.Error())
 			return nil, err
 		}
-		defer term.Restore(fd, oldState)
+		defer func() {
+			err = errors.Join(err, term.Restore(fd, oldState))
+		}()
 	}
 
-	// Run the command in a ptx for consistency accross envs
+	// Run the command in a ptx for consistency across envs
 	cmd := exec.Command("fzf", config.FzfFlags...)
 	event.Args = cmd.Args
 	ptx, err := startPty(cmd, os.Stdin, os.Stdout)
@@ -51,13 +54,18 @@ func PickProject(ctx context.Context, config *config.Config, projects []*project
 		event.Errors = append(event.Errors, err.Error())
 		return nil, err
 	}
-	defer ptx.Close()
+	defer func() {
+		err = errors.Join(err, ptx.Close())
+	}()
 
 	// Now pipe in the projects to fzf
 	displayErrs := make(chan error)
 	go func() {
 		err := DisplayProjects(ctx, projects, ptx)
-		ptx.CloseInPipe()
+		if err != nil {
+			event.Errors = append(event.Errors, err.Error())
+		}
+		err = ptx.CloseInPipe()
 		if err != nil {
 			event.Errors = append(event.Errors, err.Error())
 		}
@@ -81,11 +89,12 @@ func PickProject(ctx context.Context, config *config.Config, projects []*project
 	event.Output = string(out)
 	name, err := parseOutput(string(out))
 	if err != nil {
+		return nil, err
 	}
 	event.ParsedOutput = name
 	selected := getSelectedProject(name, projects)
 	if selected == nil {
-		return nil, fmt.Errorf("No project selected")
+		return nil, fmt.Errorf("NO PROJECT SELECTED")
 	} else {
 		return selected, nil
 	}

@@ -1,6 +1,7 @@
 package tmux
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -8,7 +9,7 @@ type paneId string
 
 func parsePaneId(s string) (paneId, error) {
 	if len(s) == 0 || s[0] != '%' {
-		return "", fmt.Errorf("invalid pane id: %q", s)
+		return "", fmt.Errorf("INVALID PANE ID: %q", s)
 	}
 	return paneId(s), nil
 }
@@ -21,7 +22,7 @@ type Pane struct {
 func (p *Pane) GetOption(key string) (string, error) {
 	lines, err := p.server.command("show-options").withTargetPane(p).withArgument(key).withFlag("-v").withFlag("-q").run()
 	if len(lines) == 0 {
-		return "", fmt.Errorf("Got no output: %w", err)
+		return "", errors.Join(fmt.Errorf("GOT NO OUTPUT"), err)
 	}
 	return lines[0], err
 }
@@ -36,7 +37,7 @@ func (p *Pane) Split() (*Pane, error) {
 		return nil, err
 	}
 	if len(lines) == 0 {
-		return nil, fmt.Errorf("Got no pane")
+		return nil, fmt.Errorf("GOT NO PANE")
 	}
 	id, err := parsePaneId(lines[0])
 	if err != nil {
@@ -55,7 +56,7 @@ func (p *Pane) SplitHorizontally() (*Pane, error) {
 		return nil, err
 	}
 	if len(lines) == 0 {
-		return nil, fmt.Errorf("Got no pane")
+		return nil, fmt.Errorf("GOT NO PANE")
 	}
 	id, err := parsePaneId(lines[0])
 	if err != nil {

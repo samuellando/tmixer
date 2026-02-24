@@ -12,13 +12,13 @@ import (
 // and runs the switch commands.
 // If no session is running one will be started.
 func (p *Project) Switch(ctx context.Context) (*tmux.Session, error) {
-	type projecSwitchEvent struct {
+	type projectSwitchEvent struct {
 		Name      string         `json:"name"`
 		SessionId tmux.SessionId `json:"sessionId"`
 		ClientId  tmux.ClientId  `json:"clientId"`
 		Errors    []string       `json:"errors,omitempty"`
 	}
-	event := &projecSwitchEvent{Name: p.Name}
+	event := &projectSwitchEvent{Name: p.Name}
 	finish := log.Track(ctx, "projectSwitchEvent", event)
 	defer finish()
 	session, err := p.Start(ctx)

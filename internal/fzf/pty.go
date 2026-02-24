@@ -1,6 +1,7 @@
 package fzf
 
 import (
+	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -16,10 +17,11 @@ type ptx struct {
 	outPipe io.ReadCloser
 	inPipe  io.WriteCloser
 	signal  chan os.Signal
+	errors  []error
 }
 
 // Starts the command in a PTY, with the special ability to pipe in
-// data from another program and get the std out seperately from whats displayed
+// data from another program and get the std out separately from whats displayed
 // on the TTY.
 //
 // # Calls cmd.Start
@@ -55,22 +57,34 @@ func startPty(cmd *exec.Cmd, stdin *os.File, stdout *os.File) (*ptx, error) {
 
 	ptx.setupResize(stdin)
 
-	go io.Copy(ptmx, stdin)
-	go io.Copy(stdout, ptmx)
+	go func() {
+		_, err = io.Copy(ptmx, stdin)
+		ptx.errors = append(ptx.errors, err)
+	}()
+	go func() {
+		_, err = io.Copy(stdout, ptmx)
+		ptx.errors = append(ptx.errors, err)
+	}()
 
 	return ptx, nil
 }
 
-func (ptx *ptx) Close() {
-	ptx.CloseInPipe()
-	ptx.ptmx.Close()
-	ptx.tty.Close()
+func (ptx *ptx) Close() error {
+	var err error
+	inErr := ptx.CloseInPipe()
+	if inErr != nil && !errors.Is(inErr, os.ErrClosed) {
+		err = inErr
+	}
+	err = errors.Join(err, ptx.ptmx.Close())
+	err = errors.Join(err, ptx.tty.Close())
 	signal.Stop(ptx.signal)
 	close(ptx.signal)
+	err = errors.Join(err, errors.Join(ptx.errors...))
+	return err
 }
 
-func (ptx *ptx) CloseInPipe() {
-	ptx.inPipe.Close()
+func (ptx *ptx) CloseInPipe() error {
+	return ptx.inPipe.Close()
 }
 
 func (ptx *ptx) Read(p []byte) (n int, err error) {

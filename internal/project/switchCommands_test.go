@@ -56,7 +56,7 @@ func TestProjectRunSwitchCommands(t *testing.T) {
 		err := tc.project.RunSwitchCommands(ctx)
 		if tc.initialStatus() == PROJECT_STATUS_INACTIVE {
 			if err != ErrSessionNotFound {
-				t.Error("Should retrun sesison not found error for inactive projects")
+				t.Error("Should return session not found error for inactive projects")
 			}
 		} else {
 			if err != nil {

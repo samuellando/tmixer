@@ -21,26 +21,29 @@ func TestProjectReset(t *testing.T) {
 			t.Error(err)
 		}
 		session, _ := tc.project.Session()
-		cleanup, reserr := tc.project.Reset(ctx)
+		cleanup, resetErr := tc.project.Reset(ctx)
 		status, err := tc.project.Status()
 		if err != nil {
 			t.Error(err)
 		}
 		switch tc.initialStatus() {
 		case PROJECT_STATUS_INACTIVE:
-			if !errors.Is(reserr, ErrSessionNotFound) {
+			if !errors.Is(resetErr, ErrSessionNotFound) {
 				t.Error("Inactive project should return not found error")
 			}
 			if session != nil {
-				t.Error("Should not return a sesison for inactive projects")
+				t.Error("Should not return a session for inactive projects")
 			}
 			err = cleanup()
 			if err != nil {
 				t.Error(err)
 			}
+			if err != nil {
+				t.Error(err)
+			}
 		case PROJECT_STATUS_ATTACHED:
-			if reserr != nil {
-				t.Error(reserr)
+			if resetErr != nil {
+				t.Error(resetErr)
 			}
 			if status != tc.initialStatus() {
 				t.Error("Status should match original")
@@ -55,9 +58,12 @@ func TestProjectReset(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
+			if err != nil {
+				t.Error(err)
+			}
 		case PROJECT_STATUS_ACTIVE:
-			if reserr != nil {
-				t.Error(reserr)
+			if resetErr != nil {
+				t.Error(resetErr)
 			}
 			if status != tc.initialStatus() {
 				t.Error("Status should match original")
@@ -66,6 +72,9 @@ func TestProjectReset(t *testing.T) {
 				t.Error("Status should match original")
 			}
 			err = cleanup()
+			if err != nil {
+				t.Error(err)
+			}
 			if err != nil {
 				t.Error(err)
 			}
@@ -102,6 +111,9 @@ func TestProjectReset_NoConfig(t *testing.T) {
 		if cleanupErr != nil {
 			t.Error(cleanupErr)
 		}
+		if cleanupErr != nil {
+			t.Error(cleanupErr)
+		}
 		expected := fmt.Sprintf("Session %s has no project config to reset to", p.Name)
 		if resetErr != nil && resetErr.Error() != expected {
 			t.Errorf("Expected error %q got %q", expected, resetErr.Error())
@@ -117,7 +129,9 @@ func TestProjectResetWindowsAndPanes(t *testing.T) {
 		}
 		session := tc.session
 		cleanup, err := tc.project.Reset(ctx)
-		cleanup()
+		if err := cleanup(); err != nil {
+			t.Error(err)
+		}
 		if err != nil {
 			t.Error(err)
 		}
@@ -188,35 +202,37 @@ func TestProjectResetCommands(t *testing.T) {
 			return
 		}
 		cleanup, err := tc.project.Reset(ctx)
-		cleanup()
+		if err := cleanup(); err != nil {
+			t.Error(err)
+		}
 		if err != nil {
 			t.Error(err)
 		}
 		ticker := time.Tick(time.Second)
-	tickloop:
+	tickLoop:
 		for i := 1; ; i++ {
 			<-ticker
 			ls, err := os.ReadDir(tc.project.Config.Directory)
 			if err != nil {
 				if i == maxAttempts {
 					t.Error(err)
-					break tickloop
+					break tickLoop
 				}
-				continue tickloop
+				continue tickLoop
 			}
 			if strings.Contains(tc.project.Name, "switch") && tc.initialStatus() == PROJECT_STATUS_ATTACHED {
 				if len(ls) == len(switchCommands) {
-					break tickloop
+					break tickLoop
 				} else if i == maxAttempts {
 					t.Errorf("Expected %d files from switch commands got %d", len(switchCommands), len(ls))
-					break tickloop
+					break tickLoop
 				}
 			} else {
 				if len(ls) == 0 {
-					break tickloop
+					break tickLoop
 				} else if i == maxAttempts {
 					t.Errorf("Expected 0 files from switch commands got %d in %s", len(ls), tc.project.Config.Directory)
-					break tickloop
+					break tickLoop
 				}
 			}
 		}

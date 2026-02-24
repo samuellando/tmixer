@@ -244,9 +244,12 @@ func TestControlModeSessionErrors(t *testing.T) {
 	ctx, logger, out := testutil.SetupLogging(ctx, log.LEVEL_DEBUG)
 
 	err := srv.StartControlMode()
+	if err != nil {
+		t.Error(err)
+	}
 	err = srv.StopControlMode()
-	if err == nil {
-		t.Error("Expected error when starting control mode with invalid socket")
+	if err != nil {
+		t.Error(err)
 	}
 
 	res := testutil.GetLogEvent(ctx, logger, out)

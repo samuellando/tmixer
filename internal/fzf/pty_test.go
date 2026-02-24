@@ -1,6 +1,7 @@
 package fzf
 
 import (
+	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -15,25 +16,26 @@ func TestStartPtyEcho(t *testing.T) {
 	}
 	stdoutR, stdoutW, err := os.Pipe()
 	if err != nil {
-		stdinR.Close()
-		stdinW.Close()
+		err = errors.Join(err, stdinR.Close())
+		err = errors.Join(err, stdinW.Close())
 		t.Fatalf("stdout pipe: %v", err)
 	}
 	cmd := exec.Command("cat")
 	ptx, err := startPty(cmd, stdinR, stdoutW)
 	if err != nil {
-		stdinR.Close()
-		stdinW.Close()
-		stdoutR.Close()
-		stdoutW.Close()
+		err = errors.Join(err, stdinR.Close())
+		err = errors.Join(err, stdinW.Close())
+		err = errors.Join(err, stdoutR.Close())
+		err = errors.Join(err, stdoutW.Close())
 		t.Fatalf("startPty: %v", err)
 	}
 	t.Cleanup(func() {
-		ptx.Close()
-		stdinR.Close()
-		stdinW.Close()
-		stdoutR.Close()
-		stdoutW.Close()
+		err = errors.Join(err, stdinW.Close())
+		err = errors.Join(err, stdoutR.Close())
+		err = errors.Join(err, stdoutW.Close())
+		if err != nil {
+			t.Error(err)
+		}
 	})
 
 	payload := "hello from pty\n"
@@ -51,7 +53,10 @@ func TestStartPtyEcho(t *testing.T) {
 	if _, err := ptx.Write([]byte(payload)); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	ptx.CloseInPipe()
+	err = ptx.CloseInPipe()
+	if err != nil {
+		t.Error(err)
+	}
 
 	waitCh := make(chan error, 1)
 	go func() {
@@ -86,15 +91,18 @@ func TestStartPtyMissingBinary(t *testing.T) {
 	}
 	stdoutR, stdoutW, err := os.Pipe()
 	if err != nil {
-		stdinR.Close()
-		stdinW.Close()
+		err = errors.Join(err, stdinR.Close())
+		err = errors.Join(err, stdinW.Close())
 		t.Fatalf("stdout pipe: %v", err)
 	}
 	t.Cleanup(func() {
-		stdinR.Close()
-		stdinW.Close()
-		stdoutR.Close()
-		stdoutW.Close()
+		err := errors.Join(err, stdinR.Close())
+		err = errors.Join(err, stdinW.Close())
+		err = errors.Join(err, stdoutR.Close())
+		err = errors.Join(err, stdoutW.Close())
+		if err != nil {
+			t.Error(err)
+		}
 	})
 
 	cmd := exec.Command("tmixer__missing_binary")

@@ -40,7 +40,7 @@ func TestProjectSwitchCreatesAttachesSession(t *testing.T) {
 		}
 		if tc.initialStatus() != PROJECT_STATUS_INACTIVE {
 			if tc.session.Id != session.Id {
-				t.Error("Should attach to existing sesison")
+				t.Error("Should attach to existing session")
 			}
 		}
 	})

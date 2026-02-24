@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os/exec"
@@ -38,7 +39,7 @@ type controlModeSession struct {
 const CONTROL_SESSION_NAME = "__tmixer_control__"
 
 func (srv *Server) StartControlMode() error {
-	// Create the contorl mode sesison object
+	// Create the control mode session object
 	session := &controlModeSession{}
 	finish := log.Track(srv.ctx, "controlModeSession", session)
 	client := controlModeClient{
@@ -46,7 +47,7 @@ func (srv *Server) StartControlMode() error {
 		finishLog:  finish,
 	}
 
-	// Setup the actuall command to run
+	// Setup the actual command to run
 	cmd := srv.command("new-session")
 	cmd = cmd.withTmuxFlag("-C").withFlag("-A").withSession(CONTROL_SESSION_NAME)
 	// Escape and setup stdin and stdout
@@ -101,9 +102,14 @@ func (srv *Server) StopControlMode() error {
 		session.Errors = append(session.Errors, err.Error())
 		return err
 	}
-	srv.controlModeClient.readMessage(nil)
-	err = srv.controlModeClient.controlModeCmd.Wait()
+	_, err = srv.controlModeClient.readMessage(nil)
 	if err != nil {
+		err = fmt.Errorf("when waiting for emptying output %w", err)
+		session.Errors = append(session.Errors, err.Error())
+	}
+	err = srv.controlModeClient.controlModeCmd.Wait()
+	var exitErr *exec.ExitError
+	if err != nil && !errors.As(err, &exitErr) {
 		err = fmt.Errorf("when waiting for exit %w", err)
 		session.Errors = append(session.Errors, err.Error())
 		return err
@@ -156,7 +162,7 @@ func (client *controlModeClient) sendCommand(ctx context.Context, c cmd) ([]stri
 
 	_, err := client.controlModeStdIn.Write([]byte(c.String() + "\n"))
 	if err != nil {
-		err = fmt.Errorf("Failed to write to stdin: %w", err)
+		err = fmt.Errorf("failed to write to stdin: %w", err)
 		event.Errors = append(event.Errors, err.Error())
 		return nil, err
 	}
@@ -214,7 +220,7 @@ func (client *controlModeClient) readMessage(event *commandEvent) ([]string, err
 		}
 		return out, err
 	default:
-		err := fmt.Errorf("Critical read error")
+		err := fmt.Errorf("CRITICAL READ ERROR")
 		if event != nil {
 			event.Errors = append(event.Errors, err.Error())
 		}

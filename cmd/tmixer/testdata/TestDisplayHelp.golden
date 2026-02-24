@@ -3,11 +3,11 @@ tmixer [flags] [command] [project_name]
 Commands:
 
 All commands will by default open fzf if no project_name is provided. Except for 
-the start command, which will start the configued default project in a new tmux client, 
+the start command, which will start the configured default project in a new tmux client, 
 and the reset command, which will reset the attached session.
 
 switch (default)
-	switch the active tmux client to the project. It will eitehr switch to the 
+	switch the active tmux client to the project. It will either switch to the 
 	existing session or start a session for the project, open it's configured 
 	startup windows and then switch to it.
 
@@ -19,7 +19,7 @@ switch (default)
 
 start
 	Equivalent to starting tmux normally, but will open into a project. By
-	default it starts the defualt configured project.
+	default it starts the default configured project.
 
 kill
 	kill the session/project.
@@ -30,7 +30,7 @@ reset
 Flags: 
 
 --combineProjects
-	Wheter projects from all config files should be combined or overridden, --config > ~/.tmixer.yml > ~/.config/tmixer/config.yml
+	Whether projects from all config files should be combined or overridden, --config > ~/.tmixer.yml > ~/.config/tmixer/config.yml
 	Usage: --combineProjects false
 	Default: true
 	EnvVar: $TMIXER_COMBINE_PROJECTS

@@ -18,7 +18,7 @@ func TestInitializeWideEvent(t *testing.T) {
 	}
 }
 
-// Recalling on an alredy initialied context should return the same context
+// Recalling on an already initialized context should return the same context
 func TestInitializeWideEventAlreadyInitialized(t *testing.T) {
 	ctx := context.Background()
 	ctx = log.InitializeWideEvent(ctx, nil)
@@ -40,8 +40,8 @@ func TestTrackNotInitialized(t *testing.T) {
 	log.Track(context.Background(), "testEvent", &TestEvent{})()
 }
 
-// Base case for the Track method, test that the fields are transfered to the
-// logs and that the time and durations asre added
+// Base case for the Track method, test that the fields are transferred to the
+// logs and that the time and durations are added
 func TestTrack(t *testing.T) {
 	ctx := context.Background()
 	ctx, logger, out := testutil.SetupLogging(ctx, log.LEVEL_DEBUG)
@@ -98,7 +98,7 @@ func TestTrackTimeDuration(t *testing.T) {
 
 	duration := event["duration"].(float64)
 	if time.Duration(duration) < time.Second {
-		t.Errorf("duration should be ~ a secound")
+		t.Errorf("duration should be ~ a second")
 	}
 }
 

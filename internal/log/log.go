@@ -49,6 +49,9 @@ func (log *Logger) logEvent(event WideEvent) {
 		panic(err)
 	}
 	for _, w := range log.w {
-		fmt.Fprintln(w, string(b))
+		_, err = fmt.Fprintln(w, string(b))
+		if err != nil {
+			panic(err)
+		}
 	}
 }

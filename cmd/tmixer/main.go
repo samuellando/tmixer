@@ -18,9 +18,9 @@ import (
 	"samuellando.com/tmixer/internal/tmux"
 )
 
-var ERR_NO_SELECTION = errors.New("No selection made")
-var ERR_PROJECT_NOT_FOUND = errors.New("Project not found")
-var ERR_COMMAND_NOT_RECONIZED = errors.New("Command not recognized")
+var ErrNoSelection = errors.New("NO SELECTION MADE")
+var ErrProjectNotFound = errors.New("PROJECT NOT FOUND")
+var ErrCommandNotRecognized = errors.New("COMMAND NOT RECOGNIZED")
 
 func main() {
 	err := run(os.Args[1:]...)
@@ -29,15 +29,17 @@ func main() {
 	}
 }
 
-func run(args ...string) error {
+func run(args ...string) (err error) {
 	session := newSession()
-	defer session.close()
+	defer func() {
+		err = errors.Join(err, session.close())
+	}()
 	// init the logging event
 	ctx := context.Background()
 	ctx = log.InitializeWideEvent(ctx, &log.LoggerOptions{Level: log.LEVEL_INFO})
-	// Parse the arguments before seetting up logging in case there's a extra log file
+	// Parse the arguments before setting up logging in case there's a extra log file
 	session.config = config.New()
-	_, err := flags.ParseArgs(ctx, args, FLAGS, session.config)
+	_, err = flags.ParseArgs(ctx, args, FLAGS, session.config)
 	if err != nil {
 		fmt.Println(err)
 		fmt.Println()
@@ -52,7 +54,9 @@ func run(args ...string) error {
 	}
 	defer func() {
 		for _, f := range files {
-			f.Close()
+			defer func() {
+				err = errors.Join(err, f.Close())
+			}()
 		}
 	}()
 	// --help flag
@@ -95,7 +99,7 @@ func runTmixer(ctx context.Context, args []string, session *session) error {
 	if err != nil {
 		event.Errors = append(event.Errors, err.Error())
 	}
-	// If any error occured before this point we should display it
+	// If any error occurred before this point we should display it
 	if len(event.Errors) != 0 {
 		errs := strings.Join(event.Errors, ", ")
 		err := srv.DisplayMessage(errs)
@@ -127,7 +131,7 @@ func runTmixer(ctx context.Context, args []string, session *session) error {
 		return err
 	}
 	// Finally run the command
-	var query string = ""
+	query := ""
 	if len(args) >= 2 {
 		query = args[1]
 	}
@@ -135,12 +139,12 @@ func runTmixer(ctx context.Context, args []string, session *session) error {
 	if err != nil {
 		return err
 	}
-	err = executeCommand(ctx, command, query, session)
+	err = executeCommand(ctx, srv, command, query, session)
 	if err != nil {
-		if err != ERR_NO_SELECTION {
-			derr := srv.DisplayMessage(err.Error())
-			if derr != nil {
-				errors.Join(derr, err)
+		if err != ErrNoSelection {
+			displayError := srv.DisplayMessage(err.Error())
+			if displayError != nil {
+				err = errors.Join(displayError, err)
 			}
 		}
 		return err
@@ -148,7 +152,7 @@ func runTmixer(ctx context.Context, args []string, session *session) error {
 	return setupHooks(srv)
 }
 
-func executeCommand(ctx context.Context, command, query string, session *session) error {
+func executeCommand(ctx context.Context, srv *tmux.Server, command, query string, session *session) error {
 	switch command {
 	// Internal (undocumented) commands
 	case "list":
@@ -156,15 +160,15 @@ func executeCommand(ctx context.Context, command, query string, session *session
 	case "notify-switch":
 		return notifySwitch(ctx, query, session)
 	case "start":
-		return start(ctx, query, session)
+		return start(ctx, srv, query, session)
 	case "switch":
-		return swtch(ctx, query, session)
+		return runSwitch(ctx, query, session)
 	case "kill":
 		return kill(ctx, query, session)
 	case "reset":
 		return reset(ctx, query, session)
 	default:
-		return ERR_COMMAND_NOT_RECONIZED
+		return ErrCommandNotRecognized
 	}
 }
 
@@ -174,16 +178,16 @@ func list(ctx context.Context, session *session) error {
 
 func notifySwitch(ctx context.Context, query string, session *session) error {
 	if query == "" {
-		return ERR_NO_SELECTION
+		return ErrNoSelection
 	}
 	selection := getProject(query, session)
 	if selection == nil {
-		return ERR_PROJECT_NOT_FOUND
+		return ErrProjectNotFound
 	}
 	return selection.RunSwitchCommands(ctx)
 }
 
-func start(ctx context.Context, query string, session *session) error {
+func start(ctx context.Context, srv *tmux.Server, query string, session *session) error {
 	var selection *project.Project
 	if query != "" {
 		selection = getProject(query, session)
@@ -195,12 +199,12 @@ func start(ctx context.Context, query string, session *session) error {
 		}
 	}
 	if selection == nil {
-		return ERR_NO_SELECTION
+		return ErrNoSelection
 	}
-	return startClient(ctx, selection)
+	return startClient(ctx, srv, selection)
 }
 
-func swtch(ctx context.Context, query string, session *session) error {
+func runSwitch(ctx context.Context, query string, session *session) error {
 	var selection *project.Project
 	if query != "" {
 		selection = getProject(query, session)
@@ -208,7 +212,7 @@ func swtch(ctx context.Context, query string, session *session) error {
 		selection, _ = fzf.PickProject(ctx, session.config, session.projects)
 	}
 	if selection == nil {
-		return ERR_NO_SELECTION
+		return ErrNoSelection
 	}
 	_, err := selection.Switch(ctx)
 	return err
@@ -222,7 +226,7 @@ func kill(ctx context.Context, query string, session *session) error {
 		selection, _ = fzf.PickProject(ctx, session.config, session.projects)
 	}
 	if selection == nil {
-		return ERR_NO_SELECTION
+		return ErrNoSelection
 	}
 	cleanup, err := selection.Kill(ctx)
 	session.addCleanup(cleanup)
@@ -246,7 +250,7 @@ func reset(ctx context.Context, query string, session *session) error {
 		}
 	}
 	if selection == nil {
-		return ERR_NO_SELECTION
+		return ErrNoSelection
 	}
 	cleanup, err := selection.Reset(ctx)
 	session.addCleanup(cleanup)
@@ -278,13 +282,13 @@ func getProject(query string, session *session) *project.Project {
 	return nil
 }
 
-func startClient(ctx context.Context, p *project.Project) error {
+func startClient(ctx context.Context, srv *tmux.Server, p *project.Project) error {
 	_, err := p.Start(ctx)
 	if err != nil {
 		return err
 	}
 	if _, is_set := os.LookupEnv("TMUX"); is_set {
-		return fmt.Errorf("Already in TMUX")
+		return fmt.Errorf("ALREADY IN TMUX")
 	}
 	cmd := exec.Command("tmux", "-u", "attach", "-t", p.TmuxSessionName())
 	cmd.Stdin = os.Stdin
@@ -294,12 +298,20 @@ func startClient(ctx context.Context, p *project.Project) error {
 	if err != nil {
 		return err
 	}
-	p.RunSwitchCommands(ctx)
+	var errs error
+	err = p.RunSwitchCommands(ctx)
+	if err != nil {
+		errs = errors.Join(errs, err)
+		err = srv.DisplayMessage(err.Error())
+		if err != nil {
+			errs = errors.Join(errs, err)
+		}
+	}
 	err = cmd.Wait()
 	if err != nil {
-		return err
+		errs = errors.Join(errs, err)
 	}
-	return nil
+	return errs
 }
 
 func setupHooks(tmux *tmux.Server) error {
@@ -368,11 +380,11 @@ func displayHelp() {
 Commands:
 
 All commands will by default open fzf if no project_name is provided. Except for 
-the start command, which will start the configued default project in a new tmux client, 
+the start command, which will start the configured default project in a new tmux client, 
 and the reset command, which will reset the attached session.
 
 switch (default)
-	switch the active tmux client to the project. It will eitehr switch to the 
+	switch the active tmux client to the project. It will either switch to the 
 	existing session or start a session for the project, open it's configured 
 	startup windows and then switch to it.
 
@@ -384,7 +396,7 @@ switch (default)
 
 start
 	Equivalent to starting tmux normally, but will open into a project. By
-	default it starts the defualt configured project.
+	default it starts the default configured project.
 
 kill
 	kill the session/project.

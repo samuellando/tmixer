@@ -16,20 +16,20 @@ import (
 //
 // # Links all current windows to a temp session that is killed in the cleanup
 //
-// When reseting an attached session, the switch commands will be rerun.
+// When resetting an attached session, the switch commands will be rerun.
 //
 // If no session exists, will return ErrSessionNotFound.
 // If there is no project config, will return an error.
 func (p *Project) Reset(ctx context.Context) (func() error, error) {
-	type projecResetEvent struct {
+	type projectResetEvent struct {
 		Name            string         `json:"name"`
 		SessionId       tmux.SessionId `json:"sessionId,omitempty"`
 		TempSessionName string         `json:"tempSessionName,omitempty"`
 		InitialStatus   ProjectStatus  `json:"initialStatus"`
 		Errors          []string       `json:"errors,omitempty"`
 	}
-	event := &projecResetEvent{Name: p.Name}
-	finish := log.Track(ctx, "projecResetEvent", event)
+	event := &projectResetEvent{Name: p.Name}
+	finish := log.Track(ctx, "projectResetEvent", event)
 	defer finish()
 
 	cleanup := func() error { return nil }
@@ -65,13 +65,13 @@ func (p *Project) Reset(ctx context.Context) (func() error, error) {
 	originalWindows, err := session.Windows()
 	if err != nil {
 		event.Errors = append(event.Errors, err.Error())
-		return cleanup, fmt.Errorf("When getting session windows: %w", err)
+		return cleanup, fmt.Errorf("when getting session windows: %w", err)
 	}
 	for _, w := range originalWindows {
 		err = w.Link(temp)
 		if err != nil {
 			event.Errors = append(event.Errors, err.Error())
-			return cleanup, fmt.Errorf("When linking window to temp session: %w", err)
+			return cleanup, fmt.Errorf("when linking window to temp session: %w", err)
 		}
 	}
 
@@ -83,7 +83,7 @@ func (p *Project) Reset(ctx context.Context) (func() error, error) {
 	err = resetWindows(session, originalWindows, windows)
 	if err != nil {
 		event.Errors = append(event.Errors, err.Error())
-		return cleanup, fmt.Errorf("when reseting windows: %w", err)
+		return cleanup, fmt.Errorf("when resetting windows: %w", err)
 	}
 
 	if status == PROJECT_STATUS_ATTACHED {
@@ -97,22 +97,22 @@ func (p *Project) Reset(ctx context.Context) (func() error, error) {
 }
 
 func resetWindows(session *tmux.Session, originalWindows []*tmux.Window, windows []config.WindowConfig) error {
-	// Need to kepp at least one window before unlinking
+	// Need to keep at least one window before unlinking
 	_, err := session.NewWindow("temp")
 	if err != nil {
-		return fmt.Errorf("When creating a temp window: %w", err)
+		return fmt.Errorf("when creating a temp window: %w", err)
 	}
 	// Unlink the original windows
 	for _, w := range originalWindows {
 		err = w.Unlink(session)
 		if err != nil {
-			return fmt.Errorf("When unlinking window from session: %w", err)
+			return fmt.Errorf("when unlinking window from session: %w", err)
 		}
 	}
 	// Re-create the windows
 	err = createWindows(session, windows)
 	if err != nil {
-		return fmt.Errorf("When recreating windows: %w", err)
+		return fmt.Errorf("when recreating windows: %w", err)
 	}
 	return nil
 }

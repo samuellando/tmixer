@@ -122,9 +122,14 @@ func TestSendKeysAndCapture(t *testing.T) {
 		panes, _ := w.Panes()
 		p := panes[0]
 		time.Sleep(2 * time.Second)
-		p.SendKeys("expr 12 \\* 88")
+		if err := p.SendKeys("expr 12 \\* 88"); err != nil {
+			t.Fatal(err)
+		}
 		time.Sleep(2 * time.Second)
-		out, _ := p.Capture()
+		out, err := p.Capture()
+		if err != nil {
+			t.Fatal(err)
+		}
 		found := false
 		for _, line := range out {
 			if strings.Contains(line, "1056") {
@@ -146,9 +151,14 @@ func TestSendCommandAndCapture(t *testing.T) {
 		panes, _ := w.Panes()
 		p := panes[0]
 		time.Sleep(2 * time.Second)
-		p.SendCommand([]string{"bash", "-c", "\"expr 12 \\* 88\""})
+		if err := p.SendCommand([]string{"bash", "-c", "\"expr 12 \\* 88\""}); err != nil {
+			t.Fatal(err)
+		}
 		time.Sleep(2 * time.Second)
-		out, _ := p.Capture()
+		out, err := p.Capture()
+		if err != nil {
+			t.Fatal(err)
+		}
 		found := false
 		for _, line := range out {
 			if strings.Contains(line, "1056") {
@@ -163,7 +173,7 @@ func TestSendCommandAndCapture(t *testing.T) {
 
 func TestPaneOptions(t *testing.T) {
 	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
-		name := "test_sess_name"
+		name := "test_session_name"
 		s, _ := srv.New(name)
 		err := s.SetOption("@hello", "world")
 		if err != nil {
@@ -176,14 +186,14 @@ func TestPaneOptions(t *testing.T) {
 			t.Fatal(err)
 		}
 		if res != "world" {
-			t.Fatal("values dont match")
+			t.Fatal("values do not match")
 		}
 	})
 }
 
 func TestPaneOptionsNotSet(t *testing.T) {
 	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
-		name := "test_sess_name"
+		name := "test_session_name"
 		s, _ := srv.New(name)
 		windows, _ := s.Windows()
 		panes, _ := windows[0].Panes()
@@ -197,32 +207,63 @@ func TestPaneOptionsNotSet(t *testing.T) {
 func TestWorkingDirectory(t *testing.T) {
 	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		dir := t.TempDir()
-		name := "test_sess_name"
-		s, _ := srv.New(name, dir)
-		s.NewWindow("a")
-		s.NewWindow("b")
-		s.NewWindow("c")
+		name := "test_session_name"
+		s, err := srv.New(name, dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.NewWindow("a"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.NewWindow("b"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.NewWindow("c"); err != nil {
+			t.Fatal(err)
+		}
 		windows, _ := s.Windows()
-		windows[0].Kill()
+		if err := windows[0].Kill(); err != nil {
+			t.Fatal(err)
+		}
 		windows, _ = s.Windows()
 		if len(windows) != 3 {
 			t.Fatal("Should have 3 windows")
 		}
 		for _, w := range windows {
-			panes, _ := w.Panes()
-			panes[0].Split()
-			panes[0].SplitHorizontally()
-			panes[0].Split()
-			panes, _ = w.Panes()
+			panes, err := w.Panes()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := panes[0].Split(); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := panes[0].SplitHorizontally(); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := panes[0].Split(); err != nil {
+				t.Fatal(err)
+			}
+			panes, err = w.Panes()
+			if err != nil {
+				t.Fatal(err)
+			}
 			for _, p := range panes {
-				p.SendKeys("pwd")
+				if err := p.SendKeys("pwd"); err != nil {
+					t.Fatal(err)
+				}
 			}
 		}
 		time.Sleep(10 * time.Second)
 		for _, w := range windows {
-			panes, _ := w.Panes()
+			panes, err := w.Panes()
+			if err != nil {
+				t.Fatal(err)
+			}
 			for _, p := range panes {
-				out, _ := p.Capture()
+				out, err := p.Capture()
+				if err != nil {
+					t.Fatal(err)
+				}
 				if !strings.Contains(strings.Join(out, ""), dir) {
 					t.Fatalf("Output is missing temp dir %v", strings.Join(out, ""))
 				}

@@ -48,11 +48,14 @@ func (srv *Server) HasSession(s *Session) bool {
 
 func (srv *Server) GetSessionWithName(name string) (*Session, error) {
 	lines, err := srv.command("list-sessions").withFilter(fmt.Sprintf("#{==:#{session_name},%s}", name)).withFormat("#{session_id}").run()
+	if err != nil {
+		return nil, err
+	}
 	if len(lines) == 0 {
 		return nil, ErrSessionNotFound
 	}
 	if len(lines) > 1 {
-		return nil, fmt.Errorf("Multiple matches")
+		return nil, fmt.Errorf("MULTIPLE MATCHES")
 	}
 	id, err := parseSessionId(lines[0])
 	if err != nil {

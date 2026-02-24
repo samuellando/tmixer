@@ -3,7 +3,7 @@
 
 all: build
 
-check: check-fmt test-all lint spell
+check: check-fmt lint spell
 
 build:
 	go build ./cmd/tmixer

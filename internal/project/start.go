@@ -77,7 +77,7 @@ func createWindows(s *tmux.Session, windows []config.WindowConfig) error {
 	// Get the original windows
 	originalWindows, err := s.Windows()
 	if err != nil {
-		return fmt.Errorf("When getting session windows: %w", err)
+		return fmt.Errorf("when getting session windows: %w", err)
 	}
 	// Create the windows
 	var firstWindow *tmux.Window
@@ -98,7 +98,7 @@ func createWindows(s *tmux.Session, windows []config.WindowConfig) error {
 	for _, w := range originalWindows {
 		err = w.Kill()
 		if err != nil {
-			return fmt.Errorf("When killing original window: %w", err)
+			return fmt.Errorf("when killing original window: %w", err)
 		}
 	}
 	// Select the first window

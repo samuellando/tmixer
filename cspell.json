@@ -10,6 +10,12 @@
         "Getsize",
         "Setsize",
         "golangci",
-        "gofmt"
+        "gofmt",
+        "cursorrules",
+        "stdlib",
+        "Errorf",
+        "lifecycles",
+        "subtests",
+        "nvim"
     ]
 }

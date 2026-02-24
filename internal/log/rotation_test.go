@@ -33,7 +33,12 @@ func TestRotateLogFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RotateLogFile failed: %v", err)
 	}
-	defer file.Close()
+	defer func() {
+		err = file.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// Check that old log was deleted
 	if _, err := os.Stat(oldLogPath); !os.IsNotExist(err) {
@@ -66,7 +71,12 @@ func TestRotateLogFile_CreatesDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RotateLogFile should create directory: %v", err)
 	}
-	defer file.Close()
+	defer func() {
+		err = file.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// Verify directory was created
 	if _, err := os.Stat(tmpDir); err != nil {
@@ -97,7 +107,12 @@ func TestRotateLogFile_IgnoresNonLogFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RotateLogFile failed: %v", err)
 	}
-	defer file.Close()
+	defer func() {
+		err = file.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// Verify all non-log files are still there
 	for _, name := range otherFiles {
@@ -124,14 +139,16 @@ func TestRotateLogFile_AppendMode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RotateLogFile failed: %v", err)
 	}
-	defer file.Close()
 
 	// Write new content
 	newContent := "new log entry\n"
 	if _, err := file.WriteString(newContent); err != nil {
 		t.Fatalf("Failed to write to log file: %v", err)
 	}
-	file.Close()
+	err = file.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Read the file and verify both entries are present
 	content, err := os.ReadFile(todayLogPath)

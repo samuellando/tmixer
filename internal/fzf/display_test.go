@@ -19,7 +19,9 @@ func TestDisplayProjects(t *testing.T) {
 	defer testutil.TeardownTestServer(tmux)
 	s, _ := tmux.New("test-session")
 	f := testutil.SetupTestClient(tmux, s)
-	defer f.Close()
+	defer func() {
+		_ = f.Close()
+	}()
 	config := &config.Config{
 		Projects: []*config.ProjectConfig{
 			{
@@ -71,12 +73,24 @@ func TestDisplayProjects(t *testing.T) {
 	for _, p := range projects {
 		switch p.Name {
 		case "cats":
-			p.Start(ctx)
+			_, err = p.Start(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
 		case "dogs":
-			p.Start(ctx)
+			_, err = p.Start(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
 		case "zzz":
-			p.Start(ctx)
-			p.Switch(ctx)
+			_, err = p.Start(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = p.Switch(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
 		}
 		time.Sleep(time.Second)
 	}

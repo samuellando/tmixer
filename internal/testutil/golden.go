@@ -20,14 +20,20 @@ func CaptureStdout(f func()) string {
 	var buf bytes.Buffer
 	done := make(chan bool)
 	go func() {
-		io.Copy(&buf, r)
+		_, err := io.Copy(&buf, r)
+		if err != nil {
+			panic(err)
+		}
 		done <- true
 	}()
 
 	f()
 
 	// 5. Close the write end of the pipe to signal that writing is complete
-	w.Close()
+	err := w.Close()
+	if err != nil {
+		panic(err)
+	}
 	<-done
 	return buf.String()
 }
@@ -36,7 +42,7 @@ func GoldenTest(t *testing.T, out string) {
 	t.Helper()
 	name := strings.ReplaceAll(t.Name(), "/", "_")
 	name = strings.ReplaceAll(name, " ", "_")
-	// Check for existing testdata to compate to
+	// Check for existing testdata to compare to
 	wantPath := filepath.Join("testdata", name+".golden")
 	wantPath, err := filepath.Abs(wantPath)
 	if err != nil {
@@ -48,14 +54,17 @@ func GoldenTest(t *testing.T, out string) {
 	}
 	// Compare the outputs
 	if !bytes.Equal(want, []byte(out)) {
-		// Wrtie out to a file in /tmp
+		// Write out to a file in /tmp
 		gotFile, err := os.CreateTemp(os.TempDir(), name+"-*.got")
 		if err != nil {
 			t.Fatalf("create got output: %v", err)
 		}
 		gotPath := gotFile.Name()
 		if _, err := gotFile.WriteString(out); err != nil {
-			gotFile.Close()
+			err = gotFile.Close()
+			if err != nil {
+				t.Error(err)
+			}
 			t.Fatalf("write got output: %v", err)
 		}
 		if err := gotFile.Close(); err != nil {

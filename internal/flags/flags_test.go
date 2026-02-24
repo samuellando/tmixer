@@ -64,7 +64,10 @@ func TestParseArgs(t *testing.T) {
 		},
 	}
 	args := []string{"--four", "--one", "aaa", "-t", "--three", "bbb", "hello"}
-	os.Setenv("TMIXER_TEST_FIVE", "env_var")
+	err := os.Setenv("TMIXER_TEST_FIVE", "env_var")
+	if err != nil {
+		t.Fatal(err)
+	}
 	remaining, err := ParseArgs(ctx, args, flags, nil)
 	if err != nil {
 		t.Fatal(err)

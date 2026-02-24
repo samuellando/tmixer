@@ -20,16 +20,16 @@ func TestLogs(t *testing.T) {
 	}
 	logPath := filepath.Join(home, ".local/state/tmixer/logs")
 	testutil.CaptureStdout(func() {
-		f, err := log.RotateLogFile(logPath, 24*time.Hour)
+		f, _ := log.RotateLogFile(logPath, 24*time.Hour)
 		logFile := f.Name()
 		stat, err := f.Stat()
 		origSize := stat.Size()
 		if err != nil {
 			t.Fatal(err)
 		}
-		f.Close()
-		sockefile := filepath.Join(t.TempDir(), "tmux.sock")
-		err = run("-S", sockefile, "--help")
+		_ = f.Close()
+		socketFile := filepath.Join(t.TempDir(), "tmux.sock")
+		err = run("-S", socketFile, "--help")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -56,8 +56,8 @@ func TestLogs(t *testing.T) {
 func TestLogFile(t *testing.T) {
 	testutil.CaptureStdout(func() {
 		logFile := filepath.Join(t.TempDir(), "log.jsonl")
-		sockefile := filepath.Join(t.TempDir(), "tmux.sock")
-		err := run("-S", sockefile, "--help", "--logFile", logFile)
+		socketFile := filepath.Join(t.TempDir(), "tmux.sock")
+		err := run("-S", socketFile, "--help", "--logFile", logFile)
 		if err != nil {
 			t.Error(err)
 		}
@@ -97,8 +97,8 @@ projects:
 		t.Fatal(err)
 	}
 	out := testutil.CaptureStdout(func() {
-		sockefile := filepath.Join(t.TempDir(), "tmux.sock")
-		err = run("-S", sockefile, "-c", configFile, "list")
+		socketFile := filepath.Join(t.TempDir(), "tmux.sock")
+		err = run("-S", socketFile, "-c", configFile, "list")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -122,8 +122,8 @@ projects:
 		t.Fatal(err)
 	}
 	testutil.GoldenTest(t, testutil.CaptureStdout(func() {
-		sockefile := filepath.Join(t.TempDir(), "tmux.sock")
-		err = run("-S", sockefile, "-c", configFile, "--combineProjects", "false", "list")
+		socketFile := filepath.Join(t.TempDir(), "tmux.sock")
+		err = run("-S", socketFile, "-c", configFile, "--combineProjects", "false", "list")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -145,7 +145,9 @@ projects:
 		_, srv := testutil.SetupTestServer(t)
 		defer testutil.TeardownTestServer(srv)
 		f := testutil.SetupTestClient(srv, nil)
-		defer f.Close()
+		defer func() {
+			_ = f.Close()
+		}()
 
 		err = run("-S", srv.SocketPath, "-c", configFile, "--combineProjects", "false", "switch", "test-switch")
 		if err != nil {
@@ -178,7 +180,9 @@ projects:
 		_, srv := testutil.SetupTestServer(t)
 		defer testutil.TeardownTestServer(srv)
 		f := testutil.SetupTestClient(srv, nil)
-		defer f.Close()
+		defer func() {
+			_ = f.Close()
+		}()
 
 		clt, _ := srv.ActiveClient()
 
@@ -235,7 +239,9 @@ projects:
 		_, srv := testutil.SetupTestServer(t)
 		defer testutil.TeardownTestServer(srv)
 		f := testutil.SetupTestClient(srv, nil)
-		defer f.Close()
+		defer func() {
+			_ = f.Close()
+		}()
 
 		clt, _ := srv.ActiveClient()
 
@@ -298,7 +304,9 @@ projects:
 		_, srv := testutil.SetupTestServer(t)
 		defer testutil.TeardownTestServer(srv)
 		f := testutil.SetupTestClient(srv, nil)
-		defer f.Close()
+		defer func() {
+			_ = f.Close()
+		}()
 
 		origSessions, _ := srv.ListSessions()
 
@@ -346,7 +354,9 @@ projects:
 		_, srv := testutil.SetupTestServer(t)
 		defer testutil.TeardownTestServer(srv)
 		f := testutil.SetupTestClient(srv, nil)
-		defer f.Close()
+		defer func() {
+			_ = f.Close()
+		}()
 
 		origSessions, _ := srv.ListSessions()
 
@@ -366,7 +376,7 @@ projects:
 
 		time.Sleep(2 * time.Second)
 
-		// Should kill the original sessiopn
+		// Should kill the original session
 		err = run(
 			"-S", srv.SocketPath, "-c", configFile,
 			"--combineProjects", "false",
