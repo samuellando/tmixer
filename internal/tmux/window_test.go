@@ -2,6 +2,7 @@ package tmux_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"samuellando.com/tmixer/internal/testutil"
@@ -55,6 +56,20 @@ func TestWindowName(t *testing.T) {
 		}
 		if res != "test_window" {
 			t.Fatal("Names dont match")
+		}
+	})
+}
+
+func TestWindowNameless(t *testing.T) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+		s, _ := srv.New("test_ses")
+		w, _ := s.NewWindow()
+		res, err := w.Name()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(res, "sh") {
+			t.Fatal("Name does not contain 'sh'")
 		}
 	})
 }
