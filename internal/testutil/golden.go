@@ -12,7 +12,8 @@ import (
 func CaptureStdout(f func()) string {
 	// Create a new read-write pipe
 	r, w, _ := os.Pipe()
-	// Redirect os.Stdout to the write end of the pipe
+	// Save original stdout and redirect os.Stdout to the write end of the pipe
+	oldStdout := os.Stdout
 	os.Stdout = w
 
 	// Use a separate goroutine to read from the pipe to prevent deadlocks
@@ -28,6 +29,9 @@ func CaptureStdout(f func()) string {
 	}()
 
 	f()
+
+	// Restore the original stdout so subsequent output goes to the real stdout
+	os.Stdout = oldStdout
 
 	// 5. Close the write end of the pipe to signal that writing is complete
 	err := w.Close()

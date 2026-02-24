@@ -38,7 +38,7 @@ func DisplayProjects(ctx context.Context, projects []*project.Project, w io.Writ
 	for _, project := range projects {
 		info, err := display(project)
 		if err != nil {
-			err := fmt.Errorf("while displaying project: %w", err)
+			err := fmt.Errorf("while generating display string for project: %w", err)
 			event.Errors = append(event.Errors, err.Error())
 			return err
 		}
