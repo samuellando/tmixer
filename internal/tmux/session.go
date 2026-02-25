@@ -101,10 +101,10 @@ func (s *Session) Kill() error {
 	return err
 }
 
-func (s *Session) NewWindow(name ...string) (*Window, error) {
+func (s *Session) NewWindow(name ...*string) (*Window, error) {
 	c := s.server.command("new-window").withTargetSession(s).withFlag("-d").print().withFormat("#{window_id}")
-	if len(name) > 0 {
-		c = c.withName(name[0])
+	if len(name) != 0 && name[0] != nil {
+		c = c.withName(*name[0])
 	}
 	if dir, err := s.GetOption("@working_dir"); err == nil {
 		c = c.withWorkingDirectory(dir)

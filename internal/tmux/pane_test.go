@@ -199,9 +199,9 @@ func TestWorkingDirectory(t *testing.T) {
 		dir := t.TempDir()
 		name := "test_sess_name"
 		s, _ := srv.New(name, dir)
-		s.NewWindow("a")
-		s.NewWindow("b")
-		s.NewWindow("c")
+		s.NewWindow()
+		s.NewWindow()
+		s.NewWindow()
 		windows, _ := s.Windows()
 		windows[0].Kill()
 		windows, _ = s.Windows()
