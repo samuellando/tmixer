@@ -518,7 +518,7 @@ switchCommands:
 			_, wasOverridden := overriddenProjects[project.Name]
 			if wasOverridden {
 				// Should have the overridden config
-				if len(project.Config.Windows) != 1 || project.Config.Windows[0].Name != "overridden-terminal" {
+				if len(project.Config.Windows) != 1 || *(project.Config.Windows[0].Name) != "overridden-terminal" {
 					t.Errorf("Project %s should have been overridden but has windows: %v", project.Name, project.Config.Windows)
 				}
 				if len(project.Config.SwitchCommands) != 1 || project.Config.SwitchCommands[0][0] != "overridden-pwd" {
@@ -590,7 +590,7 @@ switchCommands:
 		if len(homeProject.Config.SwitchCommands) == 1 {
 			t.Error("home-project should not be overridden by home .tmixer.yml")
 		}
-		if len(validProject.Config.Windows) != 1 || validProject.Config.Windows[0].Name != "overridden-terminal" {
+		if len(validProject.Config.Windows) != 1 || *(validProject.Config.Windows[0].Name) != "overridden-terminal" {
 			t.Errorf("valid-project should have overridden windows, got %v", validProject.Config.Windows)
 		}
 		if len(validProject.Config.SwitchCommands) != 1 || validProject.Config.SwitchCommands[0][0] != "overridden-pwd" {

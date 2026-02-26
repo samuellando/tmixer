@@ -2,6 +2,7 @@ package tmux_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"samuellando.com/tmixer/internal/testutil"
@@ -14,7 +15,7 @@ func TestKill(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		w, err := s.NewWindow("test-window")
+		w, err := s.NewWindow()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -51,13 +52,28 @@ func TestKill(t *testing.T) {
 func TestWindowName(t *testing.T) {
 	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		s, _ := srv.New("test_ses")
-		w, _ := s.NewWindow("test_window")
+		name := "test_window"
+		w, _ := s.NewWindow(&name)
 		res, err := w.Name()
 		if err != nil {
 			t.Fatal(err)
 		}
 		if res != "test_window" {
 			t.Fatal("Names do not match")
+		}
+	})
+}
+
+func TestWindowNameless(t *testing.T) {
+	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
+		s, _ := srv.New("test_ses")
+		w, _ := s.NewWindow()
+		res, err := w.Name()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(res, "sh") {
+			t.Fatalf("Name '%s' does not contain 'sh'", res)
 		}
 	})
 }
@@ -97,7 +113,7 @@ func TestUnlink(t *testing.T) {
 		if err2 != nil {
 			t.Fatal(err2)
 		}
-		if _, err := s1.NewWindow("extra window"); err != nil {
+		if _, err := s1.NewWindow(); err != nil {
 			t.Fatal(err)
 		}
 		windows, _ := s1.Windows()

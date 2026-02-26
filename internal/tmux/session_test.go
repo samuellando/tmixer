@@ -71,7 +71,7 @@ func TestWindows(t *testing.T) {
 		windows := make([]*tmux.Window, n)
 		var err error
 		for i := range n {
-			windows[i], err = s.NewWindow("test")
+			windows[i], err = s.NewWindow()
 			if err != nil {
 				t.Fatal(err)
 			}

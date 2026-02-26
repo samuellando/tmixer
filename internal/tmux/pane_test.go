@@ -225,18 +225,15 @@ func TestPaneOptionsNotSet(t *testing.T) {
 func TestWorkingDirectory(t *testing.T) {
 	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
 		dir := t.TempDir()
-		name := "test_session_name"
-		s, err := srv.New(name, dir)
-		if err != nil {
+		name := "test_sess_name"
+		s, _ := srv.New(name, dir)
+    if _, err := s.NewWindow(); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := s.NewWindow("a"); err != nil {
+		if _, err := s.NewWindow(); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := s.NewWindow("b"); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := s.NewWindow("c"); err != nil {
+		if _, err := s.NewWindow(); err != nil {
 			t.Fatal(err)
 		}
 		windows, _ := s.Windows()
