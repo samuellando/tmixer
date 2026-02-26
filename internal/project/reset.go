@@ -97,7 +97,7 @@ func (p *Project) Reset(ctx context.Context) (func() error, error) {
 }
 
 func resetWindows(session *tmux.Session, originalWindows []*tmux.Window, windows []config.WindowConfig) error {
-	// Need to kepp at least one window before unlinking
+	// Need to keep at least one window before unlinking
 	tempName := "temp"
 	_, err := session.NewWindow(&tempName)
 	if err != nil {
