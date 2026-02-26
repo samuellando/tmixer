@@ -25,11 +25,11 @@ func primeCommand(i, j int) []string {
 
 var testWindowConfigs = []config.WindowConfig{
 	{
-		Name:    "one",
+		Name:    stringPointer("one"),
 		Command: primeCommand(0, 0),
 	},
 	{
-		Name:    "two",
+		Name:    stringPointer("two"),
 		Command: primeCommand(1, 0),
 		Panes: []config.PaneConfig{
 			{
@@ -46,7 +46,7 @@ var testWindowConfigs = []config.WindowConfig{
 		},
 	},
 	{
-		Name: "three",
+		Name: stringPointer("three"),
 		Panes: []config.PaneConfig{
 			{
 				Command: primeCommand(2, 0),

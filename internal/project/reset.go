@@ -77,7 +77,7 @@ func (p *Project) Reset(ctx context.Context) (func() error, error) {
 
 	windows := p.Config.Windows
 	if len(p.Config.Windows) == 0 {
-		windows = []config.WindowConfig{{Name: "sh"}}
+		windows = []config.WindowConfig{{}}
 	}
 
 	err = resetWindows(session, originalWindows, windows)
@@ -98,7 +98,8 @@ func (p *Project) Reset(ctx context.Context) (func() error, error) {
 
 func resetWindows(session *tmux.Session, originalWindows []*tmux.Window, windows []config.WindowConfig) error {
 	// Need to kepp at least one window before unlinking
-	_, err := session.NewWindow("temp")
+	tempName := "temp"
+	_, err := session.NewWindow(&tempName)
 	if err != nil {
 		return fmt.Errorf("When creating a temp window: %w", err)
 	}
