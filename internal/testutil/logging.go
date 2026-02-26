@@ -18,6 +18,9 @@ func SetupLogging(ctx context.Context, level int) (context.Context, *log.Logger,
 func GetLogEvent(ctx context.Context, logger *log.Logger, out *bytes.Buffer) map[string]any {
 	logger.Info(ctx)
 	res := make(map[string]any)
-	json.Unmarshal(out.Bytes(), &res)
+	err := json.Unmarshal(out.Bytes(), &res)
+	if err != nil {
+		panic(err)
+	}
 	return res
 }

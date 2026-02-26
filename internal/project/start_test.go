@@ -51,7 +51,7 @@ func TestProjectStartWindowsAndPanes(t *testing.T) {
 			t.Error(err)
 		}
 		ticker := time.Tick(time.Second)
-	tickloop:
+	tickLoop:
 		for i := 0; ; i++ {
 			<-ticker
 			if strings.Contains(tc.project.Name, "windows") {
@@ -62,9 +62,9 @@ func TestProjectStartWindowsAndPanes(t *testing.T) {
 				if len(windows) != 3 {
 					if i == maxAttempts {
 						t.Error("Should have 3 windows")
-						break tickloop
+						break tickLoop
 					} else {
-						continue tickloop
+						continue tickLoop
 					}
 				}
 
@@ -83,9 +83,9 @@ func TestProjectStartWindowsAndPanes(t *testing.T) {
 						if !strings.Contains(allOut, expected) {
 							if i == maxAttempts {
 								t.Errorf("Missing output %s in %s", expected, allOut)
-								break tickloop
+								break tickLoop
 							} else {
-								continue tickloop
+								continue tickLoop
 							}
 						}
 					}
@@ -98,13 +98,13 @@ func TestProjectStartWindowsAndPanes(t *testing.T) {
 				if len(windows) != 1 {
 					if i == maxAttempts {
 						t.Errorf("Should have 1 (default) window got %d", len(windows))
-						break tickloop
+						break tickLoop
 					} else {
-						continue tickloop
+						continue tickLoop
 					}
 				}
 			}
-			break tickloop
+			break tickLoop
 		}
 	})
 }

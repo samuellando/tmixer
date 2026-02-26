@@ -11,7 +11,7 @@ type SessionId string
 
 func parseSessionId(s string) (SessionId, error) {
 	if len(s) == 0 || s[0] != '$' {
-		return "", fmt.Errorf("invalid session id: %q", s)
+		return "", fmt.Errorf("INVALID SESSION ID: %q", s)
 	}
 	return SessionId(s), nil
 }
@@ -31,7 +31,7 @@ func (srv *Server) New(name string, dir ...string) (*Session, error) {
 		return nil, err
 	}
 	if len(lines) == 0 {
-		return nil, fmt.Errorf("Got no session")
+		return nil, fmt.Errorf("GOT NO SESSION")
 	}
 	id, err := parseSessionId(lines[0])
 	if err != nil {
@@ -52,7 +52,7 @@ func (s *Session) SetOption(key, value string) error {
 func (s *Session) GetOption(key string) (string, error) {
 	lines, err := s.server.command("show-options").withTargetSession(s).withArgument(key).withFlag("-v").withFlag("-q").run()
 	if len(lines) == 0 {
-		return "", fmt.Errorf("Got no output: %w", err)
+		return "", errors.Join(fmt.Errorf("GOT NO OUTPUT"), err)
 	}
 	return lines[0], err
 }
@@ -60,7 +60,7 @@ func (s *Session) GetOption(key string) (string, error) {
 func (s *Session) Name() (string, error) {
 	lines, err := s.server.command("display").withFlag("-p").withTargetSession(s).withFormat("#{session_name}").run()
 	if len(lines) == 0 {
-		return "", errors.Join(fmt.Errorf("Got no name"), err)
+		return "", errors.Join(fmt.Errorf("GOT NO NAME"), err)
 	}
 	return lines[0], err
 }
@@ -73,7 +73,7 @@ func (s *Session) Rename(name string) error {
 func (s *Session) LastActivity() (*time.Time, error) {
 	lines, err := s.server.command("display").withFlag("-p").withTargetSession(s).withFormat("#{session_activity}").run()
 	if len(lines) == 0 {
-		return nil, errors.Join(fmt.Errorf("Got no time"), err)
+		return nil, errors.Join(fmt.Errorf("GOT NO TIME"), err)
 	}
 	unix, err := strconv.ParseInt(lines[0], 10, 64)
 	if err != nil {
@@ -114,7 +114,7 @@ func (s *Session) NewWindow(name ...*string) (*Window, error) {
 		return nil, err
 	}
 	if len(lines) == 0 {
-		return nil, fmt.Errorf("Got no window")
+		return nil, fmt.Errorf("GOT NO WINDOW")
 	}
 	id, err := parseWindowId(lines[0])
 	if err != nil {

@@ -61,7 +61,7 @@ func List(ctx context.Context, tmux *tmux.Server, c *config.Config) ([]*Project,
 		}
 		projects = append(projects, sessionProjects...)
 	}
-	// Add the internal fileds to all projects
+	// Add the internal fields to all projects
 	for _, p := range projects {
 		p.server = tmux
 		p.fullConfig = c
@@ -96,7 +96,7 @@ func getDuplicateNames(projects []*Project) []string {
 	return duplicates
 }
 
-// List all projects that are bare ie. don't have any sort of recusion like subdirs.
+// List all projects that are bare ie. don't have any sort of recursion like sub-dirs.
 func listBareProjects(config *config.Config) []*Project {
 	projects := make([]*Project, 0)
 	for _, projectConfig := range config.Projects {

@@ -14,11 +14,13 @@ type WideEvent struct {
 	data map[string]any
 }
 
+type wideEventKey string
+
 func Track[T any](ctx context.Context, eventName string, event *T) func() {
 	startTime := time.Now()
 
 	return func() {
-		// Convert to a generic map[string]any so we can add additonal fields.
+		// Convert to a generic map[string]any so we can add additional fields.
 		eventMap := make(map[string]any)
 		b, err := json.Marshal(event)
 		if err != nil {
@@ -45,14 +47,14 @@ func TrackLevel[T any](level int, ctx context.Context, eventName string, event *
 }
 
 func InitializeWideEvent(ctx context.Context, options *LoggerOptions) context.Context {
-	v := ctx.Value("wideEvent")
+	v := ctx.Value(wideEventKey("wideEvent"))
 	var event WideEvent
 	if v == nil {
 		event = WideEvent{
 			mu:   &sync.Mutex{},
 			data: make(map[string]any),
 		}
-		ctx = context.WithValue(ctx, "wideEvent", event)
+		ctx = context.WithValue(ctx, wideEventKey("wideEvent"), event)
 		event.data["time"] = time.Now()
 		event.data["level"] = "INFO"
 	} else {
@@ -70,7 +72,7 @@ func InitializeWideEvent(ctx context.Context, options *LoggerOptions) context.Co
 }
 
 func getWideEvent(ctx context.Context) WideEvent {
-	event, ok := ctx.Value("wideEvent").(WideEvent)
+	event, ok := ctx.Value(wideEventKey("wideEvent")).(WideEvent)
 	if !ok {
 		panic("Must call InitializeWideEvent first")
 	}
@@ -81,12 +83,12 @@ func (event WideEvent) append(key string, value any) {
 	event.mu.Lock()
 	defer event.mu.Unlock()
 	current, vok := event.data[key]
-	currentarr, arrok := event.data[key+"s"]
-	if !vok && !arrok {
+	currentArr, arrOk := event.data[key+"s"]
+	if !vok && !arrOk {
 		event.data[key] = value
 	} else {
 		delete(event.data, key)
-		arr, ok := currentarr.([]any)
+		arr, ok := currentArr.([]any)
 		if !ok {
 			event.data[key+"s"] = []any{current, value}
 		} else {
@@ -98,10 +100,10 @@ func (event WideEvent) append(key string, value any) {
 func (event WideEvent) MarshalJSON() ([]byte, error) {
 	event.mu.Lock()
 	defer event.mu.Unlock()
-	forcedBegining := []string{"level", "time", "error", "minLevel"}
+	forcedBeginning := []string{"level", "time", "error", "minLevel"}
 	forcedEnd := []string{"duration"}
 	forced := make(map[string]bool)
-	for _, k := range forcedBegining {
+	for _, k := range forcedBeginning {
 		forced[k] = true
 	}
 	for _, k := range forcedEnd {
@@ -114,7 +116,7 @@ func (event WideEvent) MarshalJSON() ([]byte, error) {
 	}
 
 	var fields []kv
-	for _, k := range forcedBegining {
+	for _, k := range forcedBeginning {
 		fields = append(fields, kv{k: k, v: event.data[k]})
 	}
 	for k, v := range event.data {

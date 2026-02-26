@@ -15,7 +15,7 @@ import (
 
 func runAllLogTestCases(t *testing.T, f func(ctx context.Context, srv *tmux.Server, out *bytes.Buffer, logger *log.Logger, tc *projectTestCase)) {
 	t.Parallel()
-	// Need to reset in bettwen for each test case to avoid switches
+	// Need to reset in between for each test case to avoid switches
 	for _, tc := range getAllTestCases() {
 		t.Run(tc.project.Name, func(t *testing.T) {
 			t.Parallel()
@@ -25,7 +25,11 @@ func runAllLogTestCases(t *testing.T, f func(ctx context.Context, srv *tmux.Serv
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer srv.StopControlMode()
+			defer func() {
+				if err := srv.StopControlMode(); err != nil {
+					t.Error(err)
+				}
+			}()
 
 			client := setupTestCase(t, ctx, tc, srv)
 			defer teardownTestCase(t, client)
@@ -49,7 +53,9 @@ func TestProjectStartLogs(t *testing.T) {
 		// Grab the log event
 		logger.Info(ctx)
 		wideEvent := make(map[string]any)
-		json.Unmarshal(out.Bytes(), &wideEvent)
+		if err := json.Unmarshal(out.Bytes(), &wideEvent); err != nil {
+			t.Error(err)
+		}
 		event := wideEvent["projectStartEvent"].(map[string]any)
 		// Check each field
 		// field: Name
@@ -67,7 +73,7 @@ func TestProjectStartLogs(t *testing.T) {
 		if sessionId != string(res.Id) {
 			t.Error("Event sessionId does not match")
 		}
-		// field: Erros
+		// field: Errors
 		if _, ok := event["errors"]; ok {
 			t.Error("Should not have any errors")
 		}
@@ -82,11 +88,15 @@ func TestProjectKillLogs(t *testing.T) {
 		if err != nil && !errors.Is(err, ErrSessionNotFound) {
 			t.Error(err)
 		}
-		cleanup()
+		if err := cleanup(); err != nil {
+			t.Error(err)
+		}
 		// Grab the log event
 		logger.Info(ctx)
 		wideEvent := make(map[string]any)
-		json.Unmarshal(out.Bytes(), &wideEvent)
+		if err := json.Unmarshal(out.Bytes(), &wideEvent); err != nil {
+			t.Error(err)
+		}
 		event := wideEvent["projectKillEvent"].(map[string]any)
 		// Check all fields
 		// field: Name
@@ -142,11 +152,15 @@ func TestProjectKillLogsSwitchDecision(t *testing.T) {
 		if err != nil && !errors.Is(err, ErrSessionNotFound) {
 			t.Error(err)
 		}
-		cleanup()
+		if err := cleanup(); err != nil {
+			t.Error(err)
+		}
 		// Grab the log event
 		logger.Info(ctx)
 		wideEvent := make(map[string]any)
-		json.Unmarshal(out.Bytes(), &wideEvent)
+		if err := json.Unmarshal(out.Bytes(), &wideEvent); err != nil {
+			t.Error(err)
+		}
 		// Check each field
 		if tc.initialStatus() == PROJECT_STATUS_ATTACHED {
 			event := wideEvent["switchToBestProject"].(map[string]any)
@@ -184,7 +198,9 @@ func TestProjectSwitchLogs(t *testing.T) {
 		// Grab the log event
 		logger.Info(ctx)
 		wideEvent := make(map[string]any)
-		json.Unmarshal(out.Bytes(), &wideEvent)
+		if err := json.Unmarshal(out.Bytes(), &wideEvent); err != nil {
+			t.Error(err)
+		}
 		event := wideEvent["projectSwitchEvent"].(map[string]any)
 		// Check each field
 		// field: Name
@@ -219,8 +235,10 @@ func TestProjectRunSwitchCommandsLogs(t *testing.T) {
 		// Grab the log event
 		logger.Info(ctx)
 		wideEvent := make(map[string]any)
-		json.Unmarshal(out.Bytes(), &wideEvent)
-		event := wideEvent["projecRunSwitchCommandsEvent"].(map[string]any)
+		if err := json.Unmarshal(out.Bytes(), &wideEvent); err != nil {
+			t.Error(err)
+		}
+		event := wideEvent["projectRunSwitchCommandsEvent"].(map[string]any)
 		// Check each field
 		// field: Name
 		name := event["name"].(string)
@@ -268,15 +286,19 @@ func TestProjectResetLogs(t *testing.T) {
 		session, _ := tc.project.Session()
 		// Exec
 		cleanup, err := tc.project.Reset(ctx)
-		cleanup()
+		if err := cleanup(); err != nil {
+			t.Error(err)
+		}
 		if err != nil && !errors.Is(err, ErrSessionNotFound) {
 			t.Error(err)
 		}
 		// Grab the event
 		logger.Info(ctx)
 		wideEvent := make(map[string]any)
-		json.Unmarshal(out.Bytes(), &wideEvent)
-		event := wideEvent["projecResetEvent"].(map[string]any)
+		if err := json.Unmarshal(out.Bytes(), &wideEvent); err != nil {
+			t.Error(err)
+		}
+		event := wideEvent["projectResetEvent"].(map[string]any)
 		// Check all the fields
 		// field: Name
 		name := event["name"].(string)
@@ -303,11 +325,11 @@ func TestProjectResetLogs(t *testing.T) {
 		if tc.initialStatus() > PROJECT_STATUS_INACTIVE {
 			tempSessionName := event["tempSessionName"].(string)
 			if tempSessionName == "" {
-				t.Error("Should return a temp sesison name if used")
+				t.Error("Should return a temp session name if used")
 			}
 		} else {
 			if _, ok := event["tempSessionName"]; ok {
-				t.Error("Shoukld not have a temp session")
+				t.Error("Should not have a temp session")
 			}
 		}
 		// field: Errors

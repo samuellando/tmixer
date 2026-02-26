@@ -43,7 +43,7 @@ var FLAGS = map[string]flags.Flag{
 			} else if strings.HasPrefix(s, "d") {
 				c.LogLevel = log.LEVEL_DEBUG
 			} else {
-				return fmt.Errorf("Unrecognized log level")
+				return fmt.Errorf("UNRECOGNIZED LOG LEVEL")
 			}
 			return nil
 		},
@@ -64,7 +64,7 @@ var FLAGS = map[string]flags.Flag{
 			} else {
 				v, err = strconv.Atoi(s)
 				if err != nil {
-					return fmt.Errorf("while parsing log retentionn days: %s", err)
+					return fmt.Errorf("while parsing log retention days: %s", err)
 				}
 			}
 			c.LogRetentionDays = &v
@@ -98,7 +98,7 @@ var FLAGS = map[string]flags.Flag{
 		EnvironmentVariable: "TMIXER_DEFAULT_PROJECT",
 	},
 	"combineProjects": {
-		Description: "Wheter projects from all config files should be combined or overridden, --config > ~/.tmixer.yml > ~/.config/tmixer/config.yml",
+		Description: "Whether projects from all config files should be combined or overridden, --config > ~/.tmixer.yml > ~/.config/tmixer/config.yml",
 		Usage:       "--combineProjects false",
 		Default:     "true",
 		ParseInput: func(s string, c *config.Config) error {
@@ -116,7 +116,7 @@ var FLAGS = map[string]flags.Flag{
 		Usage:       "--projectTtl 10h",
 		ParseInput: func(s string, c *config.Config) error {
 			if s == "" {
-				return fmt.Errorf("Requires ttl value")
+				return fmt.Errorf("REQUIRES TTL VALUE")
 			}
 			c.Ttl = &s
 			return nil
@@ -129,7 +129,7 @@ var FLAGS = map[string]flags.Flag{
 		Usage:       "--tmuxSocketPath /tmp/tmux/socket.sock",
 		ParseInput: func(s string, c *config.Config) error {
 			if s == "" {
-				return fmt.Errorf("Requires socket path")
+				return fmt.Errorf("REQUIRES SOCKET PATH")
 			}
 			c.TmuxSocketPath = &s
 			return nil

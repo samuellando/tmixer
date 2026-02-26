@@ -8,7 +8,7 @@
 
 ## Overview
 
-tmixer is a feature rich and speedy [tmux](https://github.com/tmux/tmux) sessionier written in go.
+tmixer is a feature rich and speedy [tmux](https://github.com/tmux/tmux) session manager written in go.
 
 - tmixer indexes all the projects on your system, and allows you to quickly switch between tmux sessions created for them
 - tmixer has powerful per-project configurations for:
@@ -17,7 +17,7 @@ tmixer is a feature rich and speedy [tmux](https://github.com/tmux/tmux) session
     - And more..
 - In addition to basing projects on specific directories, tmixer can also import projects from:
     - Sub directories of a specific parent directory, for example ~/Projects will import all the projects in that directory
-    - Official importers such as githud, gitlab, ect. (Comming soon)
+    - Official importers such as github, gitlab, etc. (Coming soon)
 - tmixer is fast. It communicates with tmux using control mode, using streams instead of spawning a new process for each command.
 
 ## Dependencies
@@ -30,7 +30,7 @@ tmixer is a feature rich and speedy [tmux](https://github.com/tmux/tmux) session
 Since tmixer is still in early development, clone the repository and run `make install`.
 
 Once the project has reached an official stable release some more installation
-options will be made avaialble.
+options will be made available.
 
 ## Quickstart
 
@@ -67,10 +67,10 @@ sessions and without.
     - There are also some extra keybindings in this window:
 
         - `ctrl-k` will kill the active highlighted session with `tmixer kill`
-        - `crtl-r` will call `tmixer reset` on the highlighted project
-        - `crtl-s` will start the highlighted project with `tmixer start` but not switch to it
+        - `ctrl-r` will call `tmixer reset` on the highlighted project
+        - `ctrl-s` will start the highlighted project with `tmixer start` but not switch to it
 
-5. Hitting `leader - r` will reset the currently attached project. Killing the sesison,
+5. Hitting `leader - r` will reset the currently attached project. Killing the session,
 and recreating it will all it's configured windows and panes.
 
 ## tmixer command
@@ -84,11 +84,11 @@ tmixer [flags] [command] [project_name]
 Commands:
 
 All commands will by default open fzf if no project_name is provided. Except for
-the start command, which will start the configued default project in a new tmux client,
+the start command, which will start the configured default project in a new tmux client,
 and the reset command, which will reset the currently attached session.
 
 switch (default)
-        switch the active tmux client to the project. It will eitehr switch to the
+        switch the active tmux client to the project. It will either switch to the
         existing session or start a session with the project configuration.
 
         After switching to a project/session, tmixer will run it's configured
@@ -136,11 +136,11 @@ Configurations will be overridden in the following order:
 
 #### Top level/global configurations
 
-| yaml option      |  description                                                                                             | default vlaue  |
+| yaml option      |  description                                                                                             | default value  |
 | ---              | ---                                                                                                     | ---            |
 | defaultProject   |  The default project to open at startup                                                                  |                |
 | ttl              |  How long before a project with no activity is automatically killed (example `24h`)                      |                |
-| combineProjects  | Wheter the list of projects should be overriden or combined when multiple config files are present      | `true`         |
+| combineProjects  |  Whether the list of projects should be overridden or combined when multiple config files are present      | `true`         |
 | logFile          |  Additional log file in addition to `~/.local/state/tmixer/logs/`                                        |                |
 | logLevel         |  The log level, `INFO` or `DEBUG`                                                                        | `INFO`         |
 | logRetentionDays |  How many days of logs to keep in `~/.local/state/tmixer/logs/`                                          | `7`            |
@@ -149,17 +149,17 @@ Configurations will be overridden in the following order:
 
 #### Project configurations
 
-| yaml option      |  description                                                                                             | default vlaue  |
+| yaml option      |  description                                                                                             | default value  |
 | ---              | ---                                                                                                     | ---            |
 | name             |  The name of the project                                                                                 |                |
-| diectory         | The directory of the project                                                                            |                |
+| directory        | The directory of the project                                                                            |                |
 | subDirectories   | If true, the subdirectories will be loaded as individual projects with names `[parent_name]--[sub_dir]` | `false`        |
 | windows          |  A list of window configurations                                                                         |                |
 | switchCommands   | A list commands (strings) to run every time this project is switched to                                 |                |
 
 #### Window configurations
 
-| yaml option      |  description                                                                                             | default vlaue  |
+| yaml option      |  description                                                                                             | default value  |
 | ---              | ---                                                                                                     | ---            |
 | name             |  The name of the window, will display in tmux status bar                                                 |                |
 | command          |  The startup command to execute on the first pane of this window, shorthand for adding a pane            |                |
@@ -167,10 +167,10 @@ Configurations will be overridden in the following order:
 
 #### Pane configurations
 
-| yaml option      |  description                                                                                             | default vlaue  |
+| yaml option      |  description                                                                                             | default value  |
 | ---              | ---                                                                                                     | ---            |
 | command          | The startup command for this pane                                                                       |                |
-| split            |  How to split the previously defined pane when spliting this pane  (`vertical` or `horizontal`)          | `horizontal`   |
+| split            |  How to split the previously defined pane when splitting this pane  (`vertical` or `horizontal`)          | `horizontal`   |
 
 
 ### Example configuration
@@ -210,7 +210,7 @@ projects:
 
 ```
 --combineProjects
-        Wheter projects from all config files should be combined or overridden, --config > ~/.tmixer.yml > ~/.config/tmixer/config.yml
+        Whether projects from all config files should be combined or overridden, --config > ~/.tmixer.yml > ~/.config/tmixer/config.yml
         Usage: --combineProjects false
         Default: true
         EnvVar: $TMIXER_COMBINE_PROJECTS

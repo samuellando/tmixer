@@ -24,7 +24,7 @@ type listTestCase struct {
 
 func runAllListTestCases(t *testing.T, f func(ctx context.Context, srv *tmux.Server, tc listTestCase)) {
 	t.Parallel()
-	// Need to reset in bettwen for each test case to avoid switches
+	// Need to reset in between for each test case to avoid switches
 	for name, tc := range getAllListTestCases() {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -39,17 +39,23 @@ func getAllListTestCases() map[string]func(*testing.T) listTestCase {
 	n := 10
 	createProjects := func(t *testing.T, dir string) {
 		for i := range n {
-			os.Mkdir(filepath.Join(dir, strconv.Itoa(i)), 0o700)
+			err := os.Mkdir(filepath.Join(dir, strconv.Itoa(i)), 0o700)
+			if err != nil {
+				t.Error(err)
+			}
 			f, err := os.OpenFile(filepath.Join(dir, "file"+strconv.Itoa(i)), os.O_RDONLY|os.O_CREATE, 0o644)
 			if err != nil {
 				t.Error(err)
 			}
-			f.Close()
+			err = f.Close()
+			if err != nil {
+				t.Error(err)
+			}
 		}
 	}
 
 	var testCases = map[string]func(t *testing.T) listTestCase{
-		"no conig": func(t *testing.T) listTestCase {
+		"no config": func(t *testing.T) listTestCase {
 			return listTestCase{
 				config:   &config.Config{},
 				projects: []string{testutil.DEFAULT_TEST_SESSION},
@@ -179,7 +185,9 @@ func TestListIncludesAllSessions(t *testing.T) {
 	n := 10
 	runAllListTestCases(t, func(ctx context.Context, srv *tmux.Server, tc listTestCase) {
 		for i := range n {
-			srv.New("test-" + strconv.Itoa(i))
+			if _, err := srv.New("test-" + strconv.Itoa(i)); err != nil {
+				t.Error(err)
+			}
 		}
 		projects, err := List(ctx, srv, tc.config)
 		if err != nil {
@@ -237,7 +245,9 @@ func TestAmbiguousNames(t *testing.T) {
 	dir := t.TempDir()
 	n := 10
 	for i := range n {
-		os.Mkdir(filepath.Join(dir, strconv.Itoa(i)), 0o700)
+		if err := os.Mkdir(filepath.Join(dir, strconv.Itoa(i)), 0o700); err != nil {
+			t.Error(err)
+		}
 	}
 	config := &config.Config{
 		Projects: []*config.ProjectConfig{
@@ -290,7 +300,9 @@ func TestListLogs(t *testing.T) {
 	dir := t.TempDir()
 	n := 10
 	for i := range n {
-		os.Mkdir(filepath.Join(dir, strconv.Itoa(i)), 0o700)
+		if err := os.Mkdir(filepath.Join(dir, strconv.Itoa(i)), 0o700); err != nil {
+			t.Error(err)
+		}
 	}
 	config := &config.Config{
 		Projects: []*config.ProjectConfig{
@@ -315,7 +327,9 @@ func TestListLogs(t *testing.T) {
 		}
 		logger.Info(ctx)
 		res := make(map[string]any)
-		json.Unmarshal(out.Bytes(), &res)
+		if err := json.Unmarshal(out.Bytes(), &res); err != nil {
+			t.Error(err)
+		}
 		errs := res["projectListEvent"].(map[string]any)["errors"].([]any)
 		if len(errs) != 1 {
 			t.Error("Should have one error")
@@ -399,7 +413,9 @@ func TestListLogsResult(t *testing.T) {
 		}
 		logger.Info(ctx)
 		res := make(map[string]any)
-		json.Unmarshal(out.Bytes(), &res)
+		if err := json.Unmarshal(out.Bytes(), &res); err != nil {
+			t.Error(err)
+		}
 		event := res["projectListResult"].(map[string]any)
 		list := event["result"].([]any)
 		seen := make(map[string]bool)
@@ -418,7 +434,9 @@ func BenchmarkList(b *testing.B) {
 	dir := b.TempDir()
 	n := 100
 	for i := range n {
-		os.Mkdir(filepath.Join(dir, strconv.Itoa(i)), 0o700)
+		if err := os.Mkdir(filepath.Join(dir, strconv.Itoa(i)), 0o700); err != nil {
+			b.Error(err)
+		}
 	}
 	config := &config.Config{
 		Projects: []*config.ProjectConfig{
@@ -436,7 +454,9 @@ func BenchmarkList(b *testing.B) {
 	ctx, tmux := testutil.SetupTestServer(b)
 	defer testutil.TeardownTestServer(tmux)
 	for i := range 10 {
-		tmux.New("test-" + strconv.Itoa(i))
+		if _, err := tmux.New("test-" + strconv.Itoa(i)); err != nil {
+			b.Error(err)
+		}
 	}
 	for b.Loop() {
 		projects, err := List(ctx, tmux, config)
@@ -583,7 +603,9 @@ func BenchmarkListControlMode(b *testing.B) {
 	dir := b.TempDir()
 	n := 100
 	for i := range n {
-		os.Mkdir(filepath.Join(dir, strconv.Itoa(i)), 0o700)
+		if err := os.Mkdir(filepath.Join(dir, strconv.Itoa(i)), 0o700); err != nil {
+			b.Error(err)
+		}
 	}
 	config := &config.Config{
 		Projects: []*config.ProjectConfig{
@@ -600,10 +622,18 @@ func BenchmarkListControlMode(b *testing.B) {
 	}
 	ctx, tmux := testutil.SetupTestServer(b)
 	defer testutil.TeardownTestServer(tmux)
-	tmux.StartControlMode()
-	defer tmux.StopControlMode()
+	if err := tmux.StartControlMode(); err != nil {
+		b.Error(err)
+	}
+	defer func() {
+		if err := tmux.StopControlMode(); err != nil {
+			b.Error(err)
+		}
+	}()
 	for i := range 10 {
-		tmux.New("test-" + strconv.Itoa(i))
+		if _, err := tmux.New("test-" + strconv.Itoa(i)); err != nil {
+			b.Error(err)
+		}
 	}
 	for b.Loop() {
 		projects, err := List(ctx, tmux, config)

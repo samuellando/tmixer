@@ -3,7 +3,7 @@
 
 all: build
 
-check: check-fmt test-all
+check: check-fmt lint spell
 
 build:
 	go build ./cmd/tmixer
@@ -19,6 +19,12 @@ check-fmt:
 
 test:
 	go test ./...
+
+lint:
+	golangci-lint run
+
+spell:
+	cspell .
 
 test-all:
 	go test -count=1 ./...

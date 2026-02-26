@@ -68,10 +68,6 @@ func (c cmd) withTargetPane(t *Pane) cmd {
 	return c.withFlag("-t", string(t.Id))
 }
 
-func (c cmd) withTargetSessionName(name string) cmd {
-	return c.withFlag("-t", "="+name+":")
-}
-
 func (c cmd) withSession(name string) cmd {
 	return c.withFlag("-s", name)
 }
@@ -89,7 +85,7 @@ func (c cmd) withWorkingDirectory(path string) cmd {
 }
 
 func (c cmd) withFormat(format string) cmd {
-	return c.withFlag("-F", fmt.Sprintf("%s", format))
+	return c.withFlag("-F", format)
 }
 
 func (c cmd) withFilter(filter string) cmd {

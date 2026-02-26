@@ -53,7 +53,7 @@ func (srv *Server) ActiveClient() (*Client, error) {
 	})
 	cId, err := parseClientId(clientInfos[0].id)
 	if err != nil {
-		return nil, fmt.Errorf("invalid client id: %w", err)
+		return nil, fmt.Errorf("INVALID CLIENT ID: %w", err)
 	}
 	return &Client{Id: cId, server: srv}, nil
 }
@@ -67,7 +67,7 @@ func (c *Client) Session() (*Session, error) {
 	// Since control mode always prints it's own session, we need to use list-clients here.
 	lines, err := c.server.command("list-clients").withFilter(fmt.Sprintf("#{==:#{client_name},%s}", c.Id)).withFormat("#{session_id}").run()
 	if len(lines) == 0 {
-		return nil, errors.Join(fmt.Errorf("Got no client session response"), err)
+		return nil, errors.Join(fmt.Errorf("GOT NO CLIENT SESSION RESPONSE"), err)
 	}
 	id, err := parseSessionId(lines[0])
 	if err != nil {

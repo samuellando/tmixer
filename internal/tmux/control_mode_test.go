@@ -22,7 +22,7 @@ func TestStartStopControlMode(t *testing.T) {
 	}
 }
 
-func TestStartStopControlModeSimul(t *testing.T) {
+func TestStartStopControlModeParallel(t *testing.T) {
 	ctx, s := testutil.SetupTestServer(t)
 	defer testutil.TeardownTestServer(s)
 	n := 10
@@ -60,8 +60,14 @@ func TestStartStopControlModeSimul(t *testing.T) {
 func TestRunCommand(t *testing.T) {
 	_, s := testutil.SetupTestServer(t)
 	defer testutil.TeardownTestServer(s)
-	s.StartControlMode()
-	defer s.StopControlMode()
+	if err := s.StartControlMode(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := s.StopControlMode(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 	_, err := s.ListSessions()
 	if err != nil {
 		t.Fatal(err)
@@ -74,7 +80,7 @@ func TestRunCommand(t *testing.T) {
 func TestUsesControlMode(t *testing.T) {
 	_, s := testutil.SetupTestServer(t)
 	defer testutil.TeardownTestServer(s)
-	// Since control mode is so much fater (~7000x) this is a reliable test
+	// Since control mode is so much faster (~7000x) this is a reliable test
 	n := 100
 	start := time.Now()
 	for range n {
@@ -84,8 +90,14 @@ func TestUsesControlMode(t *testing.T) {
 		}
 	}
 	psTime := time.Since(start)
-	s.StartControlMode()
-	defer s.StopControlMode()
+	if err := s.StartControlMode(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := s.StopControlMode(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 	start = time.Now()
 	for range n {
 		_, err := s.ListSessions()
@@ -94,7 +106,7 @@ func TestUsesControlMode(t *testing.T) {
 		}
 	}
 	cmTime := time.Since(start)
-	if !(20*cmTime <= psTime) {
+	if 20*cmTime > psTime {
 		t.Fatal("Should be slower")
 	}
 }
@@ -113,8 +125,14 @@ func BenchmarkRun(b *testing.B) {
 func BenchmarkControlModeRun(b *testing.B) {
 	_, s := testutil.SetupTestServer(b)
 	defer testutil.TeardownTestServer(s)
-	s.StartControlMode()
-	defer s.StopControlMode()
+	if err := s.StartControlMode(); err != nil {
+		b.Fatal(err)
+	}
+	defer func() {
+		if err := s.StopControlMode(); err != nil {
+			b.Fatal(err)
+		}
+	}()
 	for b.Loop() {
 		_, err := s.ListSessions()
 		if err != nil {

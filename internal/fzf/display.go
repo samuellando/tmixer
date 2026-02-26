@@ -38,11 +38,16 @@ func DisplayProjects(ctx context.Context, projects []*project.Project, w io.Writ
 	for _, project := range projects {
 		info, err := display(project)
 		if err != nil {
+			err := fmt.Errorf("while generating display string for project: %w", err)
+			event.Errors = append(event.Errors, err.Error())
+			return err
+		}
+		_, err = io.WriteString(w, info+"\n")
+		if err != nil {
 			err := fmt.Errorf("while displaying project: %w", err)
 			event.Errors = append(event.Errors, err.Error())
 			return err
 		}
-		io.WriteString(w, info+"\n")
 	}
 	return nil
 }
@@ -63,19 +68,19 @@ func display(p *project.Project) (string, error) {
 }
 
 func compare(projects []*project.Project, i, j int) (bool, error) {
-	istatus, err := projects[i].Status()
+	iStatus, err := projects[i].Status()
 	if err != nil {
 		return false, err
 	}
-	jstatus, err := projects[j].Status()
+	jStatus, err := projects[j].Status()
 	if err != nil {
 		return false, err
 	}
-	if istatus == project.PROJECT_STATUS_ATTACHED {
+	if iStatus == project.PROJECT_STATUS_ATTACHED {
 		return true, nil
 	}
-	if istatus == jstatus {
-		switch istatus {
+	if iStatus == jStatus {
+		switch iStatus {
 		case project.PROJECT_STATUS_INACTIVE:
 			return projects[i].Name < projects[j].Name, nil
 		case project.PROJECT_STATUS_ACTIVE:
@@ -90,5 +95,5 @@ func compare(projects []*project.Project, i, j int) (bool, error) {
 			return ila.After(*jla), nil
 		}
 	}
-	return istatus > jstatus, nil
+	return iStatus > jStatus, nil
 }

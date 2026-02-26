@@ -27,7 +27,7 @@ func TestProjectKill(t *testing.T) {
 		switch tc.initialStatus() {
 		case PROJECT_STATUS_INACTIVE:
 			if !errors.Is(res, ErrSessionNotFound) {
-				t.Error("Inactive project give session not found errror")
+				t.Error("Inactive project give session not found error")
 			}
 			err = cleanup()
 			if err != nil {
@@ -103,7 +103,10 @@ func TestProjectKillAttachedLastActive(t *testing.T) {
 			}
 		}
 		cleanup, err := attached.Kill(ctx)
-		cleanup()
+		if err != nil {
+			t.Error(err)
+		}
+		err = cleanup()
 		if err != nil {
 			t.Error(err)
 		}
@@ -137,7 +140,10 @@ func TestProjectKillAttachedDefault(t *testing.T) {
 			}
 			if tc.initialStatus() == PROJECT_STATUS_ACTIVE {
 				cleanup, err := tc.project.Kill(ctx)
-				cleanup()
+				if err != nil {
+					t.Error(err)
+				}
+				err = cleanup()
 				if err != nil {
 					t.Error(err)
 				}
@@ -158,7 +164,10 @@ func TestProjectKillAttachedDefault(t *testing.T) {
 		// Set the default project
 		attached.fullConfig.DefaultProject = &def
 		cleanup, err := attached.Kill(ctx)
-		cleanup()
+		if err != nil {
+			t.Error(err)
+		}
+		err = cleanup()
 		if err != nil {
 			t.Error(err)
 		}
@@ -207,7 +216,10 @@ func TestProjectKillAttachedNoDefault(t *testing.T) {
 		// Set the default project
 		attached.fullConfig.DefaultProject = nil
 		cleanup, err := attached.Kill(ctx)
-		cleanup()
+		if err != nil {
+			t.Error(err)
+		}
+		err = cleanup()
 		if err != nil {
 			t.Error(err)
 		}
@@ -266,7 +278,10 @@ func TestProjectKillAttachedNoProjects(t *testing.T) {
 			},
 		}
 		cleanup, err := attached.Kill(ctx)
-		cleanup()
+		if err != nil {
+			t.Error(err)
+		}
+		err = cleanup()
 		if err != nil {
 			t.Error(err)
 		}

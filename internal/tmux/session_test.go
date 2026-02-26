@@ -100,29 +100,29 @@ func TestWindows(t *testing.T) {
 
 func TestSessionName(t *testing.T) {
 	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
-		name := "test_sess_name"
+		name := "test_session_name"
 		s, _ := srv.New(name)
 		res, err := s.Name()
 		if err != nil {
 			t.Fatal(err)
 		}
 		if res != name {
-			t.Fatal("Names dont match")
+			t.Fatal("Names do not match")
 		}
 	})
 }
 
 func TestSessionReName(t *testing.T) {
 	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
-		name := "test_sess_name"
-		rename := "new_test_sess_name"
+		name := "test_session_name"
+		rename := "new_test_session_name"
 		s, _ := srv.New(name)
 		res, err := s.Name()
 		if err != nil {
 			t.Fatal(err)
 		}
 		if res != name {
-			t.Fatal("Names dont match")
+			t.Fatal("Names do not match")
 		}
 		err = s.Rename(rename)
 		if err != nil {
@@ -133,7 +133,7 @@ func TestSessionReName(t *testing.T) {
 			t.Fatal(err)
 		}
 		if res != rename {
-			t.Fatal("Renames dont match")
+			t.Fatal("Renames do not match")
 		}
 	})
 }
@@ -151,14 +151,14 @@ func TestSessionLastActivity(t *testing.T) {
 			t.Fatal(err)
 		}
 		if t1.After(*t2) {
-			t.Fatal("Shoul be before")
+			t.Fatal("Should be before")
 		}
 	})
 }
 
 func TestOptions(t *testing.T) {
 	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
-		name := "test_sess_name"
+		name := "test_session_name"
 		s, _ := srv.New(name)
 		err := s.SetOption("@hello", "world")
 		if err != nil {
@@ -169,14 +169,14 @@ func TestOptions(t *testing.T) {
 			t.Fatal(err)
 		}
 		if res != "world" {
-			t.Fatal("values dont match")
+			t.Fatal("values do not match")
 		}
 	})
 }
 
 func TestOptionsNotSet(t *testing.T) {
 	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
-		name := "test_sess_name"
+		name := "test_session_name"
 		s, _ := srv.New(name)
 		_, err := s.GetOption("@hello")
 		if err == nil {

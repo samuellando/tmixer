@@ -22,7 +22,7 @@ type Window struct {
 func (w *Window) GetOption(key string) (string, error) {
 	lines, err := w.server.command("show-options").withTargetWindow(w).withArgument(key).withFlag("-v").withFlag("-q").run()
 	if len(lines) == 0 {
-		return "", fmt.Errorf("Got no output: %w", err)
+		return "", errors.Join(fmt.Errorf("GOT NO OUTPUT"), err)
 	}
 	return lines[0], err
 }
@@ -40,7 +40,7 @@ func (w *Window) Select() error {
 func (w *Window) Name() (string, error) {
 	lines, err := w.server.command("display").withFlag("-p").withTargetWindow(w).withFormat("#{window_name}").run()
 	if len(lines) == 0 {
-		return "", errors.Join(fmt.Errorf("Got no name"), err)
+		return "", errors.Join(fmt.Errorf("GOT NO NAME"), err)
 	}
 	return lines[0], err
 }

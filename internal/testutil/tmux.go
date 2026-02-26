@@ -35,11 +35,17 @@ func SetupTestClient(tmux *tmux.Server, session *tmux.Session) *os.File {
 	select {
 	case err := <-readErrChan:
 		if err != nil {
-			f.Close()
+			err := f.Close()
+			if err != nil {
+				panic(err)
+			}
 			panic(fmt.Errorf("failed to read from tmux client: %w", err))
 		}
 	case <-time.After(2 * time.Second):
-		f.Close()
+		err := f.Close()
+		if err != nil {
+			panic(err)
+		}
 		panic(fmt.Errorf("timeout waiting for tmux client responsiveness"))
 	}
 
@@ -53,7 +59,7 @@ func SetupTestServer(t testing.TB) (context.Context, *tmux.Server) {
 	// Start one extra session so the server starts
 	_, err := tmux.New(DEFAULT_TEST_SESSION)
 	if err != nil {
-		t.Fatal(fmt.Errorf("Error while starting server %w", err))
+		t.Fatal(fmt.Errorf("while starting server %w", err))
 	}
 	return ctx, tmux
 }
@@ -82,7 +88,10 @@ func RunWithAndWithoutControlMode(t *testing.T, f func(t *testing.T, ctx context
 			t.Fatal(err)
 		}
 		f(t, ctx, tmux)
-		tmux.StopControlMode()
+		err = tmux.StopControlMode()
+		if err != nil {
+			t.Error(err)
+		}
 		TeardownTestServer(tmux)
 		// Give shell processes and tmux server time to fully exit
 		time.Sleep(500 * time.Millisecond)

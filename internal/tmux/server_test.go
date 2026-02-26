@@ -17,7 +17,9 @@ func TestHasSession(t *testing.T) {
 		if !srv.HasSession(s) {
 			t.Fatal("Should have session")
 		}
-		s.Kill()
+		if err := s.Kill(); err != nil {
+			t.Fatal(err)
+		}
 		if srv.HasSession(s) {
 			t.Fatal("Should have session anymore")
 		}
@@ -34,7 +36,9 @@ func TestHasSessionWithName(t *testing.T) {
 		if !srv.HasSessionWithName(name) {
 			t.Fatal("Should have session")
 		}
-		s.Kill()
+		if err := s.Kill(); err != nil {
+			t.Fatal(err)
+		}
 		if srv.HasSessionWithName(name) {
 			t.Fatal("Should have session anymore")
 		}

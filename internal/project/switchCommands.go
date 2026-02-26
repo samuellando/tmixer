@@ -11,14 +11,14 @@ import (
 // Runs the projects switch commands in it's active session.
 // If no session exists, it returns ErrSessionNotFound.
 func (p *Project) RunSwitchCommands(ctx context.Context) error {
-	type projecRunSwitchCommandsEvent struct {
+	type projectRunSwitchCommandsEvent struct {
 		Name      string         `json:"name"`
 		SessionId tmux.SessionId `json:"sessionId,omitempty"`
 		Commands  [][]string     `json:"commands,omitempty"`
 		Errors    []string       `json:"errors,omitempty"`
 	}
-	event := &projecRunSwitchCommandsEvent{Name: p.Name}
-	finish := log.Track(ctx, "projecRunSwitchCommandsEvent", event)
+	event := &projectRunSwitchCommandsEvent{Name: p.Name}
+	finish := log.Track(ctx, "projectRunSwitchCommandsEvent", event)
 	defer finish()
 
 	if p.Config == nil {
