@@ -75,9 +75,6 @@ func TestProjectReset(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
-			if err != nil {
-				t.Error(err)
-			}
 		default:
 			t.Error("Not implemented")
 		}
@@ -111,10 +108,7 @@ func TestProjectReset_NoConfig(t *testing.T) {
 		if cleanupErr != nil {
 			t.Error(cleanupErr)
 		}
-		if cleanupErr != nil {
-			t.Error(cleanupErr)
-		}
-		expected := fmt.Sprintf("Session %s has no project config to reset to", p.Name)
+		expected := fmt.Sprintf("SESSION %s HAS NO PROJECT CONFIG TO RESET TO", p.Name)
 		if resetErr != nil && resetErr.Error() != expected {
 			t.Errorf("Expected error %q got %q", expected, resetErr.Error())
 		}
@@ -129,9 +123,10 @@ func TestProjectResetWindowsAndPanes(t *testing.T) {
 		}
 		session := tc.session
 		cleanup, err := tc.project.Reset(ctx)
-		if err := cleanup(); err != nil {
+		if err != nil {
 			t.Error(err)
 		}
+		err = cleanup()
 		if err != nil {
 			t.Error(err)
 		}

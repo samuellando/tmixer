@@ -20,7 +20,10 @@ func TestLogs(t *testing.T) {
 	}
 	logPath := filepath.Join(home, ".local/state/tmixer/logs")
 	testutil.CaptureStdout(func() {
-		f, _ := log.RotateLogFile(logPath, 24*time.Hour)
+		f, err := log.RotateLogFile(logPath, 24*time.Hour)
+		if err != nil {
+			t.Error(err)
+		}
 		logFile := f.Name()
 		stat, err := f.Stat()
 		origSize := stat.Size()
