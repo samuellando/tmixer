@@ -70,7 +70,7 @@ func TestWindowNameless(t *testing.T) {
 			t.Fatal(err)
 		}
 		if !strings.Contains(res, "sh") {
-			t.Fatal("Name does not contain 'sh'")
+			t.Fatalf("Name '%s' does not contain 'sh'", res)
 		}
 	})
 }
