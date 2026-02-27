@@ -394,24 +394,23 @@ and the reset command, which will reset the attached session.
 
 switch (default)
 	switch the active tmux client to the project. It will either switch to the 
-	existing session or start a session for the project, open it's configured 
-	startup windows and then switch to it.
+	existing session or start a session for the project.
 
 	After switching to a project/session, tmixer will run it's configured 
 	switch commands.
 
 	Note that a project's switch commands are automatically run any time you switch 
-	to the session in tmux, even without this command. For example with leader-b.
+	to the session in tmux. For example even with leader-b.
 
 start
 	Equivalent to starting tmux normally, but will open into a project. By
 	default it starts the default configured project.
 
 kill
-	kill the session/project.
+	kill the project.
 
 reset
-	kill and restart the project session. By default will reset the attached session.
+	reset the state of the project's session to it's configured state.
 
 Flags: `)
 	fmt.Println()

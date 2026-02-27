@@ -16,6 +16,7 @@
         "Errorf",
         "lifecycles",
         "subtests",
-        "nvim"
+        "nvim",
+        "worktrees"
     ]
 }

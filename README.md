@@ -1,6 +1,6 @@
 <div align="center">
     <h1>tmixer</h1>
-    <p>v0.3.0-alpha</p>
+    <p>v0.4.0-alpha</p>
 </div>
 
 > [!NOTE]
@@ -8,17 +8,16 @@
 
 ## Overview
 
-tmixer is a feature rich and speedy [tmux](https://github.com/tmux/tmux) session manager written in go.
+tmixer is a feature rich and fast [tmux](https://github.com/tmux/tmux) session manager written in go.
 
 - tmixer indexes all the projects on your system, and allows you to quickly switch between tmux sessions created for them
 - tmixer has powerful per-project configurations for:
     - Automatically spawning tmux window and pane layouts at startup, with specific commands to execute on each.
-    - Commands that should be automatically executed every time the project is switched to.
-    - And more..
+    - Hooks that should be automatically executed every time the project is switched to.
 - In addition to basing projects on specific directories, tmixer can also import projects from:
     - Sub directories of a specific parent directory, for example ~/Projects will import all the projects in that directory
-    - Official importers such as github, gitlab, etc. (Coming soon)
-- tmixer is fast. It communicates with tmux using control mode, using streams instead of spawning a new process for each command.
+    - Importers such as git-worktrees, github, gitlab, etc. (Coming soon)
+- tmixer is fast. It communicates with tmux using control mode instead of spawning a new process for each command.
 
 ## Dependencies
 
@@ -40,7 +39,7 @@ options will be made available.
     bind r run-shell "tmixer reset"  # Reset the currently attached project
     ```
 
-2. Add the following to `~/.tmixer.yml` or `~/.config/tmixer/config.yml`
+2. Add something like the following to `~/.tmixer.yml` or `~/.config/tmixer/config.yml`
     ```yml
     defaultProject: home
 
@@ -85,30 +84,29 @@ Commands:
 
 All commands will by default open fzf if no project_name is provided. Except for
 the start command, which will start the configured default project in a new tmux client,
-and the reset command, which will reset the currently attached session.
+and the reset command, which will reset the attached session.
 
 switch (default)
         switch the active tmux client to the project. It will either switch to the
-        existing session or start a session with the project configuration.
+        existing session or start a session for the project.
 
         After switching to a project/session, tmixer will run it's configured
         switch commands.
 
         Note that a project's switch commands are automatically run any time you switch
-        to the session in tmux, even without this command. For example with leader-b.
+        to the session in tmux. For example even with leader-b.
 
 start
         Equivalent to starting tmux normally, but will open into a project. By
         default it starts the default configured project.
 
 kill
-        kill the session/project.
+        kill the project.
 
 reset
-        kill and restart the project session. By default will reset the attached session.
+        reset the state of the project's session to it's configured state.
 
 Flags:
-[See section below]
 ```
 
 ## Configuration
@@ -123,7 +121,7 @@ This can be done in:
 - a local `.tmixer.yml` file in the project directory. (Project level configs only)
 
 Projects from all the config files will be combined unless the `combineProjects` 
-is set to `false`. 
+is set to `false`.
 
 Configurations will be overridden in the following order:
 - `configs passed to command line` overrides
@@ -136,41 +134,43 @@ Configurations will be overridden in the following order:
 
 #### Top level/global configurations
 
-| yaml option      |  description                                                                                             | default value  |
-| ---              | ---                                                                                                     | ---            |
-| defaultProject   |  The default project to open at startup                                                                  |                |
-| ttl              |  How long before a project with no activity is automatically killed (example `24h`)                      |                |
-| combineProjects  |  Whether the list of projects should be overridden or combined when multiple config files are present      | `true`         |
-| logFile          |  Additional log file in addition to `~/.local/state/tmixer/logs/`                                        |                |
-| logLevel         |  The log level, `INFO` or `DEBUG`                                                                        | `INFO`         |
-| logRetentionDays |  How many days of logs to keep in `~/.local/state/tmixer/logs/`                                          | `7`            |
-| tmuxSocketPath   | ` What tmux socket to use, equivalent to the tmux `-S` flag                                               | `tmux default` |
-| projects         | A list of project configurations                                                                        |                |
+| yaml option      | type              | description                                                                                          | default value  |
+| ---              | ---               | ---                                                                                                  | ---            |
+| defaultProject   | `string`          | The default project to open at startup                                                               |                |
+| ttl              | `string`          | How long before a project with no activity is automatically killed (example `24h`)                   |                |
+| combineProjects  | `bool`            | Whether the list of projects should be overridden or combined when multiple config files are present | `true`         |
+| logFile          | `string`          | Additional log file in addition to `~/.local/state/tmixer/logs/`                                     |                |
+| logLevel         | `string`          | The log level, `INFO` or `DEBUG`                                                                     | `INFO`         |
+| logRetentionDays | `int`             | How many days of logs to keep in `~/.local/state/tmixer/logs/`                                       | `7`            |
+| tmuxSocketPath   | `string`          | What tmux socket to use, equivalent to the tmux `-S` flag                                            | `tmux default` |
+| projects         | `[]projectConfig` | A list of project configurations                                                                     |                |
 
 #### Project configurations
 
-| yaml option      |  description                                                                                             | default value  |
-| ---              | ---                                                                                                     | ---            |
-| name             |  The name of the project                                                                                 |                |
-| directory        | The directory of the project                                                                            |                |
-| subDirectories   | If true, the subdirectories will be loaded as individual projects with names `[parent_name]--[sub_dir]` | `false`        |
-| windows          |  A list of window configurations                                                                         |                |
-| switchCommands   | A list commands (strings) to run every time this project is switched to                                 |                |
+| yaml option    | type             | description                                                                                             | default value |
+| ---            | ---              | ---                                                                                                     | ---           |
+| name*          | `string`         | The name of the project                                                                                 |               |
+| directory*     | `string`         | The directory of the project                                                                            |               |
+| subDirectories | `bool`           | If true, the subdirectories will be loaded as individual projects with names `[parent_name]--[sub_dir]` | `false`       |
+| windows        | `[]windowConfig` | A list of window configurations                                                                         |               |
+| switchCommands | `[][]string`     | A list of commands to run every time this project is switched to                                        |               |
+
+* Required
 
 #### Window configurations
 
-| yaml option      |  description                                                                                             | default value  |
-| ---              | ---                                                                                                     | ---            |
-| name             |  The name of the window, will display in tmux status bar                                                 |                |
-| command          |  The startup command to execute on the first pane of this window, shorthand for adding a pane            |                |
-| panes            | A list of pane configurations                                                                           |                |
+| yaml option | type           | description                                                                                  | default value                |
+| ---         | ---            | ---                                                                                          | ---                          |
+| name        | `string`       | The name of the window, will display in tmux status bar                                      | Displays the current program |
+| command     | `[]string`     | The startup command to execute on the first pane of this window, shorthand for adding a pane |                              |
+| panes       | `[]paneConfig` | A list of pane configurations                                                                |                              |
 
 #### Pane configurations
 
-| yaml option      |  description                                                                                             | default value  |
-| ---              | ---                                                                                                     | ---            |
-| command          | The startup command for this pane                                                                       |                |
-| split            |  How to split the previously defined pane when splitting this pane  (`vertical` or `horizontal`)          | `horizontal`   |
+| yaml option | type       | description                                                                                     | default value |
+| ---         | ---        | ---                                                                                             | ---           |
+| command     | `[]string` | The startup command for this pane                                                               |               |
+| split       | `string`   | How to split the previously defined pane when splitting this pane  (`vertical` or `horizontal`) | `horizontal`  |
 
 
 ### Example configuration
@@ -191,15 +191,14 @@ projects:
     subDirectories: true
 
     windows:
-      - name: "nvim"
-        command: "nvim ."
+      - command: ["nvim", "."]
 
       - name: "shell"
 
       - name: logs 
         panes:
-          - command: "tail -f ./logs.out"
-          - command: "tail -f ./err.out"
+          - command: ["tail", "-f", "./logs.out"]
+          - command: ["tail", "-f", "./err.out"]
             split: "vert"
 
     switchCommands:
