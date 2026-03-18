@@ -76,9 +76,13 @@ func PickProject(ctx context.Context, config *config.Config, projects []*project
 	out, err := io.ReadAll(ptx)
 	err = cmd.Wait()
 	if err != nil {
-		err := fmt.Errorf("fzf command error: %w", err)
-		event.Errors = append(event.Errors, err.Error())
-		return nil, err
+		if cmd.ProcessState.ExitCode() != 130 {
+			err := fmt.Errorf("fzf command error: %w", err)
+			event.Errors = append(event.Errors, err.Error())
+			return nil, err
+		} else {
+			return nil, nil
+		}
 	}
 	if err = <-displayErrs; err != nil {
 		event.Errors = append(event.Errors, err.Error())
