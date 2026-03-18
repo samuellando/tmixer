@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"sync"
 	"syscall"
 
 	"github.com/creack/pty"
@@ -18,6 +19,7 @@ type ptx struct {
 	inPipe  io.WriteCloser
 	signal  chan os.Signal
 	errors  []error
+	mu      sync.Mutex
 }
 
 // Starts the command in a PTY, with the special ability to pipe in
@@ -59,17 +61,19 @@ func startPty(cmd *exec.Cmd, stdin *os.File, stdout *os.File) (*ptx, error) {
 
 	go func() {
 		_, err = io.Copy(ptmx, stdin)
-		ptx.errors = append(ptx.errors, err)
+		ptx.appendError(err)
 	}()
 	go func() {
 		_, err = io.Copy(stdout, ptmx)
-		ptx.errors = append(ptx.errors, err)
+		ptx.appendError(err)
 	}()
 
 	return ptx, nil
 }
 
 func (ptx *ptx) Close() error {
+	ptx.mu.Lock()
+	defer ptx.mu.Unlock()
 	var err error
 	inErr := ptx.CloseInPipe()
 	if inErr != nil && !errors.Is(inErr, os.ErrClosed) {
@@ -111,7 +115,16 @@ func (ptx *ptx) resize(stdin *os.File) {
 	if err == nil {
 		err = pty.Setsize(ptx.ptmx, ws)
 		if err != nil {
-			ptx.errors = append(ptx.errors, err)
+			ptx.appendError(err)
 		}
 	}
+}
+
+func (ptx *ptx) appendError(e error) {
+	if e == nil {
+		return
+	}
+	ptx.mu.Lock()
+	ptx.errors = append(ptx.errors, e)
+	ptx.mu.Unlock()
 }

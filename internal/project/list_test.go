@@ -577,6 +577,7 @@ switchCommands:
 		}
 		if homeProject == nil {
 			t.Fatal("home-project not listed")
+			return
 		}
 		if validProject == nil {
 			t.Fatal("valid-project not listed")
