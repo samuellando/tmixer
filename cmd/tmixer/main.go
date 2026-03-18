@@ -297,7 +297,8 @@ func startClient(ctx context.Context, srv *tmux.Server, p *project.Project) erro
 		return err
 	}
 	if _, is_set := os.LookupEnv("TMUX"); is_set {
-		return fmt.Errorf("ALREADY IN TMUX")
+		_, err := p.Start(ctx)
+		return err
 	}
 	cmd := exec.Command("tmux", "-u", "attach", "-t", p.TmuxSessionName())
 	cmd.Stdin = os.Stdin
