@@ -1,4 +1,4 @@
-package log
+package rotation
 
 import (
 	"fmt"

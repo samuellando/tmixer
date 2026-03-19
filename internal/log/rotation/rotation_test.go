@@ -1,4 +1,4 @@
-package log_test
+package rotation_test
 
 import (
 	"os"
@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"samuellando.com/tmixer/internal/log"
+	"samuellando.com/tmixer/internal/log/rotation"
 )
 
 func TestRotateLogFile(t *testing.T) {
@@ -14,22 +14,22 @@ func TestRotateLogFile(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Create some old log files
-	oldDate := time.Now().AddDate(0, 0, -10).Format(log.LogDateFormat)
-	oldLogPath := filepath.Join(tmpDir, log.LogFilePrefix+oldDate+log.LogFileSuffix)
+	oldDate := time.Now().AddDate(0, 0, -10).Format(rotation.LogDateFormat)
+	oldLogPath := filepath.Join(tmpDir, rotation.LogFilePrefix+oldDate+rotation.LogFileSuffix)
 	if err := os.WriteFile(oldLogPath, []byte("old log"), 0644); err != nil {
 		t.Fatalf("Failed to create old log file: %v", err)
 	}
 
 	// Create a recent log file (should be kept)
-	recentDate := time.Now().AddDate(0, 0, -2).Format(log.LogDateFormat)
-	recentLogPath := filepath.Join(tmpDir, log.LogFilePrefix+recentDate+log.LogFileSuffix)
+	recentDate := time.Now().AddDate(0, 0, -2).Format(rotation.LogDateFormat)
+	recentLogPath := filepath.Join(tmpDir, rotation.LogFilePrefix+recentDate+rotation.LogFileSuffix)
 	if err := os.WriteFile(recentLogPath, []byte("recent log"), 0644); err != nil {
 		t.Fatalf("Failed to create recent log file: %v", err)
 	}
 
 	// Run rotation with 7 day retention
 	retention := 7 * 24 * time.Hour
-	file, err := log.RotateLogFile(tmpDir, retention)
+	file, err := rotation.RotateLogFile(tmpDir, retention)
 	if err != nil {
 		t.Fatalf("RotateLogFile failed: %v", err)
 	}
@@ -51,8 +51,8 @@ func TestRotateLogFile(t *testing.T) {
 	}
 
 	// Check that today's log file was created
-	todayDate := time.Now().UTC().Format(log.LogDateFormat)
-	todayLogPath := filepath.Join(tmpDir, log.LogFilePrefix+todayDate+log.LogFileSuffix)
+	todayDate := time.Now().UTC().Format(rotation.LogDateFormat)
+	todayLogPath := filepath.Join(tmpDir, rotation.LogFilePrefix+todayDate+rotation.LogFileSuffix)
 	if _, err := os.Stat(todayLogPath); err != nil {
 		t.Errorf("Today's log file should have been created: %s", todayLogPath)
 	}
@@ -67,7 +67,7 @@ func TestRotateLogFile_CreatesDirectory(t *testing.T) {
 	// Use a non-existent directory
 	tmpDir := filepath.Join(t.TempDir(), "nested", "log", "dir")
 
-	file, err := log.RotateLogFile(tmpDir, 24*time.Hour)
+	file, err := rotation.RotateLogFile(tmpDir, 24*time.Hour)
 	if err != nil {
 		t.Fatalf("RotateLogFile should create directory: %v", err)
 	}
@@ -103,7 +103,7 @@ func TestRotateLogFile_IgnoresNonLogFiles(t *testing.T) {
 	}
 
 	// Run rotation
-	file, err := log.RotateLogFile(tmpDir, 24*time.Hour)
+	file, err := rotation.RotateLogFile(tmpDir, 24*time.Hour)
 	if err != nil {
 		t.Fatalf("RotateLogFile failed: %v", err)
 	}
@@ -127,15 +127,15 @@ func TestRotateLogFile_AppendMode(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Create today's log file with existing content
-	todayDate := time.Now().UTC().Format(log.LogDateFormat)
-	todayLogPath := filepath.Join(tmpDir, log.LogFilePrefix+todayDate+log.LogFileSuffix)
+	todayDate := time.Now().UTC().Format(rotation.LogDateFormat)
+	todayLogPath := filepath.Join(tmpDir, rotation.LogFilePrefix+todayDate+rotation.LogFileSuffix)
 	existingContent := "existing log entry\n"
 	if err := os.WriteFile(todayLogPath, []byte(existingContent), 0644); err != nil {
 		t.Fatalf("Failed to create existing log file: %v", err)
 	}
 
 	// Open with rotation (should append, not truncate)
-	file, err := log.RotateLogFile(tmpDir, 24*time.Hour)
+	file, err := rotation.RotateLogFile(tmpDir, 24*time.Hour)
 	if err != nil {
 		t.Fatalf("RotateLogFile failed: %v", err)
 	}

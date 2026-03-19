@@ -14,6 +14,7 @@ import (
 	"samuellando.com/tmixer/internal/flags"
 	"samuellando.com/tmixer/internal/fzf"
 	"samuellando.com/tmixer/internal/log"
+	"samuellando.com/tmixer/internal/log/rotation"
 	"samuellando.com/tmixer/internal/project"
 	"samuellando.com/tmixer/internal/tmux"
 )
@@ -362,7 +363,7 @@ func setupLogging(ctx context.Context, config *config.Config) (*log.Logger, []*o
 	}
 	logDir := filepath.Join(home, ".local/state/tmixer/logs")
 
-	f, err := log.RotateLogFile(logDir, retention)
+	f, err := rotation.RotateLogFile(logDir, retention)
 	if err != nil {
 		return nil, nil, err
 	}

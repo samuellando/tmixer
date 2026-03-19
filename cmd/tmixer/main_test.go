@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"samuellando.com/tmixer/internal/log"
+	"samuellando.com/tmixer/internal/log/rotation"
 	"samuellando.com/tmixer/internal/testutil"
 )
 
@@ -20,7 +20,7 @@ func TestLogs(t *testing.T) {
 	}
 	logPath := filepath.Join(home, ".local/state/tmixer/logs")
 	testutil.CaptureStdout(func() {
-		f, err := log.RotateLogFile(logPath, 24*time.Hour)
+		f, err := rotation.RotateLogFile(logPath, 24*time.Hour)
 		if err != nil {
 			t.Error(err)
 		}
