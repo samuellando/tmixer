@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"sync"
 	"time"
 )
 
@@ -18,11 +17,11 @@ const (
 type logger struct {
 	options   LogOptions
 	wideEvent wideEvent
-	sinks     []io.WriteCloser
 }
 
 type LogOptions struct {
 	Level int
+	Sinks []io.WriteCloser
 }
 
 type contextKey string
@@ -33,23 +32,11 @@ var CONTEXT_KEY = contextKey("logger")
 // events can be logged with the log.Track(...) methods
 // When the context is cancelled, the events will all be logged into a single
 // wide event and the close function will be called on all sinks
-func WithLogger(ctx context.Context, options LogOptions) (context.Context, *sync.WaitGroup) {
+func ContextLogger(ctx context.Context, options LogOptions) context.Context {
 	logger := logger{options: options, wideEvent: newWideEvent()}
 	ctx = context.WithValue(ctx, CONTEXT_KEY, &logger)
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	context.AfterFunc(ctx, func() {
-		defer wg.Done()
-		logger := getLogger(ctx)
-		logger.commit()
-		for _, sink := range logger.sinks {
-			err := sink.Close()
-			if err != nil {
-				panic(err)
-			}
-		}
-	})
-	return ctx, &wg
+
+	return ctx
 }
 
 // Sets the context logger's options
@@ -62,7 +49,19 @@ func SetOptions(ctx context.Context, options LogOptions) {
 // cancelled.
 func AddSink(ctx context.Context, w io.WriteCloser) {
 	logger := getLogger(ctx)
-	logger.sinks = append(logger.sinks, w)
+	logger.options.Sinks = append(logger.options.Sinks, w)
+}
+
+// Write the log event and close all sinks
+func Done(ctx context.Context) {
+	logger := getLogger(ctx)
+	logger.commit()
+	for _, sink := range logger.options.Sinks {
+		err := sink.Close()
+		if err != nil {
+			panic(err)
+		}
+	}
 }
 
 // Report a fatal error. Will set the level to "ERROR" on the wideEvent and will
@@ -70,6 +69,7 @@ func AddSink(ctx context.Context, w io.WriteCloser) {
 func Fatal(ctx context.Context, err error) {
 	logger := getLogger(ctx)
 	logger.wideEvent.fatal(err)
+	Done(ctx)
 }
 
 // Track an event.
@@ -105,13 +105,12 @@ func getLogger(ctx context.Context) *logger {
 }
 
 func (logger *logger) commit() {
-	start := logger.wideEvent.time
-	logger.wideEvent.duration = time.Since(start)
+	logger.wideEvent.done()
 	b, err := json.Marshal(logger.wideEvent)
 	if err != nil {
 		panic(err)
 	}
-	for _, w := range logger.sinks {
+	for _, w := range logger.options.Sinks {
 		_, err = fmt.Fprintln(w, string(b))
 		if err != nil {
 			panic(err)
