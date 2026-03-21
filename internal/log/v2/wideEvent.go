@@ -59,6 +59,15 @@ func (w wideEvent) MarshalJSON() ([]byte, error) {
 	}
 	fmt.Fprintf(&out, `"%s":%s`, "level", string(b))
 	out.WriteByte(',')
+	// error
+	if w.error != nil {
+		b, err := json.Marshal(w.error.Error())
+		if err != nil {
+			return nil, err
+		}
+		fmt.Fprintf(&out, `"%s":%s`, "error", string(b))
+		out.WriteByte(',')
+	}
 	// Time
 	b, err = json.Marshal(w.time)
 	if err != nil {
@@ -66,15 +75,6 @@ func (w wideEvent) MarshalJSON() ([]byte, error) {
 	}
 	fmt.Fprintf(&out, `"%s":%s`, "time", string(b))
 	out.WriteByte(',')
-	// error
-	if w.error != nil {
-		b, err := json.Marshal(w.error)
-		if err != nil {
-			return nil, err
-		}
-		fmt.Fprintf(&out, `"%s":%s`, "error", string(b))
-		out.WriteByte(',')
-	}
 	// Events
 	for _, event := range w.sortEventsByTimestamp() {
 		b, err = json.Marshal(event)

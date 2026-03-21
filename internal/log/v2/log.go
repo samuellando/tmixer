@@ -30,12 +30,10 @@ var CONTEXT_KEY = contextKey("logger")
 
 // Initialize a logger on the context
 // events can be logged with the log.Track(...) methods
-// When the context is cancelled, the events will all be logged into a single
-// wide event and the close function will be called on all sinks
+// When log.Done() is called, get log message will be written to all sinks.
 func ContextLogger(ctx context.Context, options LogOptions) context.Context {
 	logger := logger{options: options, wideEvent: newWideEvent()}
 	ctx = context.WithValue(ctx, CONTEXT_KEY, &logger)
-
 	return ctx
 }
 
@@ -45,8 +43,7 @@ func SetOptions(ctx context.Context, options LogOptions) {
 	logger.options = options
 }
 
-// Add a sink to the logger, will automatically call close when the context is
-// cancelled.
+// Add a sink to the logger
 func AddSink(ctx context.Context, w io.WriteCloser) {
 	logger := getLogger(ctx)
 	logger.options.Sinks = append(logger.options.Sinks, w)
@@ -64,8 +61,8 @@ func Done(ctx context.Context) {
 	}
 }
 
-// Report a fatal error. Will set the level to "ERROR" on the wideEvent and will
-// Log the error.
+// Report a fatal error. Will set the level to "ERROR" on the log message and will
+// Log the error. Automatically calls Done
 func Fatal(ctx context.Context, err error) {
 	logger := getLogger(ctx)
 	logger.wideEvent.fatal(err)

@@ -73,7 +73,11 @@ func (e *event) MarshalJSON() ([]byte, error) {
 	}
 	// errors
 	if len(e.errors) != 0 {
-		b, err := json.Marshal(e.errors)
+		errorStrings := make([]string, 0, len(e.errors))
+		for _, err := range e.errors {
+			errorStrings = append(errorStrings, err.Error())
+		}
+		b, err := json.Marshal(errorStrings)
 		if err != nil {
 			return nil, err
 		}
