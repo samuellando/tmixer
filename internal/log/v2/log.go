@@ -69,9 +69,10 @@ func Fatal(ctx context.Context, err error) {
 	Done(ctx)
 }
 
-// Track an event.
-// The returned object will be automatically logged when the context is cancelled
-// as part of the wide event
+// Track an event in the log message.
+// The event will be automatically included in the log message when log.Done() is
+// Called. The caller should also call the Done method on the event to keep Track
+// of the duration.
 func Track(ctx context.Context, eventName string) Event {
 	logger := getLogger(ctx)
 	e := newEvent(eventName)
@@ -80,10 +81,8 @@ func Track(ctx context.Context, eventName string) Event {
 }
 
 // Track an event.
-// but will only actually include it in the wide event if the logger's level is
-// below level.
-// The returned object will be automatically logged when the context is cancelled
-// as part of the wide event
+// but will only actually include it in the log message if the log level is sufficient.
+// Also see the log.Track
 func TrackLevel(ctx context.Context, level int, eventName string) Event {
 	logger := getLogger(ctx)
 	e := event{name: eventName, time: time.Now()}
