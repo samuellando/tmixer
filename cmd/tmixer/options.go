@@ -55,7 +55,7 @@ var FLAGS = map[string]flags.Flag{
 		Default:     "1",
 		ParseInput: func(s string, c *config.Config) error {
 			if s == "" {
-				return fmt.Errorf("log file must be provided")
+				return fmt.Errorf("number of log retention days must be provided")
 			}
 			var v int
 			var err error
@@ -76,11 +76,15 @@ var FLAGS = map[string]flags.Flag{
 		ShortName:   "c",
 		Description: "Provide an additional config file overriding global configs from ~/.tmixer.yml and ~/.config/tmixer/config.yml",
 		Usage:       "--config config.yml or -c config.yml",
+		Default:     "none",
 		ParseInput: func(s string, c *config.Config) error {
 			if s == "" {
 				return fmt.Errorf("config file must be provided")
 			}
-			c.ConfigFiles = append(c.ConfigFiles, s)
+			c.ConfigFiles = []string{"~/.config/tmixer/config.yml", "~/.tmixer.yml"}
+			if s != "none" {
+				c.ConfigFiles = append(c.ConfigFiles, s)
+			}
 			return nil
 		},
 		EnvironmentVariable: "TMIXER_CONFIG",
@@ -135,5 +139,27 @@ var FLAGS = map[string]flags.Flag{
 			return nil
 		},
 		EnvironmentVariable: "TMIXER_SOCKET_PATH",
+	},
+	"fzfFlags": {
+		Description: "Flags to pass to fzf",
+		Usage:       "comma or new line separated",
+		Default: `--ansi
+		--bind,ctrl-k:execute(tmixer kill {2})+reload(tmixer list)
+		--bind,ctrl-r:execute(tmixer reset {2})+reload(tmixer list)
+		--bind,ctrl-s:execute(tmixer start {2})+reload(tmixer list)
+		`,
+		ParseInput: func(s string, c *config.Config) error {
+			s = strings.ReplaceAll(s, "\n", ",")
+			flags := strings.Split(s, ",")
+			c.FzfFlags = make([]string, 0, len(flags))
+			for _, f := range flags {
+				s = strings.TrimSpace(f)
+				if s != "" {
+					c.FzfFlags = append(c.FzfFlags, s)
+				}
+			}
+			return nil
+		},
+		EnvironmentVariable: "TMIXER_FZF_FLAGS",
 	},
 }

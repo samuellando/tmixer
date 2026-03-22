@@ -9,7 +9,7 @@ import (
 
 func TestHelpFlag(t *testing.T) {
 	t.Parallel()
-	conf := config.New()
+	conf := &config.Config{}
 	flag := FLAGS["help"]
 
 	err := flag.ParseInput("", conf)
@@ -24,7 +24,7 @@ func TestHelpFlag(t *testing.T) {
 
 func TestLogFileFlag(t *testing.T) {
 	t.Parallel()
-	conf := config.New()
+	conf := &config.Config{}
 	flag := FLAGS["logFile"]
 
 	err := flag.ParseInput("", conf)
@@ -43,7 +43,7 @@ func TestLogFileFlag(t *testing.T) {
 
 func TestLogLevelFlag(t *testing.T) {
 	t.Parallel()
-	conf := config.New()
+	conf := &config.Config{}
 	flag := FLAGS["logLevel"]
 
 	err := flag.ParseInput("info", conf)
@@ -86,7 +86,7 @@ func TestLogLevelFlag(t *testing.T) {
 
 func TestLogRetentionDaysFlag(t *testing.T) {
 	t.Parallel()
-	conf := config.New()
+	conf := &config.Config{}
 	flag := FLAGS["logRetentionDays"]
 
 	err := flag.ParseInput("", conf)
@@ -118,7 +118,7 @@ func TestLogRetentionDaysFlag(t *testing.T) {
 
 func TestConfigFlag(t *testing.T) {
 	t.Parallel()
-	conf := config.New()
+	conf := &config.Config{}
 	flag := FLAGS["config"]
 	startingConfigFiles := len(conf.ConfigFiles)
 
@@ -146,7 +146,7 @@ func TestConfigFlag(t *testing.T) {
 
 func TestDefaultProjectFlag(t *testing.T) {
 	t.Parallel()
-	conf := config.New()
+	conf := &config.Config{}
 	flag := FLAGS["defaultProject"]
 
 	err := flag.ParseInput("", conf)
@@ -165,7 +165,7 @@ func TestDefaultProjectFlag(t *testing.T) {
 
 func TestCombineProjectsFlag(t *testing.T) {
 	t.Parallel()
-	conf := config.New()
+	conf := &config.Config{}
 	flag := FLAGS["combineProjects"]
 
 	err := flag.ParseInput("false", conf)
@@ -192,7 +192,7 @@ func TestCombineProjectsFlag(t *testing.T) {
 
 func TestProjectTtlFlag(t *testing.T) {
 	t.Parallel()
-	conf := config.New()
+	conf := &config.Config{}
 	flag := FLAGS["projectTtl"]
 
 	err := flag.ParseInput("", conf)
@@ -211,7 +211,7 @@ func TestProjectTtlFlag(t *testing.T) {
 
 func TestTmuxSocketPathFlag(t *testing.T) {
 	t.Parallel()
-	conf := config.New()
+	conf := &config.Config{}
 	flag := FLAGS["tmuxSocketPath"]
 
 	err := flag.ParseInput("", conf)
@@ -225,5 +225,19 @@ func TestTmuxSocketPathFlag(t *testing.T) {
 	}
 	if conf.TmuxSocketPath == nil || *conf.TmuxSocketPath != "sock" {
 		t.Error("tmux socket should be set in conf")
+	}
+}
+
+func TestFzfFlagsFlag(t *testing.T) {
+	t.Parallel()
+	conf := &config.Config{}
+	flag := FLAGS["fzfFlags"]
+
+	err := flag.ParseInput("--ansi,--bind", conf)
+	if err != nil {
+		t.Error(err)
+	}
+	if conf.FzfFlags == nil || conf.FzfFlags[0] != "--ansi" {
+		t.Error("fzf flags should be set in conf")
 	}
 }
