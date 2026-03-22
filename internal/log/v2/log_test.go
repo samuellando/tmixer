@@ -57,7 +57,10 @@ func TestLogger(t *testing.T) {
 	logEvent = log.Track(ctx, "test2")
 	logEvent.Log("hello", "World")
 	logEvent.Log("def", []int{4, 5, 6})
-	log.Done(ctx)
+	err := log.Done(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
 	testutil.GoldenTest(t, normalize(sink.String()))
 }
 
@@ -70,10 +73,13 @@ func TestTrackLevel(t *testing.T) {
 	})
 	log.Track(ctx, "test")
 	log.TrackLevel(ctx, log.LEVEL_DEBUG, "test2")
-	log.Done(ctx)
+	err := log.Done(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	out := make(map[string]any)
-	err := json.Unmarshal([]byte(sink.String()), &out)
+	err = json.Unmarshal([]byte(sink.String()), &out)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,15 +97,21 @@ func TestSetOptions(t *testing.T) {
 	})
 	log.Track(ctx, "test")
 	log.TrackLevel(ctx, log.LEVEL_DEBUG, "test2")
-	log.SetOptions(ctx, log.LogOptions{
+	err := log.SetOptions(ctx, log.LogOptions{
 		Level: log.LEVEL_DEBUG,
 		Sinks: []io.WriteCloser{sink},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	log.TrackLevel(ctx, log.LEVEL_DEBUG, "test3")
-	log.Done(ctx)
+	err = log.Done(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	out := make(map[string]any)
-	err := json.Unmarshal([]byte(sink.String()), &out)
+	err = json.Unmarshal([]byte(sink.String()), &out)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,10 +130,19 @@ func TestAddSinks(t *testing.T) {
 	ctx = log.ContextLogger(ctx, log.LogOptions{
 		Level: log.LEVEL_INFO,
 	})
-	log.AddSink(ctx, sink)
-	log.AddSink(ctx, sink2)
+	err := log.AddSink(ctx, sink)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = log.AddSink(ctx, sink2)
+	if err != nil {
+		t.Fatal(err)
+	}
 	log.Track(ctx, "test")
-	log.Done(ctx)
+	err = log.Done(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
 	testutil.GoldenTest(t, normalize(sink.String()))
 	testutil.GoldenTest(t, normalize(sink2.String()))
 }
@@ -133,7 +154,10 @@ func TestFatal(t *testing.T) {
 		Level: log.LEVEL_INFO,
 		Sinks: []io.WriteCloser{sink},
 	})
-	log.Fatal(ctx, fmt.Errorf("This is an error"))
+	err := log.Fatal(ctx, fmt.Errorf("This is an error"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	testutil.GoldenTest(t, normalize(sink.String()))
 }
 
@@ -145,10 +169,13 @@ func TestTimestampAndDuration(t *testing.T) {
 		Sinks: []io.WriteCloser{sink},
 	})
 	time.Sleep(time.Second)
-	log.Done(ctx)
+	err := log.Done(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	out := make(map[string]any)
-	err := json.Unmarshal([]byte(sink.String()), &out)
+	err = json.Unmarshal([]byte(sink.String()), &out)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,7 +204,10 @@ func TestLogEventErrors(t *testing.T) {
 	logEvent.Log("abc", []int{1, 2, 3})
 	logEvent.Error(fmt.Errorf("Error1"))
 	logEvent.Error(fmt.Errorf("Error2"))
-	log.Done(ctx)
+	err := log.Done(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
 	testutil.GoldenTest(t, normalize(sink.String()))
 }
 
@@ -192,10 +222,13 @@ func TestLogEventTimestampAndDuration(t *testing.T) {
 	time.Sleep(time.Second)
 	logEvent.Done()
 	time.Sleep(time.Second)
-	log.Done(ctx)
+	err := log.Done(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	out := make(map[string]any)
-	err := json.Unmarshal([]byte(sink.String()), &out)
+	err = json.Unmarshal([]byte(sink.String()), &out)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,7 +260,13 @@ func TestDisplay(t *testing.T) {
 		logEvent = log.Track(ctx, "test2")
 		logEvent.Log("hello", "World")
 		logEvent.Log("def", []int{4, 5, 6})
-		log.Done(ctx)
-		log.Display(ctx)
+		err := log.Done(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = log.Display(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
 	})))
 }

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"time"
 )
 
 const (
@@ -39,55 +38,80 @@ func ContextLogger(ctx context.Context, options LogOptions) context.Context {
 }
 
 // Sets the context logger's options
-func SetOptions(ctx context.Context, options LogOptions) {
-	logger := getLogger(ctx)
+func SetOptions(ctx context.Context, options LogOptions) error {
+	logger, err := getLogger(ctx)
+	if err != nil {
+		return err
+	}
 	logger.options = options
+	return nil
 }
 
 // Add a sink to the logger
-func AddSink(ctx context.Context, w io.WriteCloser) {
-	logger := getLogger(ctx)
+func AddSink(ctx context.Context, w io.WriteCloser) error {
+	logger, err := getLogger(ctx)
+	if err != nil {
+		return err
+	}
 	logger.options.Sinks = append(logger.options.Sinks, w)
+	return nil
 }
 
 // Write the log event and close all sinks
-func Done(ctx context.Context) {
-	logger := getLogger(ctx)
-	logger.commit()
+func Done(ctx context.Context) error {
+	logger, err := getLogger(ctx)
+	if err != nil {
+		return err
+	}
+	err = logger.commit()
+	if err != nil {
+		return err
+	}
 	for _, sink := range logger.options.Sinks {
 		err := sink.Close()
 		if err != nil {
-			panic(err)
+			return err
 		}
 	}
+	return err
 }
 
 // Report a fatal error. Will set the level to "ERROR" on the log message and will
 // Log the error. Automatically calls Done
-func Fatal(ctx context.Context, err error) {
-	logger := getLogger(ctx)
-	logger.wideEvent.fatal(err)
-	Done(ctx)
+func Fatal(ctx context.Context, e error) error {
+	logger, err := getLogger(ctx)
+	if err != nil {
+		return err
+	}
+	logger.wideEvent.fatal(e)
+	return Done(ctx)
 }
 
 // Displays the formatted log to stderr
-func Display(ctx context.Context) {
-	logger := getLogger(ctx)
+func Display(ctx context.Context) error {
+	logger, err := getLogger(ctx)
+	if err != nil {
+		return err
+	}
 	b, err := json.MarshalIndent(logger.wideEvent, "", "  ")
 	if err != nil {
-		panic(err)
+		return err
 	}
 	fmt.Fprintln(os.Stderr, string(b))
+	return nil
 }
 
 // Track an event in the log message.
 // The event will be automatically included in the log message when log.Done() is
 // Called. The caller should also call the Done method on the event to keep Track
 // of the duration.
+// If no logger is initialized on the context does noting
 func Track(ctx context.Context, eventName string) Event {
-	logger := getLogger(ctx)
 	e := newEvent(eventName)
-	logger.wideEvent.add(e)
+	logger, err := getLogger(ctx)
+	if err == nil {
+		logger.wideEvent.add(e)
+	}
 	return e
 }
 
@@ -95,32 +119,35 @@ func Track(ctx context.Context, eventName string) Event {
 // but will only actually include it in the log message if the log level is sufficient.
 // Also see the log.Track
 func TrackLevel(ctx context.Context, level int, eventName string) Event {
-	logger := getLogger(ctx)
-	e := event{name: eventName, time: time.Now()}
-	if level >= logger.options.Level {
-		logger.wideEvent.add(&e)
+	e := newEvent(eventName)
+	logger, err := getLogger(ctx)
+	if err == nil {
+		if level >= logger.options.Level {
+			logger.wideEvent.add(e)
+		}
 	}
-	return &e
+	return e
 }
 
-func getLogger(ctx context.Context) *logger {
+func getLogger(ctx context.Context) (*logger, error) {
 	logger, ok := ctx.Value(CONTEXT_KEY).(*logger)
 	if !ok {
-		panic("Must call WithLogger on context first")
+		return nil, fmt.Errorf("must call WithLogger on context first")
 	}
-	return logger
+	return logger, nil
 }
 
-func (logger *logger) commit() {
+func (logger *logger) commit() error {
 	logger.wideEvent.done()
 	b, err := json.Marshal(logger.wideEvent)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	for _, w := range logger.options.Sinks {
 		_, err = fmt.Fprintln(w, string(b))
 		if err != nil {
-			panic(err)
+			return err
 		}
 	}
+	return nil
 }
