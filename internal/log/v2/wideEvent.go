@@ -39,6 +39,8 @@ func (w *wideEvent) add(e *event) {
 }
 
 func (w *wideEvent) done() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	if w.duration == 0 {
 		w.duration = time.Since(w.time)
 	}
