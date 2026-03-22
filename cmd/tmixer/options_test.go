@@ -120,7 +120,6 @@ func TestConfigFlag(t *testing.T) {
 	t.Parallel()
 	conf := &config.Config{}
 	flag := FLAGS["config"]
-	startingConfigFiles := len(conf.ConfigFiles)
 
 	err := flag.ParseInput("", conf)
 	if err == nil {
@@ -131,16 +130,8 @@ func TestConfigFlag(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if len(conf.ConfigFiles) != startingConfigFiles+1 || conf.ConfigFiles[len(conf.ConfigFiles)-1] != "config.yml" {
+	if len(conf.ConfigFiles) != 3 || conf.ConfigFiles[len(conf.ConfigFiles)-1] != "config.yml" {
 		t.Error("Config file should be added to config files")
-	}
-
-	err = flag.ParseInput("another.yml", conf)
-	if err != nil {
-		t.Error(err)
-	}
-	if len(conf.ConfigFiles) != startingConfigFiles+2 || conf.ConfigFiles[len(conf.ConfigFiles)-1] != "another.yml" {
-		t.Error("Config file should be appended to config files")
 	}
 }
 

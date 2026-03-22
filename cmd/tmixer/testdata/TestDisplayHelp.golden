@@ -37,6 +37,7 @@ Flags:
 --config OR -c
 	Provide an additional config file overriding global configs from ~/.tmixer.yml and ~/.config/tmixer/config.yml
 	Usage: --config config.yml or -c config.yml
+	Default: none
 	EnvVar: $TMIXER_CONFIG
 
 --defaultProject
