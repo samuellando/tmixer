@@ -36,16 +36,22 @@ func newEvent(name string) *event {
 }
 
 func (e *event) Error(err error) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	e.errors = append(e.errors, err)
 }
 
 func (e *event) Done() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	if e.duration == 0 {
 		e.duration = time.Since(e.time)
 	}
 }
 
 func (e *event) Log(k string, v any) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	e.data = append(e.data, value{key: k, value: v})
 }
 
