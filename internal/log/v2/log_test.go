@@ -212,3 +212,22 @@ func TestLogEventTimestampAndDuration(t *testing.T) {
 		t.Error("Timestamp should be one sec ago")
 	}
 }
+
+func TestDisplay(t *testing.T) {
+	testutil.GoldenTest(t, normalize(testutil.CaptureStderr(func() {
+		ctx := context.Background()
+		sink := &StringWriteCloser{}
+		ctx = log.ContextLogger(ctx, log.LogOptions{
+			Level: log.LEVEL_INFO,
+			Sinks: []io.WriteCloser{sink},
+		})
+		logEvent := log.Track(ctx, "test")
+		logEvent.Log("hello", "World")
+		logEvent.Log("abc", []int{1, 2, 3})
+		logEvent = log.Track(ctx, "test2")
+		logEvent.Log("hello", "World")
+		logEvent.Log("def", []int{4, 5, 6})
+		log.Done(ctx)
+		log.Display(ctx)
+	})))
+}
