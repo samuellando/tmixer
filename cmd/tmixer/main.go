@@ -15,6 +15,7 @@ import (
 	"samuellando.com/tmixer/internal/fzf"
 	"samuellando.com/tmixer/internal/log"
 	"samuellando.com/tmixer/internal/log/rotation"
+	logV2 "samuellando.com/tmixer/internal/log/v2"
 	"samuellando.com/tmixer/internal/project"
 	"samuellando.com/tmixer/internal/tmux"
 )
@@ -38,8 +39,9 @@ func run(args ...string) (err error) {
 	// init the logging event
 	ctx := context.Background()
 	ctx = log.InitializeWideEvent(ctx, &log.LoggerOptions{Level: log.LEVEL_INFO})
+	ctx = logV2.ContextLogger(ctx, logV2.LogOptions{})
 	// Parse the arguments before setting up logging in case there's a extra log file
-	session.config = config.New()
+	session.config = &config.Config{}
 	_, err = flags.ParseArgs(ctx, args, FLAGS, session.config)
 	if err != nil {
 		fmt.Println(err)

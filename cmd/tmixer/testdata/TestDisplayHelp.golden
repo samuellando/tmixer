@@ -44,6 +44,16 @@ Flags:
 	Usage: --defaultProject projects--tmixer
 	EnvVar: $TMIXER_DEFAULT_PROJECT
 
+--fzfFlags
+	Flags to pass to fzf
+	Usage: comma or new line separated
+	Default: --ansi
+		--bind,ctrl-k:execute(tmixer kill {2})+reload(tmixer list)
+		--bind,ctrl-r:execute(tmixer reset {2})+reload(tmixer list)
+		--bind,ctrl-s:execute(tmixer start {2})+reload(tmixer list)
+		
+	EnvVar: $TMIXER_FZF_FLAGS
+
 --help OR -h
 	display a help message to stdout
 	Usage: --help or -h

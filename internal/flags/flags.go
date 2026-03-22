@@ -111,6 +111,13 @@ func ParseArgs(ctx context.Context, args []string, flags map[string]Flag, conf *
 				}
 			}
 		}
+		if !flagSet[name] && flag.Default != "" {
+			if parseErr := flag.ParseInput(flag.Default, conf); parseErr != nil {
+				err = errors.Join(err, fmt.Errorf("while parsing flag env var %s: %w", name, parseErr))
+				event.Errors = append(event.Errors, err.Error())
+				return nil, err
+			}
+		}
 	}
 
 	event.RemainingArgs = remaining

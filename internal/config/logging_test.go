@@ -29,7 +29,7 @@ projects:
 		t.Fatal(err)
 	}
 
-	cfg := config.New()
+	cfg := &config.Config{}
 	cfg.ConfigFiles = []string{configFile}
 	err = cfg.LoadFiles(ctx)
 	if err != nil {
@@ -67,7 +67,7 @@ func TestConfigLoadEventWithSingleError(t *testing.T) {
 	ctx, logger, out := testutil.SetupLogging(ctx, log.LEVEL_DEBUG)
 
 	// Use a non-existent file to trigger an error
-	cfg := config.New()
+	cfg := &config.Config{}
 	cfg.ConfigFiles = []string{"/nonexistent/path/config.yml"}
 	err := cfg.LoadFiles(ctx)
 	if err != nil {
@@ -121,7 +121,7 @@ projects:
 		t.Fatal(err)
 	}
 
-	cfg := config.New()
+	cfg := &config.Config{}
 	cfg.ConfigFiles = []string{
 		"/nonexistent/path1/config.yml",
 		"/nonexistent/path2/config.yml",
@@ -165,7 +165,7 @@ func TestConfigLoadEventResultPopulatedWithErrors(t *testing.T) {
 	ctx, logger, out := testutil.SetupLogging(ctx, log.LEVEL_DEBUG)
 
 	// Use a non-existent file to trigger an error
-	cfg := config.New()
+	cfg := &config.Config{}
 	cfg.ConfigFiles = []string{"/nonexistent/path/config.yml"}
 	err := cfg.LoadFiles(ctx)
 	if err != nil {
