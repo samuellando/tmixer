@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"time"
 )
 
@@ -67,6 +68,16 @@ func Fatal(ctx context.Context, err error) {
 	logger := getLogger(ctx)
 	logger.wideEvent.fatal(err)
 	Done(ctx)
+}
+
+// Displays the formatted log to stderr
+func Display(ctx context.Context) {
+	logger := getLogger(ctx)
+	b, err := json.MarshalIndent(logger.wideEvent, "", "  ")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Fprintln(os.Stderr, string(b))
 }
 
 // Track an event in the log message.

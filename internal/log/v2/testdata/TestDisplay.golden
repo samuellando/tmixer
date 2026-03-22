@@ -1,0 +1,25 @@
+{
+  "level": "INFO",
+  "time": "TIMESTAMP",
+  "test": {
+    "time": "TIMESTAMP",
+    "hello": "World",
+    "abc": [
+      1,
+      2,
+      3
+    ],
+    "duration":0
+  },
+  "test2": {
+    "time": "TIMESTAMP",
+    "hello": "World",
+    "def": [
+      4,
+      5,
+      6
+    ],
+    "duration":0
+  },
+  "duration":0
+}
