@@ -17,7 +17,7 @@ func TestHelpFlag(t *testing.T) {
 		t.Error(err)
 	}
 
-	if !conf.DisplayHelp {
+	if !*conf.DisplayHelp {
 		t.Error("Should set the display help option")
 	}
 }
@@ -50,7 +50,7 @@ func TestLogLevelFlag(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if conf.LogLevel != log.LEVEL_INFO {
+	if *conf.LogLevel != log.LEVEL_INFO {
 		t.Error("Should set log level to info")
 	}
 
@@ -58,7 +58,7 @@ func TestLogLevelFlag(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if conf.LogLevel != log.LEVEL_DEBUG {
+	if *conf.LogLevel != log.LEVEL_DEBUG {
 		t.Error("Should set log level to debug")
 	}
 
@@ -66,7 +66,7 @@ func TestLogLevelFlag(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if conf.LogLevel != log.LEVEL_INFO {
+	if *conf.LogLevel != log.LEVEL_INFO {
 		t.Error("Should set log level to info")
 	}
 
@@ -74,7 +74,7 @@ func TestLogLevelFlag(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if conf.LogLevel != log.LEVEL_DEBUG {
+	if *conf.LogLevel != log.LEVEL_DEBUG {
 		t.Error("Should set log level to debug")
 	}
 
@@ -163,7 +163,7 @@ func TestCombineProjectsFlag(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if conf.CombineProjects {
+	if *conf.CombineProjects {
 		t.Error("Combine projects should be set to false")
 	}
 
@@ -171,7 +171,7 @@ func TestCombineProjectsFlag(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if !conf.CombineProjects {
+	if !*conf.CombineProjects {
 		t.Error("Combine projects should be set to true")
 	}
 

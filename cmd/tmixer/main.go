@@ -49,6 +49,7 @@ func run(args ...string) (err error) {
 		displayHelp()
 		return err
 	}
+	_ = session.config.LoadFiles(ctx)
 	// Set up the logging
 	logger, files, err := setupLogging(ctx, session.config)
 	if err != nil {
@@ -63,7 +64,7 @@ func run(args ...string) (err error) {
 		}
 	}()
 	// --help flag
-	if session.config.DisplayHelp {
+	if session.config.DisplayHelp != nil && *session.config.DisplayHelp {
 		displayHelp()
 		logger.Info(ctx)
 		return nil
@@ -90,14 +91,6 @@ func runTmixer(ctx context.Context, args []string, session *session) error {
 	finish := log.Track(ctx, "runEvent", event)
 	defer finish()
 	// Parse the config files, and the args, again
-	err := session.config.LoadFiles(ctx)
-	if err != nil {
-		event.Errors = append(event.Errors, err.Error())
-	}
-	args, err = flags.ParseArgs(ctx, args, FLAGS, session.config)
-	if err != nil {
-		event.Errors = append(event.Errors, err.Error())
-	}
 	srv, err := startTmuxServer(ctx, session)
 	if err != nil {
 		event.Errors = append(event.Errors, err.Error())
@@ -355,7 +348,7 @@ func disableHooks(tmux *tmux.Server) error {
 
 func setupLogging(ctx context.Context, config *config.Config) (*log.Logger, []*os.File, error) {
 	files := []*os.File{}
-	_, logger := log.New(ctx, &log.LoggerOptions{Level: config.LogLevel})
+	_, logger := log.New(ctx, &log.LoggerOptions{Level: *config.LogLevel})
 
 	retention := 24 * time.Hour * time.Duration(*config.LogRetentionDays)
 
