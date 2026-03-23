@@ -38,14 +38,20 @@ func GetLogEvent(ctx context.Context, logger *log.Logger, out *bytes.Buffer) map
 func SetupLoggingV2(ctx context.Context, level int) (context.Context, *bytes.Buffer) {
 	ctx = logV2.ContextLogger(ctx, logV2.LogOptions{Level: level})
 	out := &bytes.Buffer{}
-	logV2.AddSink(ctx, nopWriteCloser{out})
+	err := logV2.AddSink(ctx, nopWriteCloser{out})
+	if err != nil {
+		panic(err)
+	}
 	return ctx, out
 }
 
 func GetLogEventV2(ctx context.Context, out *bytes.Buffer) map[string]any {
-	logV2.Done(ctx)
+	err := logV2.Done(ctx)
+	if err != nil {
+		panic(err)
+	}
 	res := make(map[string]any)
-	err := json.Unmarshal(out.Bytes(), &res)
+	err = json.Unmarshal(out.Bytes(), &res)
 	if err != nil {
 		panic(err)
 	}

@@ -10,13 +10,17 @@ import (
 	"samuellando.com/tmixer/internal/log"
 )
 
+func ptr[T any](v T) *T {
+	return &v
+}
+
 var FLAGS = map[string]flags.Flag{
 	"help": {
 		ShortName:   "h",
 		Description: "display a help message to stdout",
 		Usage:       "--help or -h",
 		ParseInput: func(s string, c *config.Config) error {
-			c.DisplayHelp = true
+			c.DisplayHelp = ptr(true)
 			return nil
 		},
 	},
@@ -39,9 +43,9 @@ var FLAGS = map[string]flags.Flag{
 		ParseInput: func(s string, c *config.Config) error {
 			s = strings.ToLower(s)
 			if strings.HasPrefix(s, "i") {
-				c.LogLevel = log.LEVEL_INFO
+				c.LogLevel = ptr(log.LEVEL_INFO)
 			} else if strings.HasPrefix(s, "d") {
-				c.LogLevel = log.LEVEL_DEBUG
+				c.LogLevel = ptr(log.LEVEL_DEBUG)
 			} else {
 				return fmt.Errorf("UNRECOGNIZED LOG LEVEL")
 			}
@@ -110,7 +114,7 @@ var FLAGS = map[string]flags.Flag{
 			if err != nil {
 				return err
 			}
-			c.CombineProjects = bool
+			c.CombineProjects = ptr(bool)
 			return nil
 		},
 		EnvironmentVariable: "TMIXER_COMBINE_PROJECTS",
