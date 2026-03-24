@@ -7,13 +7,13 @@ import (
 
 	"samuellando.com/tmixer/internal/config"
 	"samuellando.com/tmixer/internal/flags"
-	"samuellando.com/tmixer/internal/log"
+	"samuellando.com/tmixer/internal/log/v2"
 	"samuellando.com/tmixer/internal/testutil"
 )
 
 func TestFlagParseEventFields(t *testing.T) {
 	ctx := context.Background()
-	ctx, logger, out := testutil.SetupLogging(ctx, log.LEVEL_DEBUG)
+	ctx, out := testutil.SetupLoggingV2(ctx, log.LEVEL_DEBUG)
 
 	testFlags := map[string]flags.Flag{
 		"test": {
@@ -25,12 +25,12 @@ func TestFlagParseEventFields(t *testing.T) {
 	}
 
 	args := []string{"--test", "value", "remaining"}
-	_, err := flags.ParseArgs(ctx, args, testFlags, &config.Config{})
+	_, _, err := flags.ParseArgs(ctx, args, testFlags)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	res := testutil.GetLogEvent(ctx, logger, out)
+	res := testutil.GetLogEventV2(ctx, out)
 
 	// Check flagParseEvent exists
 	event, ok := res["flagParseEvent"].(map[string]any)
@@ -54,23 +54,6 @@ func TestFlagParseEventFields(t *testing.T) {
 		}
 		if args[2] != "remaining" {
 			t.Error("'inputArgs' field should be remaining")
-		}
-	}
-
-	// Check parsedFlags field exists and is an array
-	parsedFlags, ok := event["parsedFlags"]
-	if !ok {
-		t.Error("flagParseEvent missing 'parsedFlags' field")
-	}
-	if flags, ok := parsedFlags.([]any); !ok {
-		t.Error("'parsedFlags' field should be an array")
-	} else {
-		if len(flags) != 1 {
-			t.Fatal("Should contain parsed flags")
-		}
-		flag := flags[0].([]any)
-		if flag[0].(string) != "test" || flag[1].(string) != "value" {
-			t.Error("'parsedFlags' field should contain values")
 		}
 	}
 
@@ -108,7 +91,7 @@ func TestFlagParseEventFields(t *testing.T) {
 
 func TestFlagParseEventWithError(t *testing.T) {
 	ctx := context.Background()
-	ctx, logger, out := testutil.SetupLogging(ctx, log.LEVEL_DEBUG)
+	ctx, out := testutil.SetupLoggingV2(ctx, log.LEVEL_DEBUG)
 
 	testFlags := map[string]flags.Flag{
 		"failing": {
@@ -120,12 +103,12 @@ func TestFlagParseEventWithError(t *testing.T) {
 	}
 
 	args := []string{"tmixer", "--failing", "value"}
-	_, err := flags.ParseArgs(ctx, args, testFlags, &config.Config{})
+	_, _, err := flags.ParseArgs(ctx, args, testFlags)
 	if err == nil {
 		t.Fatal("Should return an error")
 	}
 
-	res := testutil.GetLogEvent(ctx, logger, out)
+	res := testutil.GetLogEventV2(ctx, out)
 	event := res["flagParseEvent"].(map[string]any)
 
 	// errors field should be present
