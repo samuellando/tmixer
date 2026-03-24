@@ -1,0 +1,39 @@
+syntax = "proto2";
+
+option go_package = "./protocol";
+
+enum Status {
+  PROJECT_STATUS_INACTIVE = 0;
+  PROJECT_STATUS_ACTIVE = 1;
+  PROJECT_STATUS_ATTACHED = 2;
+}
+
+service Tmixer {
+  rpc Session(stream Request) returns (stream Response);
+}
+
+message Request {
+  oneof payload {
+    Args args = 1;
+    Selection selection = 2;
+  }
+}
+
+message Args {
+  repeated string args = 1;
+}
+
+message Selection {
+  required Project project = 1;
+}
+
+message Project {
+  required string name = 1;
+  required Status status = 2;
+  required int64 lastActivity = 3;
+}
+
+message Response {
+  repeated Project projects = 1;
+  optional string error = 2;
+}

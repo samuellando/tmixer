@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/exec"
 
+	"samuellando.com/tmixer/cmd/tmixer/client"
+	"samuellando.com/tmixer/cmd/tmixer/server"
 	"samuellando.com/tmixer/internal/config"
 	"samuellando.com/tmixer/internal/display"
 	"samuellando.com/tmixer/internal/flags"
@@ -21,7 +23,13 @@ var ErrProjectNotFound = errors.New("PROJECT NOT FOUND")
 var ErrCommandNotRecognized = errors.New("COMMAND NOT RECOGNIZED")
 
 func main() {
-	err := run(os.Args[1:]...)
+	args := os.Args[1:]
+	var err error
+	if len(args) >= 1 && args[0] == "server" {
+		err = server.Run()
+	} else {
+		err = client.Run(args...)
+	}
 	if err != nil {
 		os.Exit(1)
 	}
@@ -182,9 +190,6 @@ func start(ctx context.Context, srv *tmux.Server, query string, session *session
 				return err
 			}
 		}
-	}
-	if selection == nil {
-		return ErrNoSelection
 	}
 	return startClient(ctx, srv, selection)
 }
