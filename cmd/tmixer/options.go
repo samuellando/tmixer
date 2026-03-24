@@ -19,6 +19,7 @@ var FLAGS = map[string]flags.Flag{
 		ShortName:   "h",
 		Description: "display a help message to stdout",
 		Usage:       "--help or -h",
+		Bare:        true,
 		ParseInput: func(s string, c *config.Config) error {
 			c.DisplayHelp = ptr(true)
 			return nil
