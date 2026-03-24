@@ -42,7 +42,7 @@ func run(args ...string) (err error) {
 	ctx = logV2.ContextLogger(ctx, logV2.LogOptions{})
 	// Parse the arguments before setting up logging in case there's a extra log file
 	session.config = &config.Config{}
-	_, err = flags.ParseArgs(ctx, args, FLAGS, session.config)
+	args, err = flags.ParseArgs(ctx, args, FLAGS, session.config)
 	if err != nil {
 		fmt.Println(err)
 		fmt.Println()
