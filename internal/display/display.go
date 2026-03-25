@@ -1,30 +1,29 @@
-package fzf
+package display
 
 import (
 	"context"
 	"fmt"
-	"io"
+	"slices"
 	"sort"
+	"strings"
 
-	"samuellando.com/tmixer/internal/log"
+	"samuellando.com/tmixer/internal/log/v2"
 	"samuellando.com/tmixer/internal/project"
 )
 
-func DisplayProjects(ctx context.Context, projects []*project.Project, w io.Writer) error {
-	type displayProjectsEvent struct {
-		Errors []string `json:"errors,omitempty"`
-	}
-	event := &displayProjectsEvent{}
-	finish := log.Track(ctx, "displayProjectsEvent", event)
-	defer finish()
+func Projects(ctx context.Context, projects []*project.Project) ([]string, error) {
+	logEvent := log.Track(ctx, "displayProjectsEvent")
+	defer logEvent.Done()
 	var sortError error
+	// Clone before sorting
+	projects = slices.Clone(projects)
 	sort.Slice(projects, func(i, j int) bool {
 		if sortError == nil {
 			res, err := compare(projects, i, j)
 			if err == nil {
 				return res
 			} else {
-				event.Errors = append(event.Errors, err.Error())
+				logEvent.Error(err)
 				sortError = err
 			}
 		}
@@ -32,24 +31,39 @@ func DisplayProjects(ctx context.Context, projects []*project.Project, w io.Writ
 	})
 	if sortError != nil {
 		err := fmt.Errorf("while sorting projects: %w", sortError)
-		event.Errors = append(event.Errors, err.Error())
-		return err
+		logEvent.Error(err)
+		return nil, err
 	}
+
+	result := make([]string, 0, len(projects))
 	for _, project := range projects {
 		info, err := display(project)
 		if err != nil {
 			err := fmt.Errorf("while generating display string for project: %w", err)
-			event.Errors = append(event.Errors, err.Error())
-			return err
+			logEvent.Error(err)
+			return nil, err
 		}
-		_, err = io.WriteString(w, info+"\n")
+		result = append(result, info)
 		if err != nil {
 			err := fmt.Errorf("while displaying project: %w", err)
-			event.Errors = append(event.Errors, err.Error())
-			return err
+			logEvent.Error(err)
+			return nil, err
 		}
 	}
-	return nil
+	return result, nil
+}
+
+func GetProjectFromOutput(info string, projects []*project.Project) (*project.Project, error) {
+	name, err := parseOutput(info)
+	if err != nil {
+		return nil, err
+	}
+	for _, project := range projects {
+		if project.Name == name {
+			return project, nil
+		}
+	}
+	return nil, nil
 }
 
 func display(p *project.Project) (string, error) {
@@ -96,4 +110,12 @@ func compare(projects []*project.Project, i, j int) (bool, error) {
 		}
 	}
 	return iStatus > jStatus, nil
+}
+
+func parseOutput(out string) (string, error) {
+	parts := strings.Split(out, " ")
+	if len(parts) != 2 {
+		return "", fmt.Errorf("output should have 2 parts")
+	}
+	return strings.TrimSpace(parts[1]), nil
 }

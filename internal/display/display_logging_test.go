@@ -1,4 +1,4 @@
-package fzf_test
+package display_test
 
 import (
 	"strings"

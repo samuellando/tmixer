@@ -1,4 +1,4 @@
-package fzf
+package display
 
 import (
 	"sort"
@@ -98,7 +98,7 @@ func TestDisplayProjects(t *testing.T) {
 		time.Sleep(time.Second)
 	}
 	w := &strings.Builder{}
-	err = DisplayProjects(ctx, projects, w)
+	err = Projects(ctx, projects, w)
 	if err != nil {
 		t.Fatal(err)
 	}

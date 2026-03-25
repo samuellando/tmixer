@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"samuellando.com/tmixer/internal/config"
+	"samuellando.com/tmixer/internal/display"
 	"samuellando.com/tmixer/internal/flags"
 	"samuellando.com/tmixer/internal/fzf"
 	"samuellando.com/tmixer/internal/log"
@@ -168,7 +169,14 @@ func executeCommand(ctx context.Context, srv *tmux.Server, command, query string
 }
 
 func list(ctx context.Context, session *session) error {
-	return fzf.DisplayProjects(ctx, session.projects, os.Stdout)
+	infos, err := display.Projects(ctx, session.projects)
+	if err != nil {
+		return err
+	}
+	for _, i := range infos {
+		fmt.Println(i)
+	}
+	return nil
 }
 
 func notifySwitch(ctx context.Context, query string, session *session) error {
@@ -190,7 +198,7 @@ func start(ctx context.Context, srv *tmux.Server, query string, session *session
 		if session.config.DefaultProject != nil {
 			selection = getProject(*session.config.DefaultProject, session)
 		} else {
-			selection, err = fzf.PickProject(ctx, session.config, session.projects)
+			selection, err = selectProject(ctx, session.config, session.projects)
 			if err != nil {
 				return err
 			}
@@ -207,7 +215,7 @@ func runSwitch(ctx context.Context, query string, session *session) (err error) 
 	if query != "" {
 		selection = getProject(query, session)
 	} else {
-		selection, err = fzf.PickProject(ctx, session.config, session.projects)
+		selection, err = selectProject(ctx, session.config, session.projects)
 		if err != nil {
 			return err
 		}
@@ -224,7 +232,7 @@ func kill(ctx context.Context, query string, session *session) (err error) {
 	if query != "" {
 		selection = getProject(query, session)
 	} else {
-		selection, err = fzf.PickProject(ctx, session.config, session.projects)
+		selection, err = selectProject(ctx, session.config, session.projects)
 		if err != nil {
 			return err
 		}
@@ -284,6 +292,21 @@ func getProject(query string, session *session) *project.Project {
 		}
 	}
 	return nil
+}
+
+func selectProject(ctx context.Context, config *config.Config, projects []*project.Project) (*project.Project, error) {
+	list, err := display.Projects(ctx, projects)
+	if err != nil {
+		return nil, err
+	}
+	out, err := fzf.Pick(ctx, config, list)
+	if err != nil {
+		return nil, err
+	}
+	if out == nil {
+		return nil, ErrNoSelection
+	}
+	return display.GetProjectFromOutput(*out, projects)
 }
 
 func startClient(ctx context.Context, srv *tmux.Server, p *project.Project) error {
