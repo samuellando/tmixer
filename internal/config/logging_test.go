@@ -13,7 +13,7 @@ import (
 
 func TestConfigLoadEventFields(t *testing.T) {
 	ctx := context.Background()
-	ctx, out := testutil.SetupLoggingV2(ctx, log.LEVEL_DEBUG)
+	ctx = testutil.SetupLoggingV2(ctx, log.LEVEL_DEBUG)
 
 	// Create a valid config file
 	tmpDir := t.TempDir()
@@ -36,7 +36,7 @@ projects:
 		t.Error(err)
 	}
 
-	res := testutil.GetLogEventV2(ctx, out)
+	res := testutil.GetLogEventV2(t, ctx)
 
 	// Check configLoadEvent exists
 	event, ok := res["configLoadEvent"].(map[string]any)
@@ -64,7 +64,7 @@ projects:
 
 func TestConfigLoadEventWithSingleError(t *testing.T) {
 	ctx := context.Background()
-	ctx, out := testutil.SetupLoggingV2(ctx, log.LEVEL_DEBUG)
+	ctx = testutil.SetupLoggingV2(ctx, log.LEVEL_DEBUG)
 
 	// Use a non-existent file to trigger an error
 	cfg := &config.Config{}
@@ -74,7 +74,7 @@ func TestConfigLoadEventWithSingleError(t *testing.T) {
 		t.Error(err)
 	}
 
-	res := testutil.GetLogEventV2(ctx, out)
+	res := testutil.GetLogEventV2(t, ctx)
 	event := res["configLoadEvent"].(map[string]any)
 
 	// errors field should be present
@@ -102,7 +102,7 @@ func TestConfigLoadEventWithSingleError(t *testing.T) {
 
 func TestConfigLoadEventWithMultipleErrors(t *testing.T) {
 	ctx := context.Background()
-	ctx, out := testutil.SetupLoggingV2(ctx, log.LEVEL_DEBUG)
+	ctx = testutil.SetupLoggingV2(ctx, log.LEVEL_DEBUG)
 
 	// Create multiple scenarios that will cause errors:
 	// 1. Non-existent file
@@ -132,7 +132,7 @@ projects:
 		t.Fatal("Should return an error")
 	}
 
-	res := testutil.GetLogEventV2(ctx, out)
+	res := testutil.GetLogEventV2(t, ctx)
 	event := res["configLoadEvent"].(map[string]any)
 
 	// errors field should be present
@@ -162,7 +162,7 @@ projects:
 
 func TestConfigLoadEventResultPopulatedWithErrors(t *testing.T) {
 	ctx := context.Background()
-	ctx, out := testutil.SetupLoggingV2(ctx, log.LEVEL_DEBUG)
+	ctx = testutil.SetupLoggingV2(ctx, log.LEVEL_DEBUG)
 
 	// Use a non-existent file to trigger an error
 	cfg := &config.Config{}
@@ -172,7 +172,7 @@ func TestConfigLoadEventResultPopulatedWithErrors(t *testing.T) {
 		t.Error(err)
 	}
 
-	res := testutil.GetLogEventV2(ctx, out)
+	res := testutil.GetLogEventV2(t, ctx)
 	event := res["configLoadEvent"].(map[string]any)
 
 	// result field should still exist even with errors

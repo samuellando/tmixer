@@ -13,7 +13,7 @@ import (
 
 func TestFlagParseEventFields(t *testing.T) {
 	ctx := context.Background()
-	ctx, out := testutil.SetupLoggingV2(ctx, log.LEVEL_DEBUG)
+	ctx = testutil.SetupLoggingV2(ctx, log.LEVEL_DEBUG)
 
 	testFlags := map[string]flags.Flag{
 		"test": {
@@ -30,7 +30,7 @@ func TestFlagParseEventFields(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res := testutil.GetLogEventV2(ctx, out)
+	res := testutil.GetLogEventV2(t, ctx)
 
 	// Check flagParseEvent exists
 	event, ok := res["flagParseEvent"].(map[string]any)
@@ -91,7 +91,7 @@ func TestFlagParseEventFields(t *testing.T) {
 
 func TestFlagParseEventWithError(t *testing.T) {
 	ctx := context.Background()
-	ctx, out := testutil.SetupLoggingV2(ctx, log.LEVEL_DEBUG)
+	ctx = testutil.SetupLoggingV2(ctx, log.LEVEL_DEBUG)
 
 	testFlags := map[string]flags.Flag{
 		"failing": {
@@ -108,7 +108,7 @@ func TestFlagParseEventWithError(t *testing.T) {
 		t.Fatal("Should return an error")
 	}
 
-	res := testutil.GetLogEventV2(ctx, out)
+	res := testutil.GetLogEventV2(t, ctx)
 	event := res["flagParseEvent"].(map[string]any)
 
 	// errors field should be present
