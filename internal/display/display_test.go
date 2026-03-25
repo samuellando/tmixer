@@ -1,12 +1,12 @@
-package display
+package display_test
 
 import (
 	"sort"
-	"strings"
 	"testing"
 	"time"
 
 	"samuellando.com/tmixer/internal/config"
+	"samuellando.com/tmixer/internal/display"
 	"samuellando.com/tmixer/internal/project"
 	"samuellando.com/tmixer/internal/testutil"
 
@@ -53,15 +53,16 @@ func TestDisplayProjects(t *testing.T) {
 			},
 		},
 	}
-	expected := "\033[31m\033[0m zzz"
-	expected = expected + `
- dogs
- cats
- default_test_session
- test-session
- bin
- cat
- dog`
+	expected := []string{
+		"\033[31m\033[0m zzz",
+		" dogs",
+		" cats",
+		" default_test_session",
+		" test-session",
+		" bin",
+		" cat",
+		" dog",
+	}
 
 	projects, err := project.List(ctx, tmux, config)
 	if err != nil {
@@ -97,13 +98,12 @@ func TestDisplayProjects(t *testing.T) {
 		}
 		time.Sleep(time.Second)
 	}
-	w := &strings.Builder{}
-	err = Projects(ctx, projects, w)
+	out, err := display.Projects(ctx, projects)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if diff := cmp.Diff(expected, strings.TrimSpace(w.String())); diff != "" {
+	if diff := cmp.Diff(expected, out); diff != "" {
 		t.Fatal(diff)
 	}
 }
