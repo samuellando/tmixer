@@ -35,7 +35,7 @@ func TestPickProjectEventFields(t *testing.T) {
 	}
 
 	// Call PickProject - fzf will run non-interactively with --filter
-	selectedProject, err := fzf.PickProject(ctx, cfg, projects)
+	selectedProject, err := fzf.Pick(ctx, cfg, projects)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +113,7 @@ func TestPickProjectEventWithError(t *testing.T) {
 	}
 
 	// Call PickProject - should fail because filter matches nothing
-	_, err = fzf.PickProject(ctx, cfg, projects)
+	_, err = fzf.Pick(ctx, cfg, projects)
 	if err == nil {
 		t.Fatal("Expected an error when filtering for non-existent project")
 	}

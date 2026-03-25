@@ -7,29 +7,15 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"strings"
 
 	"golang.org/x/term"
 	"samuellando.com/tmixer/internal/config"
-	"samuellando.com/tmixer/internal/log"
-	"samuellando.com/tmixer/internal/project"
+	"samuellando.com/tmixer/internal/log/v2"
 )
 
-func PickProject(ctx context.Context, config *config.Config, projects []*project.Project) (selection *project.Project, err error) {
-	type pickProjectEvent struct {
-		Args         []string `json:"args"`
-		Output       string   `json:"output"`
-		ParsedOutput string   `json:"parsedOutput"`
-		Errors       []string `json:"errors,omitempty"`
-	}
-	event := &pickProjectEvent{}
-	finish := log.Track(ctx, "pickProjectEvent", event)
-	defer finish()
-
-	// Make a copy since we do some sorting
-	input := projects
-	projects = make([]*project.Project, len(input))
-	copy(projects, input)
+func Pick(ctx context.Context, config *config.Config, options []string) (*string, error) {
+	logEvent := log.Track(ctx, "pickProjectEvent")
+	defer logEvent.Done()
 
 	// We need to use the raw stdin for the fzf command
 	fd := int(os.Stdin.Fd())
@@ -37,7 +23,7 @@ func PickProject(ctx context.Context, config *config.Config, projects []*project
 		oldState, err := term.MakeRaw(fd)
 		if err != nil {
 			err := fmt.Errorf("while getting raw stdin: %w", err)
-			event.Errors = append(event.Errors, err.Error())
+			logEvent.Error(err)
 			return nil, err
 		}
 		defer func() {
@@ -47,11 +33,11 @@ func PickProject(ctx context.Context, config *config.Config, projects []*project
 
 	// Run the command in a ptx for consistency across envs
 	cmd := exec.Command("fzf", config.FzfFlags...)
-	event.Args = cmd.Args
+	logEvent.Log("args", cmd.Args)
 	ptx, err := startPty(cmd, os.Stdin, os.Stdout)
 	if err != nil {
 		err := fmt.Errorf("while opening pty for fzf: %w", err)
-		event.Errors = append(event.Errors, err.Error())
+		logEvent.Error(err)
 		return nil, err
 	}
 	defer func() {
@@ -61,15 +47,19 @@ func PickProject(ctx context.Context, config *config.Config, projects []*project
 	// Now pipe in the projects to fzf
 	displayErrs := make(chan error)
 	go func() {
-		err := DisplayProjects(ctx, projects, ptx)
-		if err != nil {
-			event.Errors = append(event.Errors, err.Error())
+		for _, o := range options {
+			_, err := io.WriteString(ptx, o+"\n")
+			if err != nil {
+				displayErrs <- err
+				return
+			}
 		}
 		err = ptx.CloseInPipe()
 		if err != nil {
-			event.Errors = append(event.Errors, err.Error())
+			displayErrs <- err
+			return
 		}
-		displayErrs <- err
+		displayErrs <- nil
 	}()
 
 	// Wait for the command to exit
@@ -78,45 +68,19 @@ func PickProject(ctx context.Context, config *config.Config, projects []*project
 	if err != nil {
 		if cmd.ProcessState.ExitCode() != 130 {
 			err := fmt.Errorf("fzf command error: %w", err)
-			event.Errors = append(event.Errors, err.Error())
+			logEvent.Error(err)
 			return nil, err
 		} else {
 			return nil, nil
 		}
 	}
 	if err = <-displayErrs; err != nil {
-		event.Errors = append(event.Errors, err.Error())
+		logEvent.Error(err)
 		return nil, err
 	}
 
 	// Return the selected project
-	event.Output = string(out)
-	name, err := parseOutput(string(out))
-	if err != nil {
-		return nil, err
-	}
-	event.ParsedOutput = name
-	selected := getSelectedProject(name, projects)
-	if selected == nil {
-		return nil, fmt.Errorf("NO PROJECT SELECTED")
-	} else {
-		return selected, nil
-	}
-}
-
-func getSelectedProject(name string, projects []*project.Project) *project.Project {
-	for _, project := range projects {
-		if project.Name == name {
-			return project
-		}
-	}
-	return nil
-}
-
-func parseOutput(out string) (string, error) {
-	parts := strings.Split(out, " ")
-	if len(parts) != 2 {
-		return "", fmt.Errorf("output should have 2 parts")
-	}
-	return strings.TrimSpace(parts[1]), nil
+	s := string(out)
+	logEvent.Log("output", s)
+	return &s, nil
 }
