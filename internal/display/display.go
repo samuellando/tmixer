@@ -12,7 +12,7 @@ import (
 )
 
 func Projects(ctx context.Context, projects []*project.Project) ([]string, error) {
-	logEvent := log.Track(ctx, "displayProjectsEvent")
+	logEvent := log.Track(ctx, "displayProjects")
 	defer logEvent.Done()
 
 	projects, err := sortProjects(projects)
@@ -108,7 +108,7 @@ func compare(projects []*project.Project, i, j int) (bool, error) {
 	}
 	// Otherwise we compare based on the status.
 	// if the statuses are the same, we should compare by name for inactive projects
-	// and by the last ac5tivity time for active projects.
+	// and by the last activity time for active projects.
 	if iStatus == jStatus {
 		switch iStatus {
 		case project.PROJECT_STATUS_INACTIVE:

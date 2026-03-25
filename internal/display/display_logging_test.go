@@ -46,10 +46,10 @@ func TestDisplayProjectsEventFields(t *testing.T) {
 
 	res := testutil.GetLogEventV2(t, ctx)
 
-	// Check displayProjectsEvent exists
-	event, ok := res["displayProjectsEvent"].(map[string]any)
+	// Check displayProjects exists
+	event, ok := res["displayProjects"].(map[string]any)
 	if !ok {
-		t.Fatal("displayProjectsEvent not found in log output")
+		t.Fatal("displayProjects not found in log output")
 	}
 
 	// errors field should be omitted when there are no errors
