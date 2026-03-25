@@ -14,23 +14,9 @@ import (
 func Projects(ctx context.Context, projects []*project.Project) ([]string, error) {
 	logEvent := log.Track(ctx, "displayProjectsEvent")
 	defer logEvent.Done()
-	var sortError error
-	// Clone before sorting
-	projects = slices.Clone(projects)
-	sort.Slice(projects, func(i, j int) bool {
-		if sortError == nil {
-			res, err := compare(projects, i, j)
-			if err == nil {
-				return res
-			} else {
-				logEvent.Error(err)
-				sortError = err
-			}
-		}
-		return projects[i].Name < projects[j].Name
-	})
-	if sortError != nil {
-		err := fmt.Errorf("while sorting projects: %w", sortError)
+
+	projects, err := sortProjects(projects)
+	if err != nil {
 		logEvent.Error(err)
 		return nil, err
 	}
@@ -44,12 +30,8 @@ func Projects(ctx context.Context, projects []*project.Project) ([]string, error
 			return nil, err
 		}
 		result = append(result, info)
-		if err != nil {
-			err := fmt.Errorf("while displaying project: %w", err)
-			logEvent.Error(err)
-			return nil, err
-		}
 	}
+	logEvent.Log("result", result)
 	return result, nil
 }
 
@@ -64,6 +46,28 @@ func GetProjectFromOutput(info string, projects []*project.Project) (*project.Pr
 		}
 	}
 	return nil, nil
+}
+
+func sortProjects(projects []*project.Project) ([]*project.Project, error) {
+	// Clone before sorting
+	projects = slices.Clone(projects)
+	var sortError error
+	sort.Slice(projects, func(i, j int) bool {
+		if sortError == nil {
+			res, err := compare(projects, i, j)
+			if err == nil {
+				return res
+			} else {
+				sortError = err
+			}
+		}
+		return projects[i].Name < projects[j].Name
+	})
+	if sortError != nil {
+		err := fmt.Errorf("while sorting projects: %w", sortError)
+		return nil, err
+	}
+	return projects, nil
 }
 
 func display(p *project.Project) (string, error) {
@@ -81,6 +85,14 @@ func display(p *project.Project) (string, error) {
 	return icon + " " + p.Name, nil
 }
 
+func parseOutput(out string) (string, error) {
+	parts := strings.Split(out, " ")
+	if len(parts) != 2 {
+		return "", fmt.Errorf("output should have 2 parts")
+	}
+	return strings.TrimSpace(parts[1]), nil
+}
+
 func compare(projects []*project.Project, i, j int) (bool, error) {
 	iStatus, err := projects[i].Status()
 	if err != nil {
@@ -90,9 +102,13 @@ func compare(projects []*project.Project, i, j int) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	// The attached project is always first
 	if iStatus == project.PROJECT_STATUS_ATTACHED {
 		return true, nil
 	}
+	// Otherwise we compare based on the status.
+	// if the statuses are the same, we should compare by name for inactive projects
+	// and by the last ac5tivity time for active projects.
 	if iStatus == jStatus {
 		switch iStatus {
 		case project.PROJECT_STATUS_INACTIVE:
@@ -110,12 +126,4 @@ func compare(projects []*project.Project, i, j int) (bool, error) {
 		}
 	}
 	return iStatus > jStatus, nil
-}
-
-func parseOutput(out string) (string, error) {
-	parts := strings.Split(out, " ")
-	if len(parts) != 2 {
-		return "", fmt.Errorf("output should have 2 parts")
-	}
-	return strings.TrimSpace(parts[1]), nil
 }
