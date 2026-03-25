@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"testing"
 
 	"samuellando.com/tmixer/internal/log"
 	logV2 "samuellando.com/tmixer/internal/log/v2"
@@ -35,25 +36,25 @@ func GetLogEvent(ctx context.Context, logger *log.Logger, out *bytes.Buffer) map
 	return res
 }
 
-func SetupLoggingV2(ctx context.Context, level int) (context.Context, *bytes.Buffer) {
+func SetupLoggingV2(ctx context.Context, level int) context.Context {
 	ctx = logV2.ContextLogger(ctx, logV2.LogOptions{Level: level})
+	return ctx
+}
+
+func GetLogEventV2(t *testing.T, ctx context.Context) map[string]any {
 	out := &bytes.Buffer{}
 	err := logV2.AddSink(ctx, nopWriteCloser{out})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
-	return ctx, out
-}
-
-func GetLogEventV2(ctx context.Context, out *bytes.Buffer) map[string]any {
-	err := logV2.Done(ctx)
+	err = logV2.Done(ctx)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	res := make(map[string]any)
 	err = json.Unmarshal(out.Bytes(), &res)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	return res
 }
