@@ -1,55 +1,38 @@
 package fzf_test
 
 import (
+	"context"
 	"testing"
 
 	"samuellando.com/tmixer/internal/config"
 	"samuellando.com/tmixer/internal/fzf"
 	"samuellando.com/tmixer/internal/log"
-	"samuellando.com/tmixer/internal/project"
 	"samuellando.com/tmixer/internal/testutil"
 )
 
-func TestPickProjectEventFields(t *testing.T) {
-	ctx, tmux := testutil.SetupTestServer(t)
-	defer testutil.TeardownTestServer(tmux)
-
-	// Set up logging
-	ctx, logger, out := testutil.SetupLogging(ctx, log.LEVEL_DEBUG)
+func TestPickEventFields(t *testing.T) {
+	ctx := context.Background()
+	ctx = testutil.SetupLoggingV2(ctx, log.LEVEL_DEBUG)
 
 	// Create a config with a project and use --filter for non-interactive selection
 	cfg := &config.Config{
 		FzfFlags: []string{"--filter=test-project"},
-		Projects: []*config.ProjectConfig{
-			{
-				Name:      "test-project",
-				Directory: "/tmp/test",
-			},
-		},
 	}
 
-	// Get the projects list
-	projects, err := project.List(ctx, tmux, cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
+	options := []string{"abcd", "123", "test-project", "hello"}
 
 	// Call PickProject - fzf will run non-interactively with --filter
-	selectedProject, err := fzf.Pick(ctx, cfg, projects)
+	_, err := fzf.Pick(ctx, cfg, options)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if selectedProject.Name != "test-project" {
-		t.Errorf("Expected 'test-project', got '%s'", selectedProject.Name)
-	}
-
-	res := testutil.GetLogEvent(ctx, logger, out)
+	res := testutil.GetLogEventV2(t, ctx)
 
 	// Check pickProjectEvent exists
-	event, ok := res["pickProjectEvent"].(map[string]any)
+	event, ok := res["fzf"].(map[string]any)
 	if !ok {
-		t.Fatal("pickProjectEvent not found in log output")
+		t.Fatal("pickEvent not found in log output")
 	}
 
 	// Check args field exists and contains fzf command
@@ -64,22 +47,25 @@ func TestPickProjectEventFields(t *testing.T) {
 		t.Errorf("First arg should be 'fzf', got '%s'", args[0])
 	}
 
+	// Check options field exists and contains fzf command
+	optionsOut, ok := event["options"].([]any)
+	if !ok {
+		t.Fatal("pickProjectEvent missing 'options' field")
+	}
+	if len(optionsOut) == 0 {
+		t.Error("'options' should not be empty")
+	}
+	if optionsOut[0] != "abcd" {
+		t.Errorf("First option should be 'abcd', got '%s'", optionsOut[0])
+	}
+
 	// Check output field exists
 	output, ok := event["output"].(string)
 	if !ok {
 		t.Fatal("pickProjectEvent missing 'output' field")
 	}
-	if output == "" {
-		t.Error("'output' should not be empty")
-	}
-
-	// Check parsedOutput field exists and matches selected project
-	parsedOutput, ok := event["parsedOutput"].(string)
-	if !ok {
-		t.Fatal("pickProjectEvent missing 'parsedOutput' field")
-	}
-	if parsedOutput != "test-project" {
-		t.Errorf("'parsedOutput' should be 'test-project', got '%s'", parsedOutput)
+	if output != "test-project" {
+		t.Error("'output' should be 'test-project'")
 	}
 
 	// errors field should be omitted when there are no errors
@@ -89,39 +75,26 @@ func TestPickProjectEventFields(t *testing.T) {
 }
 
 func TestPickProjectEventWithError(t *testing.T) {
-	ctx, tmux := testutil.SetupTestServer(t)
-	defer testutil.TeardownTestServer(tmux)
-
-	// Set up logging
-	ctx, logger, out := testutil.SetupLogging(ctx, log.LEVEL_DEBUG)
+	ctx := context.Background()
+	ctx = testutil.SetupLoggingV2(ctx, log.LEVEL_DEBUG)
 
 	// Create a config with --filter for a non-existent project
 	cfg := &config.Config{
 		FzfFlags: []string{"--filter=nonexistent-project"},
-		Projects: []*config.ProjectConfig{
-			{
-				Name:      "test-project",
-				Directory: "/tmp/test",
-			},
-		},
 	}
 
-	// Get the projects list
-	projects, err := project.List(ctx, tmux, cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
+	options := []string{"abcd", "123", "test-project", "hello"}
 
 	// Call PickProject - should fail because filter matches nothing
-	_, err = fzf.Pick(ctx, cfg, projects)
+	_, err := fzf.Pick(ctx, cfg, options)
 	if err == nil {
 		t.Fatal("Expected an error when filtering for non-existent project")
 	}
 
-	res := testutil.GetLogEvent(ctx, logger, out)
+	res := testutil.GetLogEventV2(t, ctx)
 
 	// Check pickProjectEvent exists
-	event, ok := res["pickProjectEvent"].(map[string]any)
+	event, ok := res["fzf"].(map[string]any)
 	if !ok {
 		t.Fatal("pickProjectEvent not found in log output")
 	}

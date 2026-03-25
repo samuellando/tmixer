@@ -1,56 +1,33 @@
-package fzf
+package fzf_test
 
 import (
+	"context"
 	"testing"
 
-	"samuellando.com/tmixer/internal/project"
+	"samuellando.com/tmixer/internal/config"
+	"samuellando.com/tmixer/internal/fzf"
+	"samuellando.com/tmixer/internal/log"
+	"samuellando.com/tmixer/internal/testutil"
 )
 
-func TestParseOutput(t *testing.T) {
-	t.Run("valid", func(t *testing.T) {
-		name, err := parseOutput("x dogs")
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if name != "dogs" {
-			t.Fatalf("unexpected name: %q", name)
-		}
-	})
+func TestPick(t *testing.T) {
+	ctx := context.Background()
+	ctx = testutil.SetupLoggingV2(ctx, log.LEVEL_DEBUG)
 
-	t.Run("valid with newline", func(t *testing.T) {
-		name, err := parseOutput("x cats\n")
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if name != "cats" {
-			t.Fatalf("unexpected name: %q", name)
-		}
-	})
-
-	t.Run("invalid one part", func(t *testing.T) {
-		_, err := parseOutput("dogs")
-		if err == nil {
-			t.Fatal("expected error")
-		}
-	})
-
-	t.Run("invalid too many parts", func(t *testing.T) {
-		_, err := parseOutput("a b c")
-		if err == nil {
-			t.Fatal("expected error")
-		}
-	})
-}
-
-func TestGetSelectedProject(t *testing.T) {
-	first := &project.Project{Name: "alpha"}
-	second := &project.Project{Name: "beta"}
-	projects := []*project.Project{first, second}
-
-	if got := getSelectedProject("beta", projects); got != second {
-		t.Fatalf("unexpected project: %#v", got)
+	// Create a config with a project and use --filter for non-interactive selection
+	cfg := &config.Config{
+		FzfFlags: []string{"--filter=test-project"},
 	}
-	if got := getSelectedProject("missing", projects); got != nil {
-		t.Fatalf("expected nil, got %#v", got)
+
+	options := []string{"abcd", "123", "test-project", "hello"}
+
+	// Call PickProject - fzf will run non-interactively with --filter
+	selectedProject, err := fzf.Pick(ctx, cfg, options)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if *selectedProject != "test-project" {
+		t.Errorf("Expected 'test-project', got '%s'", *selectedProject)
 	}
 }

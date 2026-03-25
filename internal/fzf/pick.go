@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 
 	"golang.org/x/term"
 	"samuellando.com/tmixer/internal/config"
@@ -14,8 +15,9 @@ import (
 )
 
 func Pick(ctx context.Context, config *config.Config, options []string) (*string, error) {
-	logEvent := log.Track(ctx, "pickProjectEvent")
+	logEvent := log.Track(ctx, "fzf")
 	defer logEvent.Done()
+	logEvent.Log("options", options)
 
 	// We need to use the raw stdin for the fzf command
 	fd := int(os.Stdin.Fd())
@@ -80,7 +82,7 @@ func Pick(ctx context.Context, config *config.Config, options []string) (*string
 	}
 
 	// Return the selected project
-	s := string(out)
+	s := strings.TrimSpace(string(out))
 	logEvent.Log("output", s)
 	return &s, nil
 }
