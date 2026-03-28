@@ -7,7 +7,7 @@ import (
 	"io"
 	"testing"
 
-	logV2 "samuellando.com/tmixer/internal/log/v2"
+	"samuellando.com/tmixer/internal/log"
 )
 
 type nopWriteCloser struct {
@@ -19,17 +19,17 @@ func (n nopWriteCloser) Close() error {
 }
 
 func SetupLogging(ctx context.Context) context.Context {
-	ctx = logV2.ContextLogger(ctx)
+	ctx = log.ContextLogger(ctx)
 	return ctx
 }
 
 func GetLogEvent(t *testing.T, ctx context.Context) map[string]any {
 	out := &bytes.Buffer{}
-	err := logV2.AddSink(ctx, nopWriteCloser{out})
+	err := log.AddSink(ctx, nopWriteCloser{out})
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = logV2.Done(ctx)
+	err = log.Done(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"samuellando.com/tmixer/internal/log/v2"
+	"samuellando.com/tmixer/internal/log"
 	"samuellando.com/tmixer/internal/testutil"
 )
 

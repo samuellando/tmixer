@@ -11,7 +11,7 @@ import (
 	"samuellando.com/tmixer/internal/display"
 	"samuellando.com/tmixer/internal/flags"
 	"samuellando.com/tmixer/internal/fzf"
-	logV2 "samuellando.com/tmixer/internal/log/v2"
+	"samuellando.com/tmixer/internal/log"
 	"samuellando.com/tmixer/internal/project"
 	"samuellando.com/tmixer/internal/tmux"
 )
@@ -33,7 +33,7 @@ func run(args ...string) (err error) {
 		err = errors.Join(err, session.close())
 	}()
 	// init the logging event
-	ctx := logV2.ContextLogger(context.Background())
+	ctx := log.ContextLogger(context.Background())
 	// Parse the arguments before setting up logging in case there's a extra log file
 	session.config, args, err = flags.ParseArgs(ctx, args, FLAGS)
 	if err != nil {
@@ -52,19 +52,25 @@ func run(args ...string) (err error) {
 	// --help flag
 	if session.config.DisplayHelp != nil && *session.config.DisplayHelp {
 		displayHelp()
-		return logV2.Done(ctx)
+		return log.Done(ctx)
 	}
 	// And run, and output the logs
 	err = runTmixer(ctx, args, session)
+	var logErr error
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		return logV2.Fatal(ctx, err)
+		logErr = log.Fatal(ctx, err)
+	} else {
+		logErr = log.Done(ctx)
 	}
-	return logV2.Done(ctx)
+	if session.config.DisplayLog != nil && *session.config.DisplayLog {
+		logErr = errors.Join(logErr, log.Display(ctx))
+	}
+	return logErr
 }
 
 func runTmixer(ctx context.Context, args []string, session *session) error {
-	logEvent := logV2.Track(ctx, "run")
+	logEvent := log.Track(ctx, "run")
 	defer logEvent.Done()
 	// Parse the config files, and the args, again
 	srv, err := startTmuxServer(ctx, session)
@@ -348,7 +354,7 @@ func setupLogging(ctx context.Context, config *config.Config) error {
 		if err != nil {
 			return err
 		}
-		if err := logV2.AddSink(ctx, f); err != nil {
+		if err := log.AddSink(ctx, f); err != nil {
 			err = errors.Join(err, f.Close())
 			return fmt.Errorf("while adding log sink: %w", err)
 		}
@@ -391,7 +397,7 @@ Flags: `)
 }
 
 func cleanupStaleProjects(ctx context.Context, projects []*project.Project) error {
-	logEvent := logV2.Track(ctx, "cleanupStaleProjects")
+	logEvent := log.Track(ctx, "cleanupStaleProjects")
 	projectsKilled := make([]string, 0)
 	defer logEvent.Done()
 	var errs error

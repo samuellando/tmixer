@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/goccy/go-yaml"
-	"samuellando.com/tmixer/internal/log/v2"
+	"samuellando.com/tmixer/internal/log"
 )
 
 type Config struct {
@@ -22,6 +22,7 @@ type Config struct {
 	CombineProjects *bool            `yaml:"combineProjects"`
 	Projects        []*ProjectConfig `yaml:"projects"`
 	DisplayHelp     *bool            `yaml:"displayHelp"`
+	DisplayLog      *bool            `yaml:"displayLog"`
 }
 
 func mergeConfigs(a, b *Config) *Config {
@@ -61,6 +62,10 @@ func mergeConfigs(a, b *Config) *Config {
 	if b.DisplayHelp != nil {
 		displayHelp = b.DisplayHelp
 	}
+	displayLog := a.DisplayLog
+	if b.DisplayLog != nil {
+		displayLog = b.DisplayLog
+	}
 	return &Config{
 		DefaultProject:  defaultProject,
 		LogFile:         logFile,
@@ -71,6 +76,7 @@ func mergeConfigs(a, b *Config) *Config {
 		CombineProjects: combineProjects,
 		Projects:        projects,
 		DisplayHelp:     displayHelp,
+		DisplayLog:      displayLog,
 	}
 }
 
