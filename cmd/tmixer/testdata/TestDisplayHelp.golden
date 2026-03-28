@@ -74,3 +74,7 @@ Flags:
 	Usage: --tmuxSocketPath /tmp/tmux/socket.sock
 	EnvVar: $TMIXER_SOCKET_PATH
 
+--verbose OR -v
+	display information about the run
+	Usage: --verbose or -v
+
