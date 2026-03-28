@@ -5,19 +5,19 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"os"
-	"time"
 
 	"google.golang.org/grpc"
 	"samuellando.com/tmixer/internal/config"
+	"samuellando.com/tmixer/internal/display"
 	"samuellando.com/tmixer/internal/flags"
-	logV1 "samuellando.com/tmixer/internal/log"
-	logV2 "samuellando.com/tmixer/internal/log/v2"
+	"samuellando.com/tmixer/internal/log"
 	"samuellando.com/tmixer/internal/project"
 	"samuellando.com/tmixer/internal/protocol"
 	"samuellando.com/tmixer/internal/tmux"
+
+	stdLog "log"
 )
 
 var ErrNoSelection = errors.New("NO SELECTION MADE")
@@ -31,36 +31,35 @@ type server struct {
 
 func (s *server) Session(conn grpc.BidiStreamingServer[protocol.Request, protocol.Response]) error {
 	ctx := context.Background()
-	ctx = logV1.InitializeWideEvent(ctx, &logV1.LoggerOptions{Level: logV1.LEVEL_INFO})
-	ctx = logV2.ContextLogger(ctx, logV2.LogOptions{})
-	defer logV2.Done(ctx)
-	defer logV2.Display(ctx)
+	ctx = log.ContextLogger(ctx)
+	defer log.Done(ctx)
+	// defer log.Display(ctx)
 
+	var conf *config.Config
+	var args []string
 	for {
 		req, err := conn.Recv()
+		fmt.Println(req)
 		if err != nil {
 			if err == io.EOF {
 				return nil
 			}
-			logV2.Fatal(ctx, err)
+			log.Fatal(ctx, err)
 			return err
 		}
-		var conf *config.Config
-		var args []string
 		switch req := req.Payload.(type) {
 		case *protocol.Request_Args:
 			if conf == nil {
-				conf = &config.Config{}
-				args, err = flags.ParseArgs(ctx, req.Args.Args, FLAGS, conf)
+				conf, args, err = flags.ParseArgs(ctx, req.Args.Args, FLAGS)
 				if err != nil {
 					conn.Send(&protocol.Response{Error: ptr(err.Error())})
-					logV2.Fatal(ctx, err)
+					log.Fatal(ctx, err)
 					return nil
 				}
 				err = conf.LoadFiles(ctx)
 				if err != nil {
 					conn.Send(&protocol.Response{Error: ptr(err.Error())})
-					logV2.Fatal(ctx, err)
+					log.Fatal(ctx, err)
 					return nil
 				}
 			}
@@ -69,22 +68,29 @@ func (s *server) Session(conn grpc.BidiStreamingServer[protocol.Request, protoco
 				resp, err := s.projectListResponse(ctx, conf)
 				if err != nil {
 					conn.Send(&protocol.Response{Error: ptr(err.Error())})
-					logV2.Fatal(ctx, err)
+					log.Fatal(ctx, err)
 					return nil
 				}
 				conn.Send(resp)
-				return nil
 			}
 		case *protocol.Request_Selection:
 			if conf == nil {
 				conn.Send(&protocol.Response{Error: ptr("Must send initial args before a selection")})
 				return nil
+			} else {
+				name, err := display.GetProjectNameFromOutput(*req.Selection.Project)
+				if err != nil {
+					conn.Send(&protocol.Response{Error: ptr(err.Error())})
+					log.Fatal(ctx, err)
+					return nil
+				}
+				args = append(args, name)
+				return s.runCommand(ctx, conf, args...)
 			}
 		default:
 			conn.Send(&protocol.Response{Error: ptr("Invalid request type")})
 			return nil
 		}
-
 	}
 }
 
@@ -97,27 +103,11 @@ func (s *server) projectListResponse(ctx context.Context, config *config.Config)
 	if err != nil {
 		return nil, err
 	}
-	respProjects := make([]*protocol.Project, 0, len(projects))
-	for _, p := range projects {
-		status, err := p.Status()
-		if err != nil {
-			return nil, err
-		}
-		lastActivity, err := p.LastActivity()
-		if err != nil {
-			if err != project.ErrSessionNotFound {
-				return nil, err
-			} else {
-				lastActivity = &time.Time{}
-			}
-		}
-		respProjects = append(respProjects, &protocol.Project{
-			Name:         &p.Name,
-			Status:       ptr(protocol.Status(status)),
-			LastActivity: ptr(lastActivity.UnixNano()),
-		})
+	disp, err := display.Projects(ctx, projects)
+	if err != nil {
+		return nil, err
 	}
-	return &protocol.Response{Projects: respProjects}, nil
+	return &protocol.Response{Projects: disp}, nil
 }
 
 func Run() error {
@@ -126,21 +116,21 @@ func Run() error {
 
 	lis, err := net.Listen("unix", socket)
 	if err != nil {
-		log.Fatal(err)
+		stdLog.Fatal(err)
 	}
 
 	grpcServer := grpc.NewServer()
 	protocol.RegisterTmixerServer(grpcServer, &server{tmuxServers: make(map[string]*tmux.Server)})
 
-	log.Println("Server listening on", socket)
+	stdLog.Println("Server listening on", socket)
 	if err := grpcServer.Serve(lis); err != nil {
-		log.Fatal(err)
+		stdLog.Fatal(err)
 	}
 	return nil
 }
 
 func (s *server) runCommand(ctx context.Context, config *config.Config, args ...string) error {
-	logEvent := logV2.Track(ctx, "runEvent")
+	logEvent := log.Track(ctx, "runEvent")
 	defer logEvent.Done()
 	srv, err := s.getTmuxServer(ctx, config)
 	if err != nil {

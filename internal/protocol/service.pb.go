@@ -21,65 +21,6 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type Status int32
-
-const (
-	Status_PROJECT_STATUS_INACTIVE Status = 0
-	Status_PROJECT_STATUS_ACTIVE   Status = 1
-	Status_PROJECT_STATUS_ATTACHED Status = 2
-)
-
-// Enum value maps for Status.
-var (
-	Status_name = map[int32]string{
-		0: "PROJECT_STATUS_INACTIVE",
-		1: "PROJECT_STATUS_ACTIVE",
-		2: "PROJECT_STATUS_ATTACHED",
-	}
-	Status_value = map[string]int32{
-		"PROJECT_STATUS_INACTIVE": 0,
-		"PROJECT_STATUS_ACTIVE":   1,
-		"PROJECT_STATUS_ATTACHED": 2,
-	}
-)
-
-func (x Status) Enum() *Status {
-	p := new(Status)
-	*p = x
-	return p
-}
-
-func (x Status) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (Status) Descriptor() protoreflect.EnumDescriptor {
-	return file_internal_protocol_service_proto_enumTypes[0].Descriptor()
-}
-
-func (Status) Type() protoreflect.EnumType {
-	return &file_internal_protocol_service_proto_enumTypes[0]
-}
-
-func (x Status) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Do not use.
-func (x *Status) UnmarshalJSON(b []byte) error {
-	num, err := protoimpl.X.UnmarshalJSONEnum(x.Descriptor(), b)
-	if err != nil {
-		return err
-	}
-	*x = Status(num)
-	return nil
-}
-
-// Deprecated: Use Status.Descriptor instead.
-func (Status) EnumDescriptor() ([]byte, []int) {
-	return file_internal_protocol_service_proto_rawDescGZIP(), []int{0}
-}
-
 type Request struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Payload:
@@ -208,7 +149,7 @@ func (x *Args) GetArgs() []string {
 
 type Selection struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Project       *Project               `protobuf:"bytes,1,req,name=project" json:"project,omitempty"`
+	Project       *string                `protobuf:"bytes,1,req,name=project" json:"project,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -243,76 +184,16 @@ func (*Selection) Descriptor() ([]byte, []int) {
 	return file_internal_protocol_service_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *Selection) GetProject() *Project {
-	if x != nil {
-		return x.Project
-	}
-	return nil
-}
-
-type Project struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          *string                `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
-	Status        *Status                `protobuf:"varint,2,req,name=status,enum=Status" json:"status,omitempty"`
-	LastActivity  *int64                 `protobuf:"varint,3,req,name=lastActivity" json:"lastActivity,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *Project) Reset() {
-	*x = Project{}
-	mi := &file_internal_protocol_service_proto_msgTypes[3]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Project) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Project) ProtoMessage() {}
-
-func (x *Project) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_protocol_service_proto_msgTypes[3]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Project.ProtoReflect.Descriptor instead.
-func (*Project) Descriptor() ([]byte, []int) {
-	return file_internal_protocol_service_proto_rawDescGZIP(), []int{3}
-}
-
-func (x *Project) GetName() string {
-	if x != nil && x.Name != nil {
-		return *x.Name
+func (x *Selection) GetProject() string {
+	if x != nil && x.Project != nil {
+		return *x.Project
 	}
 	return ""
 }
 
-func (x *Project) GetStatus() Status {
-	if x != nil && x.Status != nil {
-		return *x.Status
-	}
-	return Status_PROJECT_STATUS_INACTIVE
-}
-
-func (x *Project) GetLastActivity() int64 {
-	if x != nil && x.LastActivity != nil {
-		return *x.LastActivity
-	}
-	return 0
-}
-
 type Response struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Projects      []*Project             `protobuf:"bytes,1,rep,name=projects" json:"projects,omitempty"`
+	Projects      []string               `protobuf:"bytes,1,rep,name=projects" json:"projects,omitempty"`
 	Error         *string                `protobuf:"bytes,2,opt,name=error" json:"error,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -320,7 +201,7 @@ type Response struct {
 
 func (x *Response) Reset() {
 	*x = Response{}
-	mi := &file_internal_protocol_service_proto_msgTypes[4]
+	mi := &file_internal_protocol_service_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -332,7 +213,7 @@ func (x *Response) String() string {
 func (*Response) ProtoMessage() {}
 
 func (x *Response) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_protocol_service_proto_msgTypes[4]
+	mi := &file_internal_protocol_service_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -345,10 +226,10 @@ func (x *Response) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Response.ProtoReflect.Descriptor instead.
 func (*Response) Descriptor() ([]byte, []int) {
-	return file_internal_protocol_service_proto_rawDescGZIP(), []int{4}
+	return file_internal_protocol_service_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *Response) GetProjects() []*Project {
+func (x *Response) GetProjects() []string {
 	if x != nil {
 		return x.Projects
 	}
@@ -373,20 +254,12 @@ const file_internal_protocol_service_proto_rawDesc = "" +
 	".SelectionH\x00R\tselectionB\t\n" +
 	"\apayload\"\x1a\n" +
 	"\x04Args\x12\x12\n" +
-	"\x04args\x18\x01 \x03(\tR\x04args\"/\n" +
-	"\tSelection\x12\"\n" +
-	"\aproject\x18\x01 \x02(\v2\b.ProjectR\aproject\"b\n" +
-	"\aProject\x12\x12\n" +
-	"\x04name\x18\x01 \x02(\tR\x04name\x12\x1f\n" +
-	"\x06status\x18\x02 \x02(\x0e2\a.StatusR\x06status\x12\"\n" +
-	"\flastActivity\x18\x03 \x02(\x03R\flastActivity\"F\n" +
-	"\bResponse\x12$\n" +
-	"\bprojects\x18\x01 \x03(\v2\b.ProjectR\bprojects\x12\x14\n" +
-	"\x05error\x18\x02 \x01(\tR\x05error*]\n" +
-	"\x06Status\x12\x1b\n" +
-	"\x17PROJECT_STATUS_INACTIVE\x10\x00\x12\x19\n" +
-	"\x15PROJECT_STATUS_ACTIVE\x10\x01\x12\x1b\n" +
-	"\x17PROJECT_STATUS_ATTACHED\x10\x022,\n" +
+	"\x04args\x18\x01 \x03(\tR\x04args\"%\n" +
+	"\tSelection\x12\x18\n" +
+	"\aproject\x18\x01 \x02(\tR\aproject\"<\n" +
+	"\bResponse\x12\x1a\n" +
+	"\bprojects\x18\x01 \x03(\tR\bprojects\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error2,\n" +
 	"\x06Tmixer\x12\"\n" +
 	"\aSession\x12\b.Request\x1a\t.Response(\x010\x01B\fZ\n" +
 	"./protocol"
@@ -403,29 +276,23 @@ func file_internal_protocol_service_proto_rawDescGZIP() []byte {
 	return file_internal_protocol_service_proto_rawDescData
 }
 
-var file_internal_protocol_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_internal_protocol_service_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_internal_protocol_service_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_internal_protocol_service_proto_goTypes = []any{
-	(Status)(0),       // 0: Status
-	(*Request)(nil),   // 1: Request
-	(*Args)(nil),      // 2: Args
-	(*Selection)(nil), // 3: Selection
-	(*Project)(nil),   // 4: Project
-	(*Response)(nil),  // 5: Response
+	(*Request)(nil),   // 0: Request
+	(*Args)(nil),      // 1: Args
+	(*Selection)(nil), // 2: Selection
+	(*Response)(nil),  // 3: Response
 }
 var file_internal_protocol_service_proto_depIdxs = []int32{
-	2, // 0: Request.args:type_name -> Args
-	3, // 1: Request.selection:type_name -> Selection
-	4, // 2: Selection.project:type_name -> Project
-	0, // 3: Project.status:type_name -> Status
-	4, // 4: Response.projects:type_name -> Project
-	1, // 5: Tmixer.Session:input_type -> Request
-	5, // 6: Tmixer.Session:output_type -> Response
-	6, // [6:7] is the sub-list for method output_type
-	5, // [5:6] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	1, // 0: Request.args:type_name -> Args
+	2, // 1: Request.selection:type_name -> Selection
+	0, // 2: Tmixer.Session:input_type -> Request
+	3, // 3: Tmixer.Session:output_type -> Response
+	3, // [3:4] is the sub-list for method output_type
+	2, // [2:3] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_internal_protocol_service_proto_init() }
@@ -442,14 +309,13 @@ func file_internal_protocol_service_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_protocol_service_proto_rawDesc), len(file_internal_protocol_service_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   5,
+			NumEnums:      0,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_internal_protocol_service_proto_goTypes,
 		DependencyIndexes: file_internal_protocol_service_proto_depIdxs,
-		EnumInfos:         file_internal_protocol_service_proto_enumTypes,
 		MessageInfos:      file_internal_protocol_service_proto_msgTypes,
 	}.Build()
 	File_internal_protocol_service_proto = out.File

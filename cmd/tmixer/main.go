@@ -10,9 +10,7 @@ import (
 	"samuellando.com/tmixer/cmd/tmixer/client"
 	"samuellando.com/tmixer/cmd/tmixer/server"
 	"samuellando.com/tmixer/internal/config"
-	"samuellando.com/tmixer/internal/display"
 	"samuellando.com/tmixer/internal/flags"
-	"samuellando.com/tmixer/internal/fzf"
 	"samuellando.com/tmixer/internal/log"
 	"samuellando.com/tmixer/internal/project"
 	"samuellando.com/tmixer/internal/tmux"
@@ -138,32 +136,11 @@ func runTmixer(ctx context.Context, args []string, session *session) error {
 func executeCommand(ctx context.Context, srv *tmux.Server, command, query string, session *session) error {
 	switch command {
 	// Internal (undocumented) commands
-	case "list":
-		return list(ctx, session)
 	case "notify-switch":
 		return notifySwitch(ctx, query, session)
-	case "start":
-		return start(ctx, srv, query, session)
-	case "switch":
-		return runSwitch(ctx, query, session)
-	case "kill":
-		return kill(ctx, query, session)
-	case "reset":
-		return reset(ctx, query, session)
 	default:
 		return ErrCommandNotRecognized
 	}
-}
-
-func list(ctx context.Context, session *session) error {
-	infos, err := display.Projects(ctx, session.projects)
-	if err != nil {
-		return err
-	}
-	for _, i := range infos {
-		fmt.Println(i)
-	}
-	return nil
 }
 
 func notifySwitch(ctx context.Context, query string, session *session) error {
@@ -175,82 +152,6 @@ func notifySwitch(ctx context.Context, query string, session *session) error {
 		return ErrProjectNotFound
 	}
 	return selection.RunSwitchCommands(ctx)
-}
-
-func start(ctx context.Context, srv *tmux.Server, query string, session *session) (err error) {
-	var selection *project.Project
-	if query != "" {
-		selection = getProject(query, session)
-	} else {
-		if session.config.DefaultProject != nil {
-			selection = getProject(*session.config.DefaultProject, session)
-		} else {
-			selection, err = selectProject(ctx, session.config, session.projects)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return startClient(ctx, srv, selection)
-}
-
-func runSwitch(ctx context.Context, query string, session *session) (err error) {
-	var selection *project.Project
-	if query != "" {
-		selection = getProject(query, session)
-	} else {
-		selection, err = selectProject(ctx, session.config, session.projects)
-		if err != nil {
-			return err
-		}
-	}
-	if selection == nil {
-		return ErrNoSelection
-	}
-	_, err = selection.Switch(ctx)
-	return err
-}
-
-func kill(ctx context.Context, query string, session *session) (err error) {
-	var selection *project.Project
-	if query != "" {
-		selection = getProject(query, session)
-	} else {
-		selection, err = selectProject(ctx, session.config, session.projects)
-		if err != nil {
-			return err
-		}
-	}
-	if selection == nil {
-		return ErrNoSelection
-	}
-	cleanup, err := selection.Kill(ctx)
-	session.addCleanup(cleanup)
-	return err
-}
-
-func reset(ctx context.Context, query string, session *session) error {
-	var selection *project.Project
-	if query != "" {
-		selection = getProject(query, session)
-	} else {
-		for _, p := range session.projects {
-			status, err := p.Status()
-			if err != nil {
-				return fmt.Errorf("while getting project status for reset: %w", err)
-			}
-			if status == project.PROJECT_STATUS_ATTACHED {
-				selection = p
-				break
-			}
-		}
-	}
-	if selection == nil {
-		return ErrNoSelection
-	}
-	cleanup, err := selection.Reset(ctx)
-	session.addCleanup(cleanup)
-	return err
 }
 
 func startTmuxServer(ctx context.Context, session *session) (*tmux.Server, error) {
@@ -276,21 +177,6 @@ func getProject(query string, session *session) *project.Project {
 		}
 	}
 	return nil
-}
-
-func selectProject(ctx context.Context, config *config.Config, projects []*project.Project) (*project.Project, error) {
-	list, err := display.Projects(ctx, projects)
-	if err != nil {
-		return nil, err
-	}
-	out, err := fzf.Pick(ctx, config, list)
-	if err != nil {
-		return nil, err
-	}
-	if out == nil {
-		return nil, ErrNoSelection
-	}
-	return display.GetProjectFromOutput(*out, projects)
 }
 
 func startClient(ctx context.Context, srv *tmux.Server, p *project.Project) error {
