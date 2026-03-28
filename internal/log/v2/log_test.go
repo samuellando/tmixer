@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"regexp"
 	"strings"
 	"testing"
@@ -47,10 +46,8 @@ func normalize(s string) string {
 func TestLogger(t *testing.T) {
 	ctx := context.Background()
 	sink := &StringWriteCloser{}
-	ctx = log.ContextLogger(ctx, log.LogOptions{
-		Level: log.LEVEL_INFO,
-		Sinks: []io.WriteCloser{sink},
-	})
+	ctx = log.ContextLogger(ctx)
+	log.AddSink(ctx, sink)
 	logEvent := log.Track(ctx, "test")
 	logEvent.Log("hello", "World")
 	logEvent.Log("abc", []int{1, 2, 3})
@@ -64,72 +61,11 @@ func TestLogger(t *testing.T) {
 	testutil.GoldenTest(t, normalize(sink.String()))
 }
 
-func TestTrackLevel(t *testing.T) {
-	ctx := context.Background()
-	sink := &StringWriteCloser{}
-	ctx = log.ContextLogger(ctx, log.LogOptions{
-		Level: log.LEVEL_INFO,
-		Sinks: []io.WriteCloser{sink},
-	})
-	log.Track(ctx, "test")
-	log.TrackLevel(ctx, log.LEVEL_DEBUG, "test2")
-	err := log.Done(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	out := make(map[string]any)
-	err = json.Unmarshal([]byte(sink.String()), &out)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := out["test2"]; ok {
-		t.Fatal("Should not have debug level log")
-	}
-}
-
-func TestSetOptions(t *testing.T) {
-	ctx := context.Background()
-	sink := &StringWriteCloser{}
-	ctx = log.ContextLogger(ctx, log.LogOptions{
-		Level: log.LEVEL_INFO,
-		Sinks: []io.WriteCloser{sink},
-	})
-	log.Track(ctx, "test")
-	log.TrackLevel(ctx, log.LEVEL_DEBUG, "test2")
-	err := log.SetOptions(ctx, log.LogOptions{
-		Level: log.LEVEL_DEBUG,
-		Sinks: []io.WriteCloser{sink},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	log.TrackLevel(ctx, log.LEVEL_DEBUG, "test3")
-	err = log.Done(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	out := make(map[string]any)
-	err = json.Unmarshal([]byte(sink.String()), &out)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := out["test2"]; ok {
-		t.Fatal("Should not have first debug level log")
-	}
-	if _, ok := out["test3"]; !ok {
-		t.Fatal("Should have second debug level log")
-	}
-}
-
 func TestAddSinks(t *testing.T) {
 	ctx := context.Background()
 	sink := &StringWriteCloser{}
 	sink2 := &StringWriteCloser{}
-	ctx = log.ContextLogger(ctx, log.LogOptions{
-		Level: log.LEVEL_INFO,
-	})
+	ctx = log.ContextLogger(ctx)
 	err := log.AddSink(ctx, sink)
 	if err != nil {
 		t.Fatal(err)
@@ -150,10 +86,8 @@ func TestAddSinks(t *testing.T) {
 func TestFatal(t *testing.T) {
 	ctx := context.Background()
 	sink := &StringWriteCloser{}
-	ctx = log.ContextLogger(ctx, log.LogOptions{
-		Level: log.LEVEL_INFO,
-		Sinks: []io.WriteCloser{sink},
-	})
+	ctx = log.ContextLogger(ctx)
+	log.AddSink(ctx, sink)
 	err := log.Fatal(ctx, fmt.Errorf("This is an error"))
 	if err != nil {
 		t.Fatal(err)
@@ -164,10 +98,8 @@ func TestFatal(t *testing.T) {
 func TestTimestampAndDuration(t *testing.T) {
 	ctx := context.Background()
 	sink := &StringWriteCloser{}
-	ctx = log.ContextLogger(ctx, log.LogOptions{
-		Level: log.LEVEL_INFO,
-		Sinks: []io.WriteCloser{sink},
-	})
+	ctx = log.ContextLogger(ctx)
+	log.AddSink(ctx, sink)
 	time.Sleep(time.Second)
 	err := log.Done(ctx)
 	if err != nil {
@@ -195,10 +127,8 @@ func TestTimestampAndDuration(t *testing.T) {
 func TestLogEventErrors(t *testing.T) {
 	ctx := context.Background()
 	sink := &StringWriteCloser{}
-	ctx = log.ContextLogger(ctx, log.LogOptions{
-		Level: log.LEVEL_INFO,
-		Sinks: []io.WriteCloser{sink},
-	})
+	ctx = log.ContextLogger(ctx)
+	log.AddSink(ctx, sink)
 	logEvent := log.Track(ctx, "test")
 	logEvent.Log("hello", "World")
 	logEvent.Log("abc", []int{1, 2, 3})
@@ -214,10 +144,8 @@ func TestLogEventErrors(t *testing.T) {
 func TestLogEventTimestampAndDuration(t *testing.T) {
 	ctx := context.Background()
 	sink := &StringWriteCloser{}
-	ctx = log.ContextLogger(ctx, log.LogOptions{
-		Level: log.LEVEL_INFO,
-		Sinks: []io.WriteCloser{sink},
-	})
+	ctx = log.ContextLogger(ctx)
+	log.AddSink(ctx, sink)
 	logEvent := log.Track(ctx, "test")
 	time.Sleep(time.Second)
 	logEvent.Done()
@@ -250,10 +178,8 @@ func TestDisplay(t *testing.T) {
 	testutil.GoldenTest(t, normalize(testutil.CaptureStderr(func() {
 		ctx := context.Background()
 		sink := &StringWriteCloser{}
-		ctx = log.ContextLogger(ctx, log.LogOptions{
-			Level: log.LEVEL_INFO,
-			Sinks: []io.WriteCloser{sink},
-		})
+		ctx = log.ContextLogger(ctx)
+		log.AddSink(ctx, sink)
 		logEvent := log.Track(ctx, "test")
 		logEvent.Log("hello", "World")
 		logEvent.Log("abc", []int{1, 2, 3})
