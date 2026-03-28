@@ -13,7 +13,7 @@ import (
 	"testing"
 
 	"samuellando.com/tmixer/internal/config"
-	"samuellando.com/tmixer/internal/log/v2"
+	"samuellando.com/tmixer/internal/log"
 	"samuellando.com/tmixer/internal/testutil"
 	"samuellando.com/tmixer/internal/tmux"
 )

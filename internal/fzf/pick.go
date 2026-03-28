@@ -11,7 +11,7 @@ import (
 
 	"golang.org/x/term"
 	"samuellando.com/tmixer/internal/config"
-	"samuellando.com/tmixer/internal/log/v2"
+	"samuellando.com/tmixer/internal/log"
 )
 
 func Pick(ctx context.Context, config *config.Config, options []string) (*string, error) {

@@ -24,6 +24,16 @@ var FLAGS = map[string]flags.Flag{
 			return nil
 		},
 	},
+	"verbose": {
+		ShortName:   "v",
+		Description: "display information about the run",
+		Usage:       "--verbose or -v",
+		Bare:        true,
+		ParseInput: func(s string, c *config.Config) error {
+			c.DisplayLog = ptr(true)
+			return nil
+		},
+	},
 	"logFile": {
 		Description: "Output logs to a file in addition to ~/.local/state/tmixer/logs .",
 		Usage:       "--logFile out.log",

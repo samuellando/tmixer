@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"samuellando.com/tmixer/internal/log/v2"
+	"samuellando.com/tmixer/internal/log"
 )
 
 type controlModeClient struct {

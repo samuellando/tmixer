@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"samuellando.com/tmixer/internal/log/v2"
+	"samuellando.com/tmixer/internal/log"
 )
 
 // Runs the projects switch commands in it's active session.

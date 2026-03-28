@@ -24,6 +24,7 @@ tmuxSocketPath: "/tmp/sock"
 configFiles: ["one", "two"]
 combineProjects: false
 displayHelp: true
+displayLog: true
 
 projects:
   - name: home
@@ -91,6 +92,7 @@ projects:
 			},
 		},
 		DisplayHelp: Ptr(true),
+		DisplayLog:  Ptr(true),
 	}
 	config := config.Config{
 		ConfigFiles: []string{configFile},

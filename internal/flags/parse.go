@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"samuellando.com/tmixer/internal/config"
-	"samuellando.com/tmixer/internal/log/v2"
+	"samuellando.com/tmixer/internal/log"
 )
 
 // Parse the args for the flags specified in inFlags
