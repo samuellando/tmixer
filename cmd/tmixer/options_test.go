@@ -21,6 +21,21 @@ func TestHelpFlag(t *testing.T) {
 	}
 }
 
+func TestVerboseFlag(t *testing.T) {
+	t.Parallel()
+	conf := &config.Config{}
+	flag := FLAGS["verbose"]
+
+	err := flag.ParseInput("", conf)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if !*conf.DisplayLog {
+		t.Error("Should set the display help option")
+	}
+}
+
 func TestLogFileFlag(t *testing.T) {
 	t.Parallel()
 	conf := &config.Config{}
