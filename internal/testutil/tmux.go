@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/creack/pty"
-	"samuellando.com/tmixer/internal/log"
+	"samuellando.com/tmixer/internal/log/v2"
 	"samuellando.com/tmixer/internal/tmux"
 )
 
@@ -53,7 +53,7 @@ func SetupTestClient(tmux *tmux.Server, session *tmux.Session) *os.File {
 }
 
 func SetupTestServer(t testing.TB) (context.Context, *tmux.Server) {
-	ctx, _ := log.New(context.Background(), nil)
+	ctx := log.ContextLogger(context.Background())
 	dir := t.TempDir()
 	tmux := tmux.Tmux(ctx, fmt.Sprintf("%s/test.sock", dir))
 	// Start one extra session so the server starts

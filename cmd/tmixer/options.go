@@ -7,7 +7,6 @@ import (
 
 	"samuellando.com/tmixer/internal/config"
 	"samuellando.com/tmixer/internal/flags"
-	"samuellando.com/tmixer/internal/log"
 )
 
 func ptr[T any](v T) *T {
@@ -36,46 +35,6 @@ var FLAGS = map[string]flags.Flag{
 			return nil
 		},
 		EnvironmentVariable: "TMIXER_LOG_FILE",
-	},
-	"logLevel": {
-		Description: "logging level: info or debug",
-		Default:     "info",
-		Usage:       "--logLevel debug",
-		ParseInput: func(s string, c *config.Config) error {
-			s = strings.ToLower(s)
-			if strings.HasPrefix(s, "i") {
-				c.LogLevel = ptr(log.LEVEL_INFO)
-			} else if strings.HasPrefix(s, "d") {
-				c.LogLevel = ptr(log.LEVEL_DEBUG)
-			} else {
-				return fmt.Errorf("UNRECOGNIZED LOG LEVEL")
-			}
-			return nil
-		},
-		EnvironmentVariable: "TMIXER_LOG_LEVEL",
-	},
-	"logRetentionDays": {
-		Description: "how many previous days of logs to keep in ~/.local/state/tmixer/logs. Set to 0 to only keep current day and none to disable logging.",
-		Usage:       "--logRetentionDays 5",
-		Default:     "1",
-		ParseInput: func(s string, c *config.Config) error {
-			if s == "" {
-				return fmt.Errorf("number of log retention days must be provided")
-			}
-			var v int
-			var err error
-			if strings.ToLower(s) == "none" {
-				v = -1
-			} else {
-				v, err = strconv.Atoi(s)
-				if err != nil {
-					return fmt.Errorf("while parsing log retention days: %s", err)
-				}
-			}
-			c.LogRetentionDays = &v
-			return nil
-		},
-		EnvironmentVariable: "TMIXER_LOG_RETENTION_DAYS",
 	},
 	"config": {
 		ShortName:   "c",

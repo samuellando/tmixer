@@ -6,7 +6,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"samuellando.com/tmixer/internal/config"
 	"samuellando.com/tmixer/internal/display"
-	"samuellando.com/tmixer/internal/log"
 	"samuellando.com/tmixer/internal/project"
 	"samuellando.com/tmixer/internal/testutil"
 )
@@ -16,7 +15,7 @@ func TestDisplayProjectsEventFields(t *testing.T) {
 	defer testutil.TeardownTestServer(tmux)
 
 	// Set up logging
-	ctx = testutil.SetupLoggingV2(ctx, log.LEVEL_DEBUG)
+	ctx = testutil.SetupLogging(ctx)
 
 	// Create a simple config with one project
 	cfg := &config.Config{
@@ -44,7 +43,7 @@ func TestDisplayProjectsEventFields(t *testing.T) {
 		anyResult[i] = r
 	}
 
-	res := testutil.GetLogEventV2(t, ctx)
+	res := testutil.GetLogEvent(t, ctx)
 
 	// Check displayProjects exists
 	event, ok := res["displayProjects"].(map[string]any)

@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"samuellando.com/tmixer/internal/log"
+	"samuellando.com/tmixer/internal/log/v2"
 	"samuellando.com/tmixer/internal/tmux"
 )
 
@@ -17,48 +17,41 @@ import (
 // 3. If no default project is set, it will switch to a random project.
 // 4. It will exit tmux if there are no other configured projects.
 func (p *Project) Kill(ctx context.Context) (func() error, error) {
-	type projectKillEvent struct {
-		Name            string         `json:"name"`
-		InitialStatus   ProjectStatus  `json:"initialStatus"`
-		SessionId       tmux.SessionId `json:"sessionId,omitempty"`
-		TempSessionName string         `json:"tempSessionName,omitempty"`
-		Errors          []string       `json:"errors,omitempty"`
-	}
-	event := &projectKillEvent{Name: p.Name}
-	finish := log.Track(ctx, "projectKillEvent", event)
-	defer finish()
+	logEvent := log.Track(ctx, "projectKill")
+	logEvent.Log("name", p.Name)
+	defer logEvent.Done()
 
 	cleanup := func() error { return nil }
 
 	status, err := p.Status()
 	if err != nil {
-		event.Errors = append(event.Errors, err.Error())
+		logEvent.Error(err)
 		return cleanup, fmt.Errorf("when killing the session: %w", err)
 	}
-	event.InitialStatus = status
+	logEvent.Log("initialStatus", status)
 	session, err := p.Session()
 	if err != nil {
-		event.Errors = append(event.Errors, err.Error())
+		logEvent.Error(err)
 		return cleanup, fmt.Errorf("when killing the session: %w", err)
 	}
-	event.SessionId = session.Id
+	logEvent.Log("sessionId", session.Id)
 	if status == PROJECT_STATUS_ATTACHED {
 		err = switchToBestProject(ctx, p)
 		if err != nil {
-			event.Errors = append(event.Errors, err.Error())
+			logEvent.Error(err)
 			return cleanup, fmt.Errorf("when killing the session: %w", err)
 		}
 		name, err := randomlyRename(session)
 		if err != nil {
-			event.Errors = append(event.Errors, err.Error())
+			logEvent.Error(err)
 			return cleanup, fmt.Errorf("when randomly renaming attached session: %w", err)
 		}
-		event.TempSessionName = name
+		logEvent.Log("tempSessionName", name)
 		return session.Kill, nil
 	} else {
 		err = session.Kill()
 		if err != nil {
-			event.Errors = append(event.Errors, err.Error())
+			logEvent.Error(err)
 			return cleanup, fmt.Errorf("when killing the session: %w", err)
 		}
 		return cleanup, nil
@@ -66,43 +59,39 @@ func (p *Project) Kill(ctx context.Context) (func() error, error) {
 }
 
 func switchToBestProject(ctx context.Context, p *Project) error {
-	type switchToBestProjectEvent struct {
-		Name       string   `json:"name"`
-		SortResult []string `json:"sortResult"`
-		Selected   string   `json:"selected"`
-		Errors     []string `json:"errors,omitempty"`
-	}
-	event := &switchToBestProjectEvent{Name: p.Name}
-	finish := log.Track(ctx, "switchToBestProject", event)
-	defer finish()
+	logEvent := log.Track(ctx, "switchToBestProject")
+	defer logEvent.Done()
+	logEvent.Log("name", p.Name)
 
 	all, err := List(ctx, p.server, p.fullConfig)
 	if err != nil {
-		event.Errors = append(event.Errors, err.Error())
+		logEvent.Error(err)
 		return fmt.Errorf("while listing projects for best switch: %w", err)
 	}
 	err = sortProjects(p.fullConfig, all)
 	if err != nil {
-		event.Errors = append(event.Errors, err.Error())
+		logEvent.Error(err)
 		return fmt.Errorf("while sorting projects for best switch: %w", err)
 	}
+	sortResult := make([]string, 0)
 	for _, o := range all {
 		status, err := o.Status()
 		if err != nil {
-			event.Errors = append(event.Errors, err.Error())
+			logEvent.Error(err)
 		}
 		time, err := o.LastActivity()
 		if err != nil && err != ErrSessionNotFound {
-			event.Errors = append(event.Errors, err.Error())
+			logEvent.Error(err)
 		}
-		event.SortResult = append(event.SortResult, fmt.Sprintf("%d %v: %s", status, time, o.Name))
+		sortResult = append(sortResult, fmt.Sprintf("%d %v: %s", status, time, o.Name))
 	}
+	logEvent.Log("sortResult", sortResult)
 	for _, o := range all {
 		if o.Name != p.Name {
-			event.Selected = o.Name
+			logEvent.Log("selected", o.Name)
 			_, err = o.Switch(ctx)
 			if err != nil {
-				event.Errors = append(event.Errors, err.Error())
+				logEvent.Error(err)
 				return err
 			}
 			break

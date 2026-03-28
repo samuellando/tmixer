@@ -19,8 +19,6 @@ func TestParseConfig(t *testing.T) {
 defaultProject: home
 logFile: "/tmp/tmixer-log.json"
 ttl: 24h
-logLevel: 2 
-logRetentionDays: 10
 fzfFlags: ["--ansi", "--bind"]
 tmuxSocketPath: "/tmp/sock"
 configFiles: ["one", "two"]
@@ -52,15 +50,13 @@ projects:
 		t.Fatal(err)
 	}
 	expected := config.Config{
-		DefaultProject:   Ptr("home"),
-		LogFile:          Ptr("/tmp/tmixer-log.json"),
-		Ttl:              Ptr("24h"),
-		LogLevel:         Ptr(2),
-		LogRetentionDays: Ptr(10),
-		FzfFlags:         []string{"--ansi", "--bind"},
-		TmuxSocketPath:   Ptr("/tmp/sock"),
-		ConfigFiles:      []string{configFile},
-		CombineProjects:  Ptr(false),
+		DefaultProject:  Ptr("home"),
+		LogFile:         Ptr("/tmp/tmixer-log.json"),
+		Ttl:             Ptr("24h"),
+		FzfFlags:        []string{"--ansi", "--bind"},
+		TmuxSocketPath:  Ptr("/tmp/sock"),
+		ConfigFiles:     []string{configFile},
+		CombineProjects: Ptr(false),
 		Projects: []*config.ProjectConfig{
 			{
 				Name:      "home",

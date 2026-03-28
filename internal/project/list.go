@@ -9,18 +9,11 @@ import (
 
 	"github.com/goccy/go-yaml"
 	"samuellando.com/tmixer/internal/config"
-	"samuellando.com/tmixer/internal/log"
+	"samuellando.com/tmixer/internal/log/v2"
 	"samuellando.com/tmixer/internal/tmux"
 )
 
 var ErrAmbiguousName = errors.New("ambiguous project name detected")
-
-type projectListEvent struct {
-	Errors []string `json:"errors,omitempty"`
-}
-type projectListResult struct {
-	Result []*Project `json:"result"`
-}
 
 // List all configured projects
 //
@@ -35,28 +28,27 @@ type projectListResult struct {
 // If the logging module is setup in ctx, it will log all errors at the Info level and
 // Results at the debug level.
 func List(ctx context.Context, tmux *tmux.Server, c *config.Config) ([]*Project, error) {
-	event, resultEvent, finish := setupListLogEvents(ctx)
-	defer finish()
+	logEvent := log.Track(ctx, "projectList")
 	// The regular projects
 	projects := listBareProjects(c)
 	// Sub directory projects
 	subDirProjects, err := listSubDirProjects(c)
 	if err != nil {
-		event.Errors = append(event.Errors, err.Error())
+		logEvent.Error(err)
 		return nil, err
 	}
 	projects = append(projects, subDirProjects...)
 	// Check for name ambiguity
 	if l := getDuplicateNames(projects); len(l) > 0 {
 		err = fmt.Errorf("%w: %v", ErrAmbiguousName, l)
-		event.Errors = append(event.Errors, err.Error())
+		logEvent.Error(err)
 		return nil, err
 	}
 	// Existing tmux sessions
 	if tmux != nil {
 		sessionProjects, err := listSessionsWithoutProject(tmux, projects)
 		if err != nil {
-			event.Errors = append(event.Errors, err.Error())
+			logEvent.Error(err)
 			return nil, err
 		}
 		projects = append(projects, sessionProjects...)
@@ -68,20 +60,7 @@ func List(ctx context.Context, tmux *tmux.Server, c *config.Config) ([]*Project,
 	}
 	// Load project-specific configs
 	loadProjectConfigs(ctx, projects)
-	resultEvent.Result = projects
 	return projects, nil
-}
-
-func setupListLogEvents(ctx context.Context) (*projectListEvent, *projectListResult, func()) {
-	event := &projectListEvent{}
-	finish := log.Track(ctx, "projectListEvent", event)
-	resultEvent := &projectListResult{}
-	resultFinish := log.TrackLevel(log.LEVEL_DEBUG, ctx, "projectListResult", resultEvent)
-
-	return event, resultEvent, func() {
-		finish()
-		resultFinish()
-	}
 }
 
 func getDuplicateNames(projects []*Project) []string {
@@ -162,19 +141,15 @@ func listSessionsWithoutProject(s *tmux.Server, configProjects []*Project) ([]*P
 // loadProjectConfigs loads project-specific .tmixer.yml files from project directories
 // and replaces the inherited config with project-specific overrides
 func loadProjectConfigs(ctx context.Context, projects []*Project) {
-	type loadProjectConfigsEvent struct {
-		LoadedProjects []string `json:"loadedProjects,omitempty"`
-		Errors         []string `json:"errors,omitempty"`
-	}
-	event := &loadProjectConfigsEvent{}
-	finish := log.Track(ctx, "loadProjectConfigsEvent", event)
-	defer finish()
+	logEvent := log.Track(ctx, "loadProjectConfigs")
+	defer logEvent.Done()
 
 	home, err := os.UserHomeDir()
 	if err != nil {
-		event.Errors = append(event.Errors, fmt.Sprintf("Failed to get user home dir: %v", err))
+		logEvent.Error(err)
 	}
 
+	loadedProjects := make([]string, 0)
 	for _, project := range projects {
 		// Skip orphaned sessions that don't have a config
 		if project.Config == nil {
@@ -193,14 +168,14 @@ func loadProjectConfigs(ctx context.Context, projects []*Project) {
 
 		bytes, err := os.ReadFile(configPath)
 		if err != nil {
-			event.Errors = append(event.Errors, fmt.Sprintf("failed to read %s: %v", configPath, err))
+			logEvent.Error(fmt.Errorf("failed to read %s: %w", configPath, err))
 			continue
 		}
 
 		var projectConfig config.ProjectConfig
 		err = yaml.Unmarshal(bytes, &projectConfig)
 		if err != nil {
-			event.Errors = append(event.Errors, fmt.Sprintf("failed to parse %s: %v", configPath, err))
+			logEvent.Error(fmt.Errorf("failed to parse %s: %w", configPath, err))
 			continue
 		}
 
@@ -209,6 +184,7 @@ func loadProjectConfigs(ctx context.Context, projects []*Project) {
 		projectConfig.Directory = project.Config.Directory
 		projectConfig.SubDirectories = project.Config.SubDirectories
 		project.Config = &projectConfig
-		event.LoadedProjects = append(event.LoadedProjects, project.Name)
+		loadedProjects = append(loadedProjects, project.Name)
 	}
+	logEvent.Log("loadedProjects", loadedProjects)
 }

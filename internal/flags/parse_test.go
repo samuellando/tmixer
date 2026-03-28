@@ -7,11 +7,11 @@ import (
 
 	"samuellando.com/tmixer/internal/config"
 	"samuellando.com/tmixer/internal/flags"
-	"samuellando.com/tmixer/internal/log"
+	"samuellando.com/tmixer/internal/log/v2"
 )
 
 func TestParseArgs(t *testing.T) {
-	ctx, _ := log.New(context.Background(), nil)
+	ctx := log.ContextLogger(context.Background())
 	counter := 0
 	args := []string{"--four", "--one", "aaa", "-t", "--three", "bbb", "hello"}
 	inFlags := map[string]flags.Flag{
