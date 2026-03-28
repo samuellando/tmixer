@@ -14,7 +14,6 @@ import (
 )
 
 func TestDisplayProjects(t *testing.T) {
-	// TODO: Sub dirs
 	ctx, tmux := testutil.SetupTestServer(t)
 	defer testutil.TeardownTestServer(tmux)
 	s, _ := tmux.New("test-session")
