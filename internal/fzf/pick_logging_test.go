@@ -6,13 +6,12 @@ import (
 
 	"samuellando.com/tmixer/internal/config"
 	"samuellando.com/tmixer/internal/fzf"
-	"samuellando.com/tmixer/internal/log"
 	"samuellando.com/tmixer/internal/testutil"
 )
 
 func TestPickEventFields(t *testing.T) {
 	ctx := context.Background()
-	ctx = testutil.SetupLoggingV2(ctx, log.LEVEL_DEBUG)
+	ctx = testutil.SetupLogging(ctx)
 
 	// Create a config with a project and use --filter for non-interactive selection
 	cfg := &config.Config{
@@ -27,7 +26,7 @@ func TestPickEventFields(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res := testutil.GetLogEventV2(t, ctx)
+	res := testutil.GetLogEvent(t, ctx)
 
 	// Check pickProjectEvent exists
 	event, ok := res["fzf"].(map[string]any)
@@ -76,7 +75,7 @@ func TestPickEventFields(t *testing.T) {
 
 func TestPickProjectEventWithError(t *testing.T) {
 	ctx := context.Background()
-	ctx = testutil.SetupLoggingV2(ctx, log.LEVEL_DEBUG)
+	ctx = testutil.SetupLogging(ctx)
 
 	// Create a config with --filter for a non-existent project
 	cfg := &config.Config{
@@ -91,7 +90,7 @@ func TestPickProjectEventWithError(t *testing.T) {
 		t.Fatal("Expected an error when filtering for non-existent project")
 	}
 
-	res := testutil.GetLogEventV2(t, ctx)
+	res := testutil.GetLogEvent(t, ctx)
 
 	// Check pickProjectEvent exists
 	event, ok := res["fzf"].(map[string]any)

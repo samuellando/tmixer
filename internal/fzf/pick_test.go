@@ -6,13 +6,12 @@ import (
 
 	"samuellando.com/tmixer/internal/config"
 	"samuellando.com/tmixer/internal/fzf"
-	"samuellando.com/tmixer/internal/log"
 	"samuellando.com/tmixer/internal/testutil"
 )
 
 func TestPick(t *testing.T) {
 	ctx := context.Background()
-	ctx = testutil.SetupLoggingV2(ctx, log.LEVEL_DEBUG)
+	ctx = testutil.SetupLogging(ctx)
 
 	// Create a config with a project and use --filter for non-interactive selection
 	cfg := &config.Config{

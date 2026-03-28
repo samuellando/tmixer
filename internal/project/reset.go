@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"samuellando.com/tmixer/internal/config"
-	"samuellando.com/tmixer/internal/log"
+	"samuellando.com/tmixer/internal/log/v2"
 	"samuellando.com/tmixer/internal/tmux"
 )
 
@@ -21,56 +21,49 @@ import (
 // If no session exists, will return ErrSessionNotFound.
 // If there is no project config, will return an error.
 func (p *Project) Reset(ctx context.Context) (func() error, error) {
-	type projectResetEvent struct {
-		Name            string         `json:"name"`
-		SessionId       tmux.SessionId `json:"sessionId,omitempty"`
-		TempSessionName string         `json:"tempSessionName,omitempty"`
-		InitialStatus   ProjectStatus  `json:"initialStatus"`
-		Errors          []string       `json:"errors,omitempty"`
-	}
-	event := &projectResetEvent{Name: p.Name}
-	finish := log.Track(ctx, "projectResetEvent", event)
-	defer finish()
+	logEvent := log.Track(ctx, "projectReset")
+	defer logEvent.Done()
+	logEvent.Log("name", p.Name)
 
 	cleanup := func() error { return nil }
 
 	if p.Config == nil {
 		err := fmt.Errorf("SESSION %s HAS NO PROJECT CONFIG TO RESET TO", p.Name)
-		event.Errors = append(event.Errors, err.Error())
+		logEvent.Error(err)
 		return cleanup, err
 	}
 
 	status, err := p.Status()
 	if err != nil {
-		event.Errors = append(event.Errors, err.Error())
+		logEvent.Error(err)
 		return cleanup, fmt.Errorf("when checking status for reset: %w", err)
 	}
-	event.InitialStatus = status
+	logEvent.Log("initialStatus", status)
 	session, err := p.Session()
 	if err != nil {
-		event.Errors = append(event.Errors, err.Error())
+		logEvent.Error(err)
 		return cleanup, fmt.Errorf("when getting session to reset: %w", err)
 	}
-	event.SessionId = session.Id
+	logEvent.Log("sessionId", session.Id)
 
 	tempName, temp, err := createTempSession(p.server)
 	if err != nil {
-		event.Errors = append(event.Errors, err.Error())
+		logEvent.Error(err)
 		return cleanup, fmt.Errorf("when creating temp session: %w", err)
 	}
-	event.TempSessionName = tempName
+	logEvent.Log("tempSessionName", tempName)
 	cleanup = temp.Kill
 
 	// Move all the originalWindows to the temp session
 	originalWindows, err := session.Windows()
 	if err != nil {
-		event.Errors = append(event.Errors, err.Error())
+		logEvent.Error(err)
 		return cleanup, fmt.Errorf("when getting session windows: %w", err)
 	}
 	for _, w := range originalWindows {
 		err = w.Link(temp)
 		if err != nil {
-			event.Errors = append(event.Errors, err.Error())
+			logEvent.Error(err)
 			return cleanup, fmt.Errorf("when linking window to temp session: %w", err)
 		}
 	}
@@ -82,14 +75,14 @@ func (p *Project) Reset(ctx context.Context) (func() error, error) {
 
 	err = resetWindows(session, originalWindows, windows)
 	if err != nil {
-		event.Errors = append(event.Errors, err.Error())
+		logEvent.Error(err)
 		return cleanup, fmt.Errorf("when resetting windows: %w", err)
 	}
 
 	if status == PROJECT_STATUS_ATTACHED {
 		err = p.RunSwitchCommands(ctx)
 		if err != nil {
-			event.Errors = append(event.Errors, err.Error())
+			logEvent.Error(err)
 			return cleanup, fmt.Errorf("when running switch commands after reset: %w", err)
 		}
 	}

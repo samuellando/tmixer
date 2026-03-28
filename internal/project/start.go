@@ -6,54 +6,48 @@ import (
 	"strings"
 
 	"samuellando.com/tmixer/internal/config"
-	"samuellando.com/tmixer/internal/log"
+	"samuellando.com/tmixer/internal/log/v2"
 	"samuellando.com/tmixer/internal/tmux"
 )
 
 // Starts a tmux session for the project, and creates all it's configured windows and panes.
 // If a session for the project already exists, it is returned and nothing else is done.
 func (p *Project) Start(ctx context.Context) (*tmux.Session, error) {
-	type projectStartEvent struct {
-		Name          string         `json:"name"`
-		InitialStatus ProjectStatus  `json:"initialStatus"`
-		SessionId     tmux.SessionId `json:"sessionId"`
-		Errors        []string       `json:"errors,omitempty"`
-	}
-	event := &projectStartEvent{Name: p.Name}
-	finish := log.Track(ctx, "projectStartEvent", event)
-	defer finish()
+	logEvent := log.Track(ctx, "projectStart")
+	defer logEvent.Done()
+	logEvent.Log("name", p.Name)
 
 	status, err := p.Status()
 	if err != nil {
 		err := fmt.Errorf("when getting project status: %w", err)
-		event.Errors = append(event.Errors, err.Error())
+		logEvent.Error(err)
 		return nil, err
 	}
 
-	event.InitialStatus = status
+	logEvent.Log("initialStatus", status)
 	if status >= PROJECT_STATUS_ACTIVE {
 		session, err := p.Session()
 		if err != nil {
-			event.Errors = append(event.Errors, err.Error())
+			logEvent.Error(err)
 			return nil, err
 		}
-		event.SessionId = session.Id
+		logEvent.Log("sessionId", session.Id)
 		return session, nil
 	}
 
 	s, err := p.server.New(p.TmuxSessionName(), p.Config.Directory)
 	if err != nil {
 		err := fmt.Errorf("when starting project: %w", err)
-		event.Errors = append(event.Errors, err.Error())
+		logEvent.Error(err)
 		return nil, err
 	}
 	err = p.createWindows(s)
 	if err != nil {
 		err := fmt.Errorf("when starting project: %w", err)
-		event.Errors = append(event.Errors, err.Error())
+		logEvent.Error(err)
 		return nil, err
 	}
-	event.SessionId = s.Id
+	logEvent.Log("sessionId", s.Id)
 	return s, nil
 }
 

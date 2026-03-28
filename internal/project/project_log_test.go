@@ -8,12 +8,12 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"samuellando.com/tmixer/internal/log"
+	"samuellando.com/tmixer/internal/log/v2"
 	"samuellando.com/tmixer/internal/testutil"
 	"samuellando.com/tmixer/internal/tmux"
 )
 
-func runAllLogTestCases(t *testing.T, f func(ctx context.Context, srv *tmux.Server, out *bytes.Buffer, logger *log.Logger, tc *projectTestCase)) {
+func runAllLogTestCases(t *testing.T, f func(ctx context.Context, srv *tmux.Server, out *bytes.Buffer, tc *projectTestCase)) {
 	t.Parallel()
 	// Need to reset in between for each test case to avoid switches
 	for _, tc := range getAllTestCases() {
@@ -35,28 +35,32 @@ func runAllLogTestCases(t *testing.T, f func(ctx context.Context, srv *tmux.Serv
 			defer teardownTestCase(t, client)
 
 			ctx = context.Background()
-			ctx, logger := log.New(ctx, nil)
+			ctx = log.ContextLogger(ctx)
 			out := bytes.Buffer{}
-			logger.AddSink(&out)
+			if err := log.AddSink(ctx, NopWriteCloser{&out}); err != nil {
+				t.Fatal(err)
+			}
 
 			tc.project.server = srv
 
-			f(ctx, srv, &out, logger, tc)
+			f(ctx, srv, &out, tc)
 		})
 	}
 }
 
 func TestProjectStartLogs(t *testing.T) {
-	runAllLogTestCases(t, func(ctx context.Context, srv *tmux.Server, out *bytes.Buffer, logger *log.Logger, tc *projectTestCase) {
+	runAllLogTestCases(t, func(ctx context.Context, srv *tmux.Server, out *bytes.Buffer, tc *projectTestCase) {
 		// Exec
 		res, _ := tc.project.Start(ctx)
 		// Grab the log event
-		logger.Info(ctx)
+		if err := log.Done(ctx); err != nil {
+			t.Fatal(err)
+		}
 		wideEvent := make(map[string]any)
 		if err := json.Unmarshal(out.Bytes(), &wideEvent); err != nil {
 			t.Error(err)
 		}
-		event := wideEvent["projectStartEvent"].(map[string]any)
+		event := wideEvent["projectStart"].(map[string]any)
 		// Check each field
 		// field: Name
 		name := event["name"].(string)
@@ -81,7 +85,7 @@ func TestProjectStartLogs(t *testing.T) {
 }
 
 func TestProjectKillLogs(t *testing.T) {
-	runAllLogTestCases(t, func(ctx context.Context, srv *tmux.Server, out *bytes.Buffer, logger *log.Logger, tc *projectTestCase) {
+	runAllLogTestCases(t, func(ctx context.Context, srv *tmux.Server, out *bytes.Buffer, tc *projectTestCase) {
 		initialSession, _ := tc.project.Session()
 		// Exec
 		cleanup, err := tc.project.Kill(ctx)
@@ -92,12 +96,14 @@ func TestProjectKillLogs(t *testing.T) {
 			t.Error(err)
 		}
 		// Grab the log event
-		logger.Info(ctx)
+		if err := log.Done(ctx); err != nil {
+			t.Fatal(err)
+		}
 		wideEvent := make(map[string]any)
 		if err := json.Unmarshal(out.Bytes(), &wideEvent); err != nil {
 			t.Error(err)
 		}
-		event := wideEvent["projectKillEvent"].(map[string]any)
+		event := wideEvent["projectKill"].(map[string]any)
 		// Check all fields
 		// field: Name
 		name := event["name"].(string)
@@ -146,7 +152,7 @@ func TestProjectKillLogs(t *testing.T) {
 }
 
 func TestProjectKillLogsSwitchDecision(t *testing.T) {
-	runAllLogTestCases(t, func(ctx context.Context, srv *tmux.Server, out *bytes.Buffer, logger *log.Logger, tc *projectTestCase) {
+	runAllLogTestCases(t, func(ctx context.Context, srv *tmux.Server, out *bytes.Buffer, tc *projectTestCase) {
 		// Exec
 		cleanup, err := tc.project.Kill(ctx)
 		if err != nil && !errors.Is(err, ErrSessionNotFound) {
@@ -156,7 +162,9 @@ func TestProjectKillLogsSwitchDecision(t *testing.T) {
 			t.Error(err)
 		}
 		// Grab the log event
-		logger.Info(ctx)
+		if err := log.Done(ctx); err != nil {
+			t.Fatal(err)
+		}
 		wideEvent := make(map[string]any)
 		if err := json.Unmarshal(out.Bytes(), &wideEvent); err != nil {
 			t.Error(err)
@@ -192,16 +200,18 @@ func TestProjectKillLogsSwitchDecision(t *testing.T) {
 }
 
 func TestProjectSwitchLogs(t *testing.T) {
-	runAllLogTestCases(t, func(ctx context.Context, srv *tmux.Server, out *bytes.Buffer, logger *log.Logger, tc *projectTestCase) {
+	runAllLogTestCases(t, func(ctx context.Context, srv *tmux.Server, out *bytes.Buffer, tc *projectTestCase) {
 		// Exec
 		session, _ := tc.project.Switch(ctx)
 		// Grab the log event
-		logger.Info(ctx)
+		if err := log.Done(ctx); err != nil {
+			t.Fatal(err)
+		}
 		wideEvent := make(map[string]any)
 		if err := json.Unmarshal(out.Bytes(), &wideEvent); err != nil {
 			t.Error(err)
 		}
-		event := wideEvent["projectSwitchEvent"].(map[string]any)
+		event := wideEvent["projectSwitch"].(map[string]any)
 		// Check each field
 		// field: Name
 		name := event["name"].(string)
@@ -226,19 +236,21 @@ func TestProjectSwitchLogs(t *testing.T) {
 }
 
 func TestProjectRunSwitchCommandsLogs(t *testing.T) {
-	runAllLogTestCases(t, func(ctx context.Context, srv *tmux.Server, out *bytes.Buffer, logger *log.Logger, tc *projectTestCase) {
+	runAllLogTestCases(t, func(ctx context.Context, srv *tmux.Server, out *bytes.Buffer, tc *projectTestCase) {
 		// Exec
 		err := tc.project.RunSwitchCommands(ctx)
 		if err != nil && !errors.Is(err, ErrSessionNotFound) {
 			t.Error(err)
 		}
 		// Grab the log event
-		logger.Info(ctx)
+		if err := log.Done(ctx); err != nil {
+			t.Fatal(err)
+		}
 		wideEvent := make(map[string]any)
 		if err := json.Unmarshal(out.Bytes(), &wideEvent); err != nil {
 			t.Error(err)
 		}
-		event := wideEvent["projectRunSwitchCommandsEvent"].(map[string]any)
+		event := wideEvent["projectRunSwitchCommands"].(map[string]any)
 		// Check each field
 		// field: Name
 		name := event["name"].(string)
@@ -261,7 +273,7 @@ func TestProjectRunSwitchCommandsLogs(t *testing.T) {
 					t.Error("Should list all switch commands")
 				}
 			} else {
-				if _, ok := event["commands"]; ok {
+				if cmds, _ := event["commands"].([]any); len(cmds) != 0 {
 					t.Error("Should not have commands")
 				}
 			}
@@ -282,7 +294,7 @@ func TestProjectRunSwitchCommandsLogs(t *testing.T) {
 }
 
 func TestProjectResetLogs(t *testing.T) {
-	runAllLogTestCases(t, func(ctx context.Context, srv *tmux.Server, out *bytes.Buffer, logger *log.Logger, tc *projectTestCase) {
+	runAllLogTestCases(t, func(ctx context.Context, srv *tmux.Server, out *bytes.Buffer, tc *projectTestCase) {
 		session, _ := tc.project.Session()
 		// Exec
 		cleanup, err := tc.project.Reset(ctx)
@@ -293,12 +305,14 @@ func TestProjectResetLogs(t *testing.T) {
 			t.Error(err)
 		}
 		// Grab the event
-		logger.Info(ctx)
+		if err := log.Done(ctx); err != nil {
+			t.Fatal(err)
+		}
 		wideEvent := make(map[string]any)
 		if err := json.Unmarshal(out.Bytes(), &wideEvent); err != nil {
 			t.Error(err)
 		}
-		event := wideEvent["projectResetEvent"].(map[string]any)
+		event := wideEvent["projectReset"].(map[string]any)
 		// Check all the fields
 		// field: Name
 		name := event["name"].(string)

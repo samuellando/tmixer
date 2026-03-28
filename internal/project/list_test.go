@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -12,10 +13,18 @@ import (
 	"testing"
 
 	"samuellando.com/tmixer/internal/config"
-	"samuellando.com/tmixer/internal/log"
+	"samuellando.com/tmixer/internal/log/v2"
 	"samuellando.com/tmixer/internal/testutil"
 	"samuellando.com/tmixer/internal/tmux"
 )
+
+type NopWriteCloser struct {
+	io.Writer
+}
+
+func (n NopWriteCloser) Close() error {
+	return nil
+}
 
 type listTestCase struct {
 	config   *config.Config
@@ -271,7 +280,7 @@ func TestAmbiguousNames(t *testing.T) {
 }
 
 func TestListNoTmux(t *testing.T) {
-	ctx, _ := log.New(context.Background(), nil)
+	ctx := log.ContextLogger(context.Background())
 	for name, tcf := range getAllListTestCases() {
 		t.Run(name, func(t *testing.T) {
 			tc := tcf(t)
@@ -318,19 +327,22 @@ func TestListLogs(t *testing.T) {
 		},
 	}
 	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
-		_, logger := log.New(ctx, nil)
 		out := bytes.Buffer{}
-		logger.AddSink(&out)
+		if err := log.AddSink(ctx, NopWriteCloser{&out}); err != nil {
+			t.Fatal(err)
+		}
 		_, err := List(ctx, srv, config)
 		if !errors.Is(err, ErrAmbiguousName) {
 			t.Errorf("wrong error returned %v", err)
 		}
-		logger.Info(ctx)
+		if err := log.Done(ctx); err != nil {
+			t.Fatal(err)
+		}
 		res := make(map[string]any)
 		if err := json.Unmarshal(out.Bytes(), &res); err != nil {
 			t.Error(err)
 		}
-		errs := res["projectListEvent"].(map[string]any)["errors"].([]any)
+		errs := res["projectList"].(map[string]any)["errors"].([]any)
 		if len(errs) != 1 {
 			t.Error("Should have one error")
 		}
@@ -378,14 +390,14 @@ switchCommands:
 	}
 
 	testutil.RunWithAndWithoutControlMode(t, func(t *testing.T, ctx context.Context, srv *tmux.Server) {
-		ctx, logger, out := testutil.SetupLogging(ctx, log.LEVEL_INFO)
+		ctx = testutil.SetupLogging(ctx)
 		_, err := List(ctx, srv, config)
 		if err != nil {
 			t.Error(err)
 		}
 
-		res := testutil.GetLogEvent(ctx, logger, out)
-		event := res["loadProjectConfigsEvent"].(map[string]any)
+		res := testutil.GetLogEvent(t, ctx)
+		event := res["loadProjectConfigs"].(map[string]any)
 
 		loadedProjects := event["loadedProjects"].([]any)
 		if len(loadedProjects) != 1 || loadedProjects[0].(string) != "valid-project" {
@@ -398,34 +410,6 @@ switchCommands:
 		}
 		if !strings.Contains(errs[0].(string), filepath.Join(invalidDir, ".tmixer.yml")) {
 			t.Errorf("Expected error to include invalid config path, got %v", errs[0])
-		}
-	})
-}
-
-func TestListLogsResult(t *testing.T) {
-	runAllListTestCases(t, func(ctx context.Context, srv *tmux.Server, tc listTestCase) {
-		ctx, logger := log.New(ctx, &log.LoggerOptions{Level: log.LEVEL_DEBUG})
-		out := bytes.Buffer{}
-		logger.AddSink(&out)
-		_, err := List(ctx, srv, tc.config)
-		if err != nil {
-			t.Error(err)
-		}
-		logger.Info(ctx)
-		res := make(map[string]any)
-		if err := json.Unmarshal(out.Bytes(), &res); err != nil {
-			t.Error(err)
-		}
-		event := res["projectListResult"].(map[string]any)
-		list := event["result"].([]any)
-		seen := make(map[string]bool)
-		for _, p := range list {
-			seen[p.(map[string]any)["Name"].(string)] = true
-		}
-		for _, p := range tc.projects {
-			if !seen[p] {
-				t.Errorf("Project %s was not listed", p)
-			}
 		}
 	})
 }

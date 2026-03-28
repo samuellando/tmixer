@@ -140,8 +140,6 @@ Configurations will be overridden in the following order:
 | ttl              | `string`          | How long before a project with no activity is automatically killed (example `24h`)                   |                |
 | combineProjects  | `bool`            | Whether the list of projects should be overridden or combined when multiple config files are present | `true`         |
 | logFile          | `string`          | Additional log file in addition to `~/.local/state/tmixer/logs/`                                     |                |
-| logLevel         | `string`          | The log level, `INFO` or `DEBUG`                                                                     | `INFO`         |
-| logRetentionDays | `int`             | How many days of logs to keep in `~/.local/state/tmixer/logs/`                                       | `7`            |
 | tmuxSocketPath   | `string`          | What tmux socket to use, equivalent to the tmux `-S` flag                                            | `tmux default` |
 | projects         | `[]projectConfig` | A list of project configurations                                                                     |                |
 
@@ -232,18 +230,6 @@ projects:
         Output logs to a file in addition to ~/.local/state/tmixer/logs .
         Usage: --logFile out.log
         EnvVar: $TMIXER_LOG_FILE
-
---logLevel
-        logging level: info or debug
-        Usage: --logLevel debug
-        Default: info
-        EnvVar: $TMIXER_LOG_LEVEL
-
---logRetentionDays
-        how many previous days of logs to keep in ~/.local/state/tmixer/logs. Set to 0 to only keep current day and none to disable logging.
-        Usage: --logRetentionDays 5
-        Default: 1
-        EnvVar: $TMIXER_LOG_RETENTION_DAYS
 
 --projectTtl
         The project time to live, after it's inactive for a certain time it will automatically be killed

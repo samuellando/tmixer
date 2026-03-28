@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -9,55 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"samuellando.com/tmixer/internal/log/rotation"
 	"samuellando.com/tmixer/internal/testutil"
 )
-
-func TestLogs(t *testing.T) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		t.Fatal(err)
-	}
-	logPath := filepath.Join(home, ".local/state/tmixer/logs")
-	testutil.CaptureStdout(func() {
-		f, err := rotation.RotateLogFile(logPath, 24*time.Hour)
-		if err != nil {
-			t.Error(err)
-		}
-		logFile := f.Name()
-		stat, err := f.Stat()
-		origSize := stat.Size()
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = f.Close()
-		if err != nil {
-			t.Error(err)
-		}
-		socketFile := filepath.Join(t.TempDir(), "tmux.sock")
-		err = run("-S", socketFile, "--help")
-		if err != nil {
-			t.Fatal(err)
-		}
-		out, err := os.ReadFile(logFile)
-		if err != nil {
-			t.Fatal(err)
-		}
-		data := make(map[string]any)
-		if len(out) <= int(origSize) {
-			t.Error("The log file should contain more data")
-		}
-		parts := bytes.Split(out, []byte{'\n'})
-		out = parts[len(parts)-2]
-		err = json.Unmarshal(out, &data)
-		if err != nil {
-			t.Error(err)
-		}
-		if data["level"].(string) != "INFO" {
-			t.Error("The log file should contain a valid event")
-		}
-	})
-}
 
 func TestLogFile(t *testing.T) {
 	testutil.CaptureStdout(func() {

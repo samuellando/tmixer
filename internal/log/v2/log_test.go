@@ -47,7 +47,9 @@ func TestLogger(t *testing.T) {
 	ctx := context.Background()
 	sink := &StringWriteCloser{}
 	ctx = log.ContextLogger(ctx)
-	log.AddSink(ctx, sink)
+	if err := log.AddSink(ctx, sink); err != nil {
+		t.Fatal(err)
+	}
 	logEvent := log.Track(ctx, "test")
 	logEvent.Log("hello", "World")
 	logEvent.Log("abc", []int{1, 2, 3})
@@ -87,7 +89,9 @@ func TestFatal(t *testing.T) {
 	ctx := context.Background()
 	sink := &StringWriteCloser{}
 	ctx = log.ContextLogger(ctx)
-	log.AddSink(ctx, sink)
+	if err := log.AddSink(ctx, sink); err != nil {
+		t.Fatal(err)
+	}
 	err := log.Fatal(ctx, fmt.Errorf("This is an error"))
 	if err != nil {
 		t.Fatal(err)
@@ -99,7 +103,9 @@ func TestTimestampAndDuration(t *testing.T) {
 	ctx := context.Background()
 	sink := &StringWriteCloser{}
 	ctx = log.ContextLogger(ctx)
-	log.AddSink(ctx, sink)
+	if err := log.AddSink(ctx, sink); err != nil {
+		t.Fatal(err)
+	}
 	time.Sleep(time.Second)
 	err := log.Done(ctx)
 	if err != nil {
@@ -128,7 +134,9 @@ func TestLogEventErrors(t *testing.T) {
 	ctx := context.Background()
 	sink := &StringWriteCloser{}
 	ctx = log.ContextLogger(ctx)
-	log.AddSink(ctx, sink)
+	if err := log.AddSink(ctx, sink); err != nil {
+		t.Fatal(err)
+	}
 	logEvent := log.Track(ctx, "test")
 	logEvent.Log("hello", "World")
 	logEvent.Log("abc", []int{1, 2, 3})
@@ -145,7 +153,9 @@ func TestLogEventTimestampAndDuration(t *testing.T) {
 	ctx := context.Background()
 	sink := &StringWriteCloser{}
 	ctx = log.ContextLogger(ctx)
-	log.AddSink(ctx, sink)
+	if err := log.AddSink(ctx, sink); err != nil {
+		t.Fatal(err)
+	}
 	logEvent := log.Track(ctx, "test")
 	time.Sleep(time.Second)
 	logEvent.Done()
@@ -179,7 +189,9 @@ func TestDisplay(t *testing.T) {
 		ctx := context.Background()
 		sink := &StringWriteCloser{}
 		ctx = log.ContextLogger(ctx)
-		log.AddSink(ctx, sink)
+		if err := log.AddSink(ctx, sink); err != nil {
+			t.Fatal(err)
+		}
 		logEvent := log.Track(ctx, "test")
 		logEvent.Log("hello", "World")
 		logEvent.Log("abc", []int{1, 2, 3})

@@ -13,17 +13,15 @@ import (
 )
 
 type Config struct {
-	DefaultProject   *string          `yaml:"defaultProject"`
-	LogFile          *string          `yaml:"logFile"`
-	Ttl              *string          `yaml:"ttl"`
-	LogLevel         *int             `yaml:"logLevel"`
-	LogRetentionDays *int             `yaml:"logRetentionDays"`
-	FzfFlags         []string         `yaml:"fzfFlags"`
-	TmuxSocketPath   *string          `yaml:"tmuxSocketPath"`
-	ConfigFiles      []string         `yaml:"configFiles"`
-	CombineProjects  *bool            `yaml:"combineProjects"`
-	Projects         []*ProjectConfig `yaml:"projects"`
-	DisplayHelp      *bool            `yaml:"displayHelp"`
+	DefaultProject  *string          `yaml:"defaultProject"`
+	LogFile         *string          `yaml:"logFile"`
+	Ttl             *string          `yaml:"ttl"`
+	FzfFlags        []string         `yaml:"fzfFlags"`
+	TmuxSocketPath  *string          `yaml:"tmuxSocketPath"`
+	ConfigFiles     []string         `yaml:"configFiles"`
+	CombineProjects *bool            `yaml:"combineProjects"`
+	Projects        []*ProjectConfig `yaml:"projects"`
+	DisplayHelp     *bool            `yaml:"displayHelp"`
 }
 
 func mergeConfigs(a, b *Config) *Config {
@@ -38,14 +36,6 @@ func mergeConfigs(a, b *Config) *Config {
 	ttl := a.Ttl
 	if b.Ttl != nil {
 		ttl = b.Ttl
-	}
-	logLevel := a.LogLevel
-	if b.LogLevel != nil {
-		logLevel = b.LogLevel
-	}
-	logRetentionDays := a.LogRetentionDays
-	if b.LogRetentionDays != nil {
-		logRetentionDays = b.LogRetentionDays
 	}
 	fzfFlags := a.FzfFlags
 	if b.FzfFlags != nil {
@@ -72,17 +62,15 @@ func mergeConfigs(a, b *Config) *Config {
 		displayHelp = b.DisplayHelp
 	}
 	return &Config{
-		DefaultProject:   defaultProject,
-		LogFile:          logFile,
-		Ttl:              ttl,
-		LogLevel:         logLevel,
-		LogRetentionDays: logRetentionDays,
-		FzfFlags:         fzfFlags,
-		TmuxSocketPath:   tmuxSocketPath,
-		ConfigFiles:      configFiles,
-		CombineProjects:  combineProjects,
-		Projects:         projects,
-		DisplayHelp:      displayHelp,
+		DefaultProject:  defaultProject,
+		LogFile:         logFile,
+		Ttl:             ttl,
+		FzfFlags:        fzfFlags,
+		TmuxSocketPath:  tmuxSocketPath,
+		ConfigFiles:     configFiles,
+		CombineProjects: combineProjects,
+		Projects:        projects,
+		DisplayHelp:     displayHelp,
 	}
 }
 

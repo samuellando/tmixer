@@ -6,16 +6,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
-	"strings"
-	"time"
 
 	"samuellando.com/tmixer/internal/config"
 	"samuellando.com/tmixer/internal/display"
 	"samuellando.com/tmixer/internal/flags"
 	"samuellando.com/tmixer/internal/fzf"
-	"samuellando.com/tmixer/internal/log"
-	"samuellando.com/tmixer/internal/log/rotation"
 	logV2 "samuellando.com/tmixer/internal/log/v2"
 	"samuellando.com/tmixer/internal/project"
 	"samuellando.com/tmixer/internal/tmux"
@@ -38,9 +33,7 @@ func run(args ...string) (err error) {
 		err = errors.Join(err, session.close())
 	}()
 	// init the logging event
-	ctx := context.Background()
-	ctx = log.InitializeWideEvent(ctx, &log.LoggerOptions{Level: log.LEVEL_INFO})
-	ctx = logV2.ContextLogger(ctx, logV2.LogOptions{})
+	ctx := logV2.ContextLogger(context.Background())
 	// Parse the arguments before setting up logging in case there's a extra log file
 	session.config, args, err = flags.ParseArgs(ctx, args, FLAGS)
 	if err != nil {
@@ -51,65 +44,41 @@ func run(args ...string) (err error) {
 	}
 	_ = session.config.LoadFiles(ctx)
 	// Set up the logging
-	logger, files, err := setupLogging(ctx, session.config)
+	err = setupLogging(ctx, session.config)
 	if err != nil {
 		fmt.Println(err)
 		return err
 	}
-	defer func() {
-		for _, f := range files {
-			defer func() {
-				err = errors.Join(err, f.Close())
-			}()
-		}
-	}()
 	// --help flag
 	if session.config.DisplayHelp != nil && *session.config.DisplayHelp {
 		displayHelp()
-		logger.Info(ctx)
-		return nil
+		return logV2.Done(ctx)
 	}
 	// And run, and output the logs
 	err = runTmixer(ctx, args, session)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		logger.Error(ctx, err)
-		return err
-	} else {
-		logger.Info(ctx)
+		return logV2.Fatal(ctx, err)
 	}
-	return nil
+	return logV2.Done(ctx)
 }
 
 func runTmixer(ctx context.Context, args []string, session *session) error {
-	type runEvent struct {
-		Command   string           `json:"command"`
-		Selection *project.Project `json:"selection"`
-		Errors    []string         `json:"errors"`
-	}
-	event := &runEvent{}
-	finish := log.Track(ctx, "runEvent", event)
-	defer finish()
+	logEvent := logV2.Track(ctx, "run")
+	defer logEvent.Done()
 	// Parse the config files, and the args, again
 	srv, err := startTmuxServer(ctx, session)
 	if err != nil {
-		event.Errors = append(event.Errors, err.Error())
-	}
-	// If any error occurred before this point we should display it
-	if len(event.Errors) != 0 {
-		errs := strings.Join(event.Errors, ", ")
-		err := srv.DisplayMessage(errs)
-		if err != nil {
-			errs = ", " + err.Error()
-		}
-		return errors.New(errs)
+		logEvent.Error(err)
+		err = errors.Join(srv.DisplayMessage(err.Error()), err)
+		return err
 	}
 	// Determine the command
 	command := "switch"
 	if len(args) >= 1 {
 		command = args[0]
 	}
-	event.Command = command
+	logEvent.Log("command", command)
 	// We should ignore switch notifications on the control mode session
 	if command == "notify-switch" {
 		if len(args) < 2 || args[1] == tmux.CONTROL_SESSION_NAME {
@@ -119,11 +88,13 @@ func runTmixer(ctx context.Context, args []string, session *session) error {
 	// Now load all the projects
 	session.projects, err = project.List(ctx, srv, session.config)
 	if err != nil {
+		logEvent.Error(err)
 		return err
 	}
 	// Cleanup any projects that have passed the ttl
 	err = cleanupStaleProjects(ctx, session.projects)
 	if err != nil {
+		logEvent.Error(err)
 		return err
 	}
 	// Finally run the command
@@ -133,6 +104,7 @@ func runTmixer(ctx context.Context, args []string, session *session) error {
 	}
 	err = disableHooks(srv)
 	if err != nil {
+		logEvent.Error(err)
 		return err
 	}
 	err = executeCommand(ctx, srv, command, query, session)
@@ -142,6 +114,7 @@ func runTmixer(ctx context.Context, args []string, session *session) error {
 			if displayError != nil {
 				err = errors.Join(displayError, err)
 			}
+			logEvent.Error(err)
 		}
 		return err
 	}
@@ -368,38 +341,19 @@ func disableHooks(tmux *tmux.Server) error {
 	return nil
 }
 
-func setupLogging(ctx context.Context, config *config.Config) (*log.Logger, []*os.File, error) {
-	files := []*os.File{}
-	_, logger := log.New(ctx, &log.LoggerOptions{Level: *config.LogLevel})
-
-	retention := 24 * time.Hour * time.Duration(*config.LogRetentionDays)
-
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil, nil, err
-	}
-	logDir := filepath.Join(home, ".local/state/tmixer/logs")
-
-	f, err := rotation.RotateLogFile(logDir, retention)
-	if err != nil {
-		return nil, nil, err
-	}
-	if f != nil {
-		logger.AddSink(f)
-		files = append(files, f)
-	}
-
+func setupLogging(ctx context.Context, config *config.Config) error {
 	if config.LogFile != nil {
 		// Use log rotation with daily retention (24 hours)
 		f, err := os.OpenFile(*config.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			return nil, nil, err
+			return err
 		}
-		logger.AddSink(f)
-		files = append(files, f)
+		if err := logV2.AddSink(ctx, f); err != nil {
+			err = errors.Join(err, f.Close())
+			return fmt.Errorf("while adding log sink: %w", err)
+		}
 	}
-
-	return logger, files, nil
+	return nil
 }
 
 func displayHelp() {
@@ -437,31 +391,28 @@ Flags: `)
 }
 
 func cleanupStaleProjects(ctx context.Context, projects []*project.Project) error {
-	type cleanupStaleProjectsEvent struct {
-		ProjectsKilled []string `json:"projectsKilled,omitempty"`
-		Errors         []string `json:"errors,omitempty"`
-	}
-	event := &cleanupStaleProjectsEvent{}
-	finish := log.Track(ctx, "cleanupStaleProjectsEvent", event)
-	defer finish()
+	logEvent := logV2.Track(ctx, "cleanupStaleProjects")
+	projectsKilled := make([]string, 0)
+	defer logEvent.Done()
 	var errs error
 	for _, p := range projects {
 		status, err := p.Status()
 		if err != nil {
-			event.Errors = append(event.Errors, err.Error())
+			logEvent.Error(err)
 			errs = errors.Join(errs, err)
 		}
 		if status == project.PROJECT_STATUS_ACTIVE {
 			if passed, _ := p.TtlPassed(); passed {
 				_, err := p.Kill(ctx)
 				if err != nil {
-					event.Errors = append(event.Errors, err.Error())
+					logEvent.Error(err)
 					errs = errors.Join(errs, err)
 				} else {
-					event.ProjectsKilled = append(event.ProjectsKilled, p.Name)
+					projectsKilled = append(projectsKilled, p.Name)
 				}
 			}
 		}
 	}
+	logEvent.Log("projectsKilled", projectsKilled)
 	return errs
 }

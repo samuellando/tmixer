@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"samuellando.com/tmixer/internal/config"
-	"samuellando.com/tmixer/internal/log"
 )
 
 func TestHelpFlag(t *testing.T) {
@@ -38,81 +37,6 @@ func TestLogFileFlag(t *testing.T) {
 	}
 	if conf.LogFile == nil || *conf.LogFile != "out.txt" {
 		t.Error("Log file should be set in conf")
-	}
-}
-
-func TestLogLevelFlag(t *testing.T) {
-	t.Parallel()
-	conf := &config.Config{}
-	flag := FLAGS["logLevel"]
-
-	err := flag.ParseInput("info", conf)
-	if err != nil {
-		t.Error(err)
-	}
-	if *conf.LogLevel != log.LEVEL_INFO {
-		t.Error("Should set log level to info")
-	}
-
-	err = flag.ParseInput("DEBUG", conf)
-	if err != nil {
-		t.Error(err)
-	}
-	if *conf.LogLevel != log.LEVEL_DEBUG {
-		t.Error("Should set log level to debug")
-	}
-
-	err = flag.ParseInput("i", conf)
-	if err != nil {
-		t.Error(err)
-	}
-	if *conf.LogLevel != log.LEVEL_INFO {
-		t.Error("Should set log level to info")
-	}
-
-	err = flag.ParseInput("d", conf)
-	if err != nil {
-		t.Error(err)
-	}
-	if *conf.LogLevel != log.LEVEL_DEBUG {
-		t.Error("Should set log level to debug")
-	}
-
-	err = flag.ParseInput("verbose", conf)
-	if err == nil {
-		t.Error("Requires a recognized log level")
-	}
-}
-
-func TestLogRetentionDaysFlag(t *testing.T) {
-	t.Parallel()
-	conf := &config.Config{}
-	flag := FLAGS["logRetentionDays"]
-
-	err := flag.ParseInput("", conf)
-	if err == nil {
-		t.Error("Requires input")
-	}
-
-	err = flag.ParseInput("none", conf)
-	if err != nil {
-		t.Error(err)
-	}
-	if conf.LogRetentionDays == nil || *conf.LogRetentionDays != -1 {
-		t.Error("Log retention days should be set to -1")
-	}
-
-	err = flag.ParseInput("5", conf)
-	if err != nil {
-		t.Error(err)
-	}
-	if conf.LogRetentionDays == nil || *conf.LogRetentionDays != 5 {
-		t.Error("Log retention days should be set to 5")
-	}
-
-	err = flag.ParseInput("abc", conf)
-	if err == nil {
-		t.Error("Requires a numeric log retention value")
 	}
 }
 
