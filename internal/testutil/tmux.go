@@ -55,7 +55,7 @@ func SetupTestClient(tmux *tmux.Server, session *tmux.Session) *os.File {
 func SetupTestServer(t testing.TB) (context.Context, *tmux.Server) {
 	ctx := log.ContextLogger(context.Background())
 	dir := t.TempDir()
-	tmux := tmux.Tmux(ctx, fmt.Sprintf("%s/test.sock", dir))
+	tmux := tmux.Tmux(fmt.Sprintf("%s/test.sock", dir))
 	// Start one extra session so the server starts
 	_, err := tmux.New(DEFAULT_TEST_SESSION)
 	if err != nil {

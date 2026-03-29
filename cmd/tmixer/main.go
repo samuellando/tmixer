@@ -251,9 +251,9 @@ func reset(ctx context.Context, query string, session *session) error {
 func startTmuxServer(ctx context.Context, session *session) (*tmux.Server, error) {
 	var srv *tmux.Server
 	if session.config.TmuxSocketPath != nil {
-		srv = tmux.Tmux(ctx, *session.config.TmuxSocketPath)
+		srv = tmux.Tmux(*session.config.TmuxSocketPath)
 	} else {
-		srv = tmux.Tmux(ctx)
+		srv = tmux.Tmux()
 	}
 	err := srv.StartControlMode()
 	if err != nil {

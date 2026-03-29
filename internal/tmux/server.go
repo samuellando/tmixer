@@ -1,25 +1,58 @@
 package tmux
 
 import (
-	"context"
 	"errors"
 	"fmt"
+	"time"
 )
 
 var ErrSessionNotFound = errors.New("session not found")
 
+// Tmux servers hold the connection information and possibly a active
+// control mode session with the tmux server on a specified socket.
+// This is the main entry point for all tmux operations
 type Server struct {
 	SocketPath        string
 	controlModeClient *controlModeClient
-	ctx               context.Context
+	stats             ServerStats
 }
 
-func Tmux(ctx context.Context, socketPaths ...string) *Server {
+// A server session serves the purpose of capturing session specific stats.
+// It is derived from a server, and reports stats of all command runs that
+// happened since the start of the session. This may be an issue if there are
+// concurrent sessions, but for the purposes of logging it is okay.
+type ServerSession struct {
+	*Server
+	beforeStats ServerStats
+}
+
+type ServerStats struct {
+	CommandRuns int
+	TotalTime   time.Duration
+}
+
+func Tmux(socketPaths ...string) *Server {
 	if len(socketPaths) > 0 {
-		return &Server{ctx: ctx, SocketPath: socketPaths[0]}
+		return &Server{SocketPath: socketPaths[0]}
 	} else {
-		return &Server{ctx: ctx}
+		return &Server{}
 	}
+}
+
+func (srv *Server) Session() *ServerSession {
+	s := ServerSession{srv, srv.stats}
+	return &s
+}
+
+func (srv *ServerSession) Stats() ServerStats {
+	return ServerStats{
+		CommandRuns: srv.stats.CommandRuns - srv.beforeStats.CommandRuns,
+		TotalTime:   srv.stats.TotalTime - srv.beforeStats.TotalTime,
+	}
+}
+
+func (srv *Server) Stats() ServerStats {
+	return srv.stats
 }
 
 func (srv *Server) SetHook(name, cmd string) error {

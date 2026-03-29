@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 type cmd struct {
@@ -30,7 +31,12 @@ func (srv *Server) command(c string) cmd {
 }
 
 func (c cmd) run() ([]string, error) {
-	return c.server.runCommandInControlModeIfStarted(c)
+	srv := c.server
+	start := time.Now()
+	res, err := c.server.runCommandInControlModeIfStarted(c)
+	srv.stats.CommandRuns += 1
+	srv.stats.TotalTime += time.Since(start)
+	return res, err
 }
 
 func (c cmd) withFlag(flagValues ...string) cmd {

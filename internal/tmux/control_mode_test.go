@@ -23,13 +23,13 @@ func TestStartStopControlMode(t *testing.T) {
 }
 
 func TestStartStopControlModeParallel(t *testing.T) {
-	ctx, s := testutil.SetupTestServer(t)
+	_, s := testutil.SetupTestServer(t)
 	defer testutil.TeardownTestServer(s)
 	n := 10
 	servers := make([]*tmux.Server, n)
 	var err error
 	for i := range n {
-		servers[i] = tmux.Tmux(ctx, s.SocketPath)
+		servers[i] = tmux.Tmux(s.SocketPath)
 		err = servers[i].StartControlMode()
 		if err != nil {
 			t.Fatal(err)
@@ -108,6 +108,65 @@ func TestUsesControlMode(t *testing.T) {
 	cmTime := time.Since(start)
 	if 20*cmTime > psTime {
 		t.Fatal("Should be slower")
+	}
+}
+
+func TestSubscriptions(t *testing.T) {
+	_, srv := testutil.SetupTestServer(t)
+	defer testutil.TeardownTestServer(srv)
+	f := testutil.SetupTestClient(srv, nil)
+	defer func() {
+		err := f.Close()
+		if err != nil {
+			t.Error(err)
+		}
+	}()
+	if err := srv.StartControlMode(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := srv.StopControlMode(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	ch := srv.Sub()
+	ch2 := srv.Sub()
+
+	s, err := srv.New("test")
+	if err != nil {
+		t.Error(err)
+	}
+	c, err := srv.ActiveClient()
+	if err != nil {
+		t.Error(err)
+	}
+	err = c.Switch(s)
+	if err != nil {
+		t.Error(err)
+	}
+
+	e := <-ch
+	e2 := <-ch2
+	srv.UnSub(ch)
+	srv.UnSub(ch2)
+	if e.Client != c.Id {
+		t.Error("Client id does not match")
+	}
+	if e.Session != s.Id {
+		t.Error("Session id does not match")
+	}
+	if e.SessionName != "test" {
+		t.Error("Session Name does not match")
+	}
+	if e2.Client != c.Id {
+		t.Error("Client id does not match")
+	}
+	if e2.Session != s.Id {
+		t.Error("Session id does not match")
+	}
+	if e2.SessionName != "test" {
+		t.Error("Session Name does not match")
 	}
 }
 

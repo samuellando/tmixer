@@ -6,31 +6,72 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os/exec"
 	"strings"
-	"time"
-
-	"samuellando.com/tmixer/internal/log"
+	"sync"
 )
 
+type outputEvent struct {
+	Lines []string
+	Err   error
+}
+
+type ClientSessionChangeEvent struct {
+	Session     SessionId
+	SessionName string
+	Client      ClientId
+}
+
 type controlModeClient struct {
+	commandMu         sync.Mutex
+	subscribersMu     sync.Mutex
 	controlModeCmd    *exec.Cmd
 	controlModeStdIn  io.WriteCloser
 	controlModeStdOut *bufio.Reader
-	logEvent          log.Event
-	commandRuns       int
-	averageDuration   time.Duration
+	outputEvents      chan *outputEvent
+	subscribers       map[chan *ClientSessionChangeEvent]bool
+}
+
+func (s *Server) Sub() chan *ClientSessionChangeEvent {
+	client := s.controlModeClient
+	if s.controlModeClient == nil {
+		log.Fatal("Need's control mode to subscribe")
+	}
+	client.subscribersMu.Lock()
+	defer client.subscribersMu.Unlock()
+	ch := make(chan *ClientSessionChangeEvent)
+	client.subscribers[ch] = true
+	return ch
+}
+
+func (s *Server) UnSub(ch chan *ClientSessionChangeEvent) {
+	client := s.controlModeClient
+	if s.controlModeClient == nil {
+		log.Fatal("Need's control mode to unsubscribe")
+	}
+	client.subscribersMu.Lock()
+	defer client.subscribersMu.Unlock()
+	delete(client.subscribers, ch)
+	close(ch)
+}
+
+func (client *controlModeClient) transmit(e *ClientSessionChangeEvent) {
+	client.subscribersMu.Lock()
+	defer client.subscribersMu.Unlock()
+	for s := range client.subscribers {
+		s <- e
+	}
 }
 
 const CONTROL_SESSION_NAME = "__tmixer_control__"
 
 func (srv *Server) StartControlMode() error {
 	// Create the control mode session object
-	logEvent := log.Track(srv.ctx, "controlModeSession")
 	client := controlModeClient{
-		logEvent: logEvent,
+		outputEvents: make(chan *outputEvent),
+		subscribers:  make(map[chan *ClientSessionChangeEvent]bool),
 	}
-
 	// Setup the actual command to run
 	cmd := srv.command("new-session")
 	cmd = cmd.withTmuxFlag("-C").withFlag("-A").withSession(CONTROL_SESSION_NAME)
@@ -41,8 +82,6 @@ func (srv *Server) StartControlMode() error {
 	srv.controlModeClient = &client
 	rollback := func(err error) error {
 		srv.controlModeClient = nil
-		client.logEvent.Error(err)
-		logEvent.Done()
 		return err
 	}
 
@@ -62,6 +101,7 @@ func (srv *Server) StartControlMode() error {
 	if err != nil {
 		return rollback(err)
 	}
+	go client.processOutput()
 	_, err = client.readMessage()
 	if err != nil {
 		return rollback(err)
@@ -77,27 +117,16 @@ func (srv *Server) StopControlMode() error {
 		srv.controlModeClient = nil
 	}()
 
-	logEvent := srv.controlModeClient.logEvent
-	logEvent.Log("commandRuns", srv.controlModeClient.commandRuns)
-	logEvent.Log("averageDuration", srv.controlModeClient.averageDuration)
-	defer logEvent.Done()
-
 	err := srv.controlModeClient.controlModeStdIn.Close()
 	if err != nil {
 		err = fmt.Errorf("when closing stdin %w", err)
-		logEvent.Error(err)
 		return err
 	}
-	_, err = srv.controlModeClient.readMessage()
-	if err != nil {
-		err = fmt.Errorf("when waiting for emptying output %w", err)
-		logEvent.Error(err)
-	}
+	_, _ = srv.controlModeClient.readMessage()
 	err = srv.controlModeClient.controlModeCmd.Wait()
 	var exitErr *exec.ExitError
 	if err != nil && !errors.As(err, &exitErr) {
 		err = fmt.Errorf("when waiting for exit %w", err)
-		logEvent.Error(err)
 		return err
 	}
 	// Finally clean up the session if we can
@@ -130,59 +159,77 @@ func (srv *Server) runCommandOutsideControlMode(c cmd) ([]string, error) {
 }
 
 func (client *controlModeClient) sendCommand(c cmd) ([]string, error) {
-	start := time.Now()
-
+	client.commandMu.Lock()
+	defer client.commandMu.Unlock()
 	_, err := client.controlModeStdIn.Write([]byte(c.String() + "\n"))
 	if err != nil {
 		err = fmt.Errorf("failed to write to stdin: %w", err)
 		return nil, err
 	}
 	out, err := client.readMessage()
-	// Update some of the log session stuff
-	client.averageDuration = ((client.averageDuration * time.Duration(client.commandRuns)) + time.Since(start)) / time.Duration(client.commandRuns+1)
-	client.commandRuns++
 	return out, err
 }
 
 func (client *controlModeClient) readMessage() ([]string, error) {
-	readState := "before"
-	out := make([]string, 0)
+	e := <-client.outputEvents
+	return e.Lines, e.Err
+}
+
+func (client *controlModeClient) processOutput() {
 	for {
-		outLine, err := client.controlModeStdOut.ReadString('\n')
-		if err == io.EOF {
-			break
+		readState := "before"
+		out := make([]string, 0)
+		for {
+			outLine, err := client.controlModeStdOut.ReadString('\n')
+			if err == io.EOF {
+				return
+			}
+			if err != nil {
+				client.outputEvents <- &outputEvent{Err: err}
+				return
+			}
+			if strings.HasPrefix(outLine, "%client-session-changed") {
+				parts := strings.Split(strings.TrimSpace(outLine), " ")
+				clientId, _ := parseClientId(parts[1])
+				sessionId, _ := parseSessionId(parts[2])
+				sessionName := parts[3]
+				if sessionName != CONTROL_SESSION_NAME {
+					client.transmit(&ClientSessionChangeEvent{
+						Client:      clientId,
+						Session:     sessionId,
+						SessionName: sessionName,
+					})
+				}
+			}
+			if strings.HasPrefix(outLine, "%begin") {
+				readState = "inside"
+				continue
+			}
+			if strings.HasPrefix(outLine, "%end") {
+				readState = "done"
+				break
+			}
+			if strings.HasPrefix(outLine, "%exit") {
+				readState = "done"
+				break
+			}
+			if strings.HasPrefix(outLine, "%error") {
+				readState = "error"
+				break
+			}
+			if readState == "inside" {
+				out = append(out, strings.TrimSpace(outLine))
+			}
 		}
-		if err != nil {
-			return nil, err
+		switch readState {
+		case "done":
+			client.outputEvents <- &outputEvent{Lines: out, Err: nil}
+		case "error":
+			err := fmt.Errorf("command returned error output \"%s\"", strings.Join(out, "\n"))
+			client.outputEvents <- &outputEvent{Lines: out, Err: err}
+		default:
+			err := fmt.Errorf("CRITICAL READ ERROR")
+			client.outputEvents <- &outputEvent{Lines: nil, Err: err}
 		}
-		if strings.HasPrefix(outLine, "%begin") {
-			readState = "inside"
-			continue
-		}
-		if strings.HasPrefix(outLine, "%end") {
-			readState = "done"
-			break
-		}
-		if strings.HasPrefix(outLine, "%exit") {
-			readState = "done"
-			break
-		}
-		if strings.HasPrefix(outLine, "%error") {
-			readState = "error"
-			break
-		}
-		if readState == "inside" {
-			out = append(out, strings.TrimSpace(outLine))
-		}
-	}
-	switch readState {
-	case "done":
-		return out, nil
-	case "error":
-		err := fmt.Errorf("command returned error output \"%s\"", strings.Join(out, "\n"))
-		return out, err
-	default:
-		err := fmt.Errorf("CRITICAL READ ERROR")
-		return out, err
 	}
 }
