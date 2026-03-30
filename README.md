@@ -1,6 +1,6 @@
 <div align="center">
     <h1>tmixer</h1>
-    <p>v0.4.0-alpha</p>
+    <p>v0.5.0-alpha</p>
 </div>
 
 > [!NOTE]
@@ -105,8 +105,6 @@ kill
 
 reset
         reset the state of the project's session to it's configured state.
-
-Flags:
 ```
 
 ## Configuration
@@ -124,8 +122,9 @@ Projects from all the config files will be combined unless the `combineProjects`
 is set to `false`.
 
 Configurations will be overridden in the following order:
-- `configs passed to command line` overrides
+- `command line flags` overrides
 - `environment variables` overrides
+- `config files passed to the command line` overrides
 - `~/.tmixer.yml` overrides
 - `~/.config/tmixer/config.yml`
 
@@ -134,14 +133,15 @@ Configurations will be overridden in the following order:
 
 #### Top level/global configurations
 
-| yaml option      | type              | description                                                                                          | default value  |
-| ---              | ---               | ---                                                                                                  | ---            |
-| defaultProject   | `string`          | The default project to open at startup                                                               |                |
-| ttl              | `string`          | How long before a project with no activity is automatically killed (example `24h`)                   |                |
-| combineProjects  | `bool`            | Whether the list of projects should be overridden or combined when multiple config files are present | `true`         |
-| logFile          | `string`          | Additional log file in addition to `~/.local/state/tmixer/logs/`                                     |                |
-| tmuxSocketPath   | `string`          | What tmux socket to use, equivalent to the tmux `-S` flag                                            | `tmux default` |
-| projects         | `[]projectConfig` | A list of project configurations                                                                     |                |
+| yaml option     | type              | description                                                                                          | default value      |
+| ---             | ---               | ---                                                                                                  | ---                |
+| defaultProject  | `string`          | The default project to open at startup                                                               |                    |
+| ttl             | `string`          | How long before a project with no activity is automatically killed (example `24h`)                   |                    |
+| combineProjects | `bool`            | Whether the list of projects should be overridden or combined when multiple config files are present | `true`             |
+| logFile         | `string`          | A file to write logs to                                                                              | None               |
+| tmuxSocketPath  | `string`          | What tmux socket to use, equivalent to the tmux `-S` flag                                            | `tmux default`     |
+| fzfFlags        | `[]string`        | Flags to pass to fzf when selecting a project                                                        | `--ansi` and binds |
+| projects        | `[]projectConfig` | A list of project configurations                                                                     |                    |
 
 #### Project configurations
 
@@ -200,7 +200,7 @@ projects:
             split: "vert"
 
     switchCommands:
-      - "ln -sfn /opt/corp/sys/usr ."
+      - ["ln", "-sfn", "/opt/corp/sys/usr", "."]
 ```
 
 ### Command line flags and environment variables
@@ -215,12 +215,23 @@ projects:
 --config OR -c
         Provide an additional config file overriding global configs from ~/.tmixer.yml and ~/.config/tmixer/config.yml
         Usage: --config config.yml or -c config.yml
+        Default: none
         EnvVar: $TMIXER_CONFIG
 
 --defaultProject
         Set a default project for the start command, if none is passed
         Usage: --defaultProject projects--tmixer
         EnvVar: $TMIXER_DEFAULT_PROJECT
+
+--fzfFlags
+        Flags to pass to fzf
+        Usage: comma or new line separated
+        Default: --ansi
+                --bind,ctrl-k:execute(tmixer kill {2})+reload(tmixer list)
+                --bind,ctrl-r:execute(tmixer reset {2})+reload(tmixer list)
+                --bind,ctrl-s:execute(tmixer start {2})+reload(tmixer list)
+
+        EnvVar: $TMIXER_FZF_FLAGS
 
 --help OR -h
         display a help message to stdout
@@ -240,4 +251,8 @@ projects:
         The tmux socket path, the tmux -S flag
         Usage: --tmuxSocketPath /tmp/tmux/socket.sock
         EnvVar: $TMIXER_SOCKET_PATH
-``` 
+
+--verbose OR -v
+        display information about the run
+        Usage: --verbose or -v
+```
