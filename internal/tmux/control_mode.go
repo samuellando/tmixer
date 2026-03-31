@@ -35,8 +35,8 @@ type controlModeClient struct {
 
 func (s *Server) Sub() chan *ClientSessionChangeEvent {
 	client := s.controlModeClient
-	if s.controlModeClient == nil {
-		log.Fatal("Need's control mode to subscribe")
+	if client == nil {
+		log.Fatal("Needs control mode to subscribe")
 	}
 	client.subscribersMu.Lock()
 	defer client.subscribersMu.Unlock()
@@ -48,8 +48,8 @@ func (s *Server) Sub() chan *ClientSessionChangeEvent {
 
 func (s *Server) UnSub(ch chan *ClientSessionChangeEvent) {
 	client := s.controlModeClient
-	if s.controlModeClient == nil {
-		log.Fatal("Need's control mode to unsubscribe")
+	if client == nil {
+		log.Fatal("Needs control mode to unsubscribe")
 	}
 	client.subscribersMu.Lock()
 	defer client.subscribersMu.Unlock()
@@ -60,6 +60,7 @@ func (s *Server) UnSub(ch chan *ClientSessionChangeEvent) {
 func (client *controlModeClient) transmit(e *ClientSessionChangeEvent) {
 	client.subscribersMu.Lock()
 	defer client.subscribersMu.Unlock()
+	// Channels are buffered so sending in any order should be okay
 	for s := range client.subscribers {
 		s <- e
 	}
