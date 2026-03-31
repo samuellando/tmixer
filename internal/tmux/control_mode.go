@@ -40,7 +40,8 @@ func (s *Server) Sub() chan *ClientSessionChangeEvent {
 	}
 	client.subscribersMu.Lock()
 	defer client.subscribersMu.Unlock()
-	ch := make(chan *ClientSessionChangeEvent)
+	// Buffer the channels with a size of 1 do avoid deadlocks
+	ch := make(chan *ClientSessionChangeEvent, 1)
 	client.subscribers[ch] = true
 	return ch
 }
