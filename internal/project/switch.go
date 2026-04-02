@@ -32,5 +32,5 @@ func (p *Project) Switch(ctx context.Context) (*tmux.Session, error) {
 		logEvent.Error(err)
 		return nil, fmt.Errorf("when switching to the session: %w", err)
 	}
-	return session, p.RunSwitchCommands(ctx)
+	return session, nil
 }

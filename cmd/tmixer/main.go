@@ -5,15 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 
 	"samuellando.com/tmixer/cmd/tmixer/client"
 	"samuellando.com/tmixer/cmd/tmixer/server"
-	"samuellando.com/tmixer/internal/config"
 	"samuellando.com/tmixer/internal/flags"
 	"samuellando.com/tmixer/internal/log"
 	"samuellando.com/tmixer/internal/project"
-	"samuellando.com/tmixer/internal/tmux"
 )
 
 var ErrNoSelection = errors.New("NO SELECTION MADE")
@@ -24,233 +21,13 @@ func main() {
 	args := os.Args[1:]
 	var err error
 	if len(args) >= 1 && args[0] == "server" {
-		err = server.Run()
+		err = server.Run(args...)
 	} else {
 		err = client.Run(args...)
 	}
 	if err != nil {
 		os.Exit(1)
 	}
-}
-
-func run(args ...string) (err error) {
-	session := newSession()
-	defer func() {
-		err = errors.Join(err, session.close())
-	}()
-	// init the logging event
-	ctx := log.ContextLogger(context.Background())
-	// Parse the arguments before setting up logging in case there's a extra log file
-	session.config, args, err = flags.ParseArgs(ctx, args, FLAGS)
-	if err != nil {
-		fmt.Println(err)
-		fmt.Println()
-		displayHelp()
-		return err
-	}
-	_ = session.config.LoadFiles(ctx)
-	// Set up the logging
-	err = setupLogging(ctx, session.config)
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
-	// --help flag
-	if session.config.DisplayHelp != nil && *session.config.DisplayHelp {
-		displayHelp()
-		return log.Done(ctx)
-	}
-	// And run, and output the logs
-	err = runTmixer(ctx, args, session)
-	var logErr error
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		logErr = log.Fatal(ctx, err)
-	} else {
-		logErr = log.Done(ctx)
-	}
-	if session.config.DisplayLog != nil && *session.config.DisplayLog {
-		logErr = errors.Join(logErr, log.Display(ctx))
-	}
-	return logErr
-}
-
-func runTmixer(ctx context.Context, args []string, session *session) error {
-	logEvent := log.Track(ctx, "run")
-	defer logEvent.Done()
-	// Parse the config files, and the args, again
-	srv, err := startTmuxServer(ctx, session)
-	if err != nil {
-		logEvent.Error(err)
-		err = errors.Join(srv.DisplayMessage(err.Error()), err)
-		return err
-	}
-	// Determine the command
-	command := "switch"
-	if len(args) >= 1 {
-		command = args[0]
-	}
-	logEvent.Log("command", command)
-	// We should ignore switch notifications on the control mode session
-	if command == "notify-switch" {
-		if len(args) < 2 || args[1] == tmux.CONTROL_SESSION_NAME {
-			return nil
-		}
-	}
-	// Now load all the projects
-	session.projects, err = project.List(ctx, srv, session.config)
-	if err != nil {
-		logEvent.Error(err)
-		return err
-	}
-	// Cleanup any projects that have passed the ttl
-	err = cleanupStaleProjects(ctx, session.projects)
-	if err != nil {
-		logEvent.Error(err)
-		return err
-	}
-	// Finally run the command
-	query := ""
-	if len(args) >= 2 {
-		query = args[1]
-	}
-	err = disableHooks(srv)
-	if err != nil {
-		logEvent.Error(err)
-		return err
-	}
-	err = executeCommand(ctx, srv, command, query, session)
-	if err != nil {
-		if err != ErrNoSelection {
-			displayError := srv.DisplayMessage(err.Error())
-			if displayError != nil {
-				err = errors.Join(displayError, err)
-			}
-			logEvent.Error(err)
-		}
-		return err
-	}
-	return setupHooks(srv)
-}
-
-func executeCommand(ctx context.Context, srv *tmux.Server, command, query string, session *session) error {
-	switch command {
-	// Internal (undocumented) commands
-	case "notify-switch":
-		return notifySwitch(ctx, query, session)
-	default:
-		return ErrCommandNotRecognized
-	}
-}
-
-func notifySwitch(ctx context.Context, query string, session *session) error {
-	if query == "" {
-		return ErrNoSelection
-	}
-	selection := getProject(query, session)
-	if selection == nil {
-		return ErrProjectNotFound
-	}
-	return selection.RunSwitchCommands(ctx)
-}
-
-func startTmuxServer(ctx context.Context, session *session) (*tmux.Server, error) {
-	var srv *tmux.Server
-	if session.config.TmuxSocketPath != nil {
-		srv = tmux.Tmux(*session.config.TmuxSocketPath)
-	} else {
-		srv = tmux.Tmux()
-	}
-	err := srv.StartControlMode()
-	if err != nil {
-		return srv, err
-	} else {
-		session.addCleanup(srv.StopControlMode)
-	}
-	return srv, nil
-}
-
-func getProject(query string, session *session) *project.Project {
-	for _, p := range session.projects {
-		if p.Name == query {
-			return p
-		}
-	}
-	return nil
-}
-
-func startClient(ctx context.Context, srv *tmux.Server, p *project.Project) error {
-	_, err := p.Start(ctx)
-	if err != nil {
-		return err
-	}
-	if _, is_set := os.LookupEnv("TMUX"); is_set {
-		_, err := p.Start(ctx)
-		return err
-	}
-	cmd := exec.Command("tmux", "-u", "attach", "-t", p.TmuxSessionName())
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	err = cmd.Start()
-	if err != nil {
-		return err
-	}
-	var errs error
-	err = p.RunSwitchCommands(ctx)
-	if err != nil {
-		errs = errors.Join(errs, err)
-		err = srv.DisplayMessage(err.Error())
-		if err != nil {
-			errs = errors.Join(errs, err)
-		}
-	}
-	err = cmd.Wait()
-	if err != nil {
-		errs = errors.Join(errs, err)
-	}
-	return errs
-}
-
-func setupHooks(tmux *tmux.Server) error {
-	cmd := `run-shell 'tmixer notify-switch #{session_name}'`
-	err := tmux.SetHook("client-session-changed[2000]", cmd)
-	if err != nil {
-		return err
-	}
-	err = tmux.SetHook("client-attached[2000]", cmd)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func disableHooks(tmux *tmux.Server) error {
-	cmd := ``
-	err := tmux.SetHook("client-session-changed[2000]", cmd)
-	if err != nil {
-		return err
-	}
-	err = tmux.SetHook("client-attached[2000]", cmd)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func setupLogging(ctx context.Context, config *config.Config) error {
-	if config.LogFile != nil {
-		// Use log rotation with daily retention (24 hours)
-		f, err := os.OpenFile(*config.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			return err
-		}
-		if err := log.AddSink(ctx, f); err != nil {
-			err = errors.Join(err, f.Close())
-			return fmt.Errorf("while adding log sink: %w", err)
-		}
-	}
-	return nil
 }
 
 func displayHelp() {

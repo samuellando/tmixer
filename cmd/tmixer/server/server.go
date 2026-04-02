@@ -72,6 +72,8 @@ func (s *server) Session(conn grpc.BidiStreamingServer[protocol.Request, protoco
 					return nil
 				}
 				conn.Send(resp)
+			} else {
+				return nil
 			}
 		case *protocol.Request_Selection:
 			if conf == nil {
@@ -95,7 +97,7 @@ func (s *server) Session(conn grpc.BidiStreamingServer[protocol.Request, protoco
 }
 
 func (s *server) projectListResponse(ctx context.Context, config *config.Config) (*protocol.Response, error) {
-	srv, err := s.getTmuxServer(ctx, config)
+	srv, err := s.getTmuxServer(config)
 	if err != nil {
 		return nil, err
 	}
@@ -110,29 +112,73 @@ func (s *server) projectListResponse(ctx context.Context, config *config.Config)
 	return &protocol.Response{Projects: disp}, nil
 }
 
-func Run() error {
+func Run(args ...string) error {
 	socket := "/tmp/tmixer.sock"
-	os.Remove(socket) // important for UDS
 
 	lis, err := net.Listen("unix", socket)
 	if err != nil {
-		stdLog.Fatal(err)
+		// Step 1: check if something is actually listening
+		conn, dialErr := net.Dial("unix", socket)
+		if dialErr == nil {
+			conn.Close()
+			stdLog.Fatal("server already running on socket")
+		}
+
+		// Step 2: stale socket → safe to remove
+		if rmErr := os.Remove(socket); rmErr != nil {
+			stdLog.Fatalf("failed to remove stale socket: %v", rmErr)
+		}
+
+		// Step 3: retry listen
+		lis, err = net.Listen("unix", socket)
+		if err != nil {
+			stdLog.Fatalf("failed to bind after cleanup: %v", err)
+		}
 	}
 
 	grpcServer := grpc.NewServer()
-	protocol.RegisterTmixerServer(grpcServer, &server{tmuxServers: make(map[string]*tmux.Server)})
+	srv := &server{tmuxServers: make(map[string]*tmux.Server)}
+	protocol.RegisterTmixerServer(grpcServer, srv)
+
+	ctx := log.ContextLogger(context.Background())
+	config, _, err := flags.ParseArgs(ctx, args, FLAGS)
+	config.LoadFiles(ctx)
+	tmux, _ := srv.getTmuxServer(config)
+	ch := tmux.Sub()
+	go func() {
+		for {
+			if e, ok := <-ch; ok {
+				config, _, err := flags.ParseArgs(ctx, args, FLAGS)
+				config.LoadFiles(ctx)
+				list, _ := project.List(ctx, tmux, config)
+				p := getProject(e.SessionName, list)
+				if p != nil {
+					stdLog.Println(p.Name)
+					err = p.RunSwitchCommands(ctx)
+					if err != nil {
+						stdLog.Println(err)
+					}
+				}
+			} else {
+				break
+			}
+		}
+	}()
 
 	stdLog.Println("Server listening on", socket)
 	if err := grpcServer.Serve(lis); err != nil {
 		stdLog.Fatal(err)
 	}
+
+	tmux.UnSub(ch)
+
 	return nil
 }
 
 func (s *server) runCommand(ctx context.Context, config *config.Config, args ...string) error {
 	logEvent := log.Track(ctx, "runEvent")
 	defer logEvent.Done()
-	srv, err := s.getTmuxServer(ctx, config)
+	srv, err := s.getTmuxServer(config)
 	if err != nil {
 		logEvent.Error(err)
 		return err
@@ -159,7 +205,7 @@ func (s *server) runCommand(ctx context.Context, config *config.Config, args ...
 	return nil
 }
 
-func (s *server) getTmuxServer(ctx context.Context, config *config.Config) (*tmux.Server, error) {
+func (s *server) getTmuxServer(config *config.Config) (*tmux.Server, error) {
 	path := "DEFAULT"
 	if config.TmuxSocketPath != nil {
 		path = *config.TmuxSocketPath
@@ -167,7 +213,7 @@ func (s *server) getTmuxServer(ctx context.Context, config *config.Config) (*tmu
 	if srv, ok := s.tmuxServers[path]; ok {
 		return srv, nil
 	} else {
-		srv = tmux.Tmux(ctx)
+		srv = tmux.Tmux()
 		err := srv.StartControlMode()
 		if err != nil {
 			return nil, err
@@ -189,7 +235,7 @@ func executeCommand(ctx context.Context, srv *tmux.Server, command, query string
 	case "reset":
 		return reset(ctx, query, projects)
 	default:
-		return ErrCommandNotRecognized
+		return runSwitch(ctx, command, projects)
 	}
 }
 
