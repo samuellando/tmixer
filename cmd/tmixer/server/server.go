@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"strings"
 
 	"google.golang.org/grpc"
 	"samuellando.com/tmixer/internal/config"
@@ -20,6 +21,9 @@ import (
 	stdLog "log"
 )
 
+const TMIXER_SOCKET = "unix:///tmp/tmixer.sock"
+const TMIXER_SERVER_VERSION = "0.6.0"
+
 var ErrNoSelection = errors.New("NO SELECTION MADE")
 var ErrProjectNotFound = errors.New("PROJECT NOT FOUND")
 var ErrCommandNotRecognized = errors.New("COMMAND NOT RECOGNIZED")
@@ -27,6 +31,19 @@ var ErrCommandNotRecognized = errors.New("COMMAND NOT RECOGNIZED")
 type server struct {
 	protocol.UnimplementedTmixerServer
 	tmuxServers map[string]*tmux.Server
+	stop        chan bool
+}
+
+func (s *server) Ping(_ context.Context, _ *protocol.Empty) (*protocol.PingResponse, error) {
+	return &protocol.PingResponse{
+		Version: ptr(TMIXER_SERVER_VERSION),
+		Pid:     ptr(int64(os.Getpid())),
+	}, nil
+}
+
+func (s *server) ShutDown(_ context.Context, _ *protocol.Empty) (*protocol.Empty, error) {
+	s.stop <- true
+	return &protocol.Empty{}, nil
 }
 
 func (s *server) Session(conn grpc.BidiStreamingServer[protocol.Request, protocol.Response]) error {
@@ -52,64 +69,70 @@ func (s *server) Session(conn grpc.BidiStreamingServer[protocol.Request, protoco
 			if conf == nil {
 				conf, args, err = flags.ParseArgs(ctx, req.Args.Args, FLAGS)
 				if err != nil {
-					conn.Send(&protocol.Response{Error: ptr(err.Error())})
+					conn.Send(&protocol.Response{Payload: &protocol.Response_Err{
+						Err: &protocol.Error{Error: ptr(err.Error())},
+					},
+					})
 					log.Fatal(ctx, err)
 					return nil
 				}
 				err = conf.LoadFiles(ctx)
 				if err != nil {
-					conn.Send(&protocol.Response{Error: ptr(err.Error())})
+					conn.Send(&protocol.Response{Payload: &protocol.Response_Err{
+						Err: &protocol.Error{Error: ptr(err.Error())},
+					},
+					})
 					log.Fatal(ctx, err)
 					return nil
 				}
 			}
-			err := s.runCommand(ctx, conf, args...)
+			out, err := s.runCommand(ctx, conf, args...)
 			if err == ErrNoSelection {
 				resp, err := s.projectListResponse(ctx, conf)
 				if err != nil {
-					conn.Send(&protocol.Response{Error: ptr(err.Error())})
+					conn.Send(&protocol.Response{Payload: &protocol.Response_Err{
+						Err: &protocol.Error{Error: ptr(err.Error())},
+					},
+					})
 					log.Fatal(ctx, err)
-					return nil
 				}
 				conn.Send(resp)
+			} else if out != nil {
+				resp := s.outputResponse(ctx, out)
+				conn.Send(resp)
+				return nil
 			} else {
 				return nil
 			}
 		case *protocol.Request_Selection:
 			if conf == nil {
-				conn.Send(&protocol.Response{Error: ptr("Must send initial args before a selection")})
+				conn.Send(&protocol.Response{Payload: &protocol.Response_Err{
+					Err: &protocol.Error{Error: ptr(err.Error())},
+				},
+				})
 				return nil
 			} else {
 				name, err := display.GetProjectNameFromOutput(*req.Selection.Project)
 				if err != nil {
-					conn.Send(&protocol.Response{Error: ptr(err.Error())})
+					conn.Send(&protocol.Response{Payload: &protocol.Response_Err{
+						Err: &protocol.Error{Error: ptr(err.Error())},
+					},
+					})
 					log.Fatal(ctx, err)
 					return nil
 				}
 				args = append(args, name)
-				return s.runCommand(ctx, conf, args...)
+				_, err = s.runCommand(ctx, conf, args...)
+				return err
 			}
 		default:
-			conn.Send(&protocol.Response{Error: ptr("Invalid request type")})
+			conn.Send(&protocol.Response{Payload: &protocol.Response_Err{
+				Err: &protocol.Error{Error: ptr("Invalid request type")},
+			},
+			})
 			return nil
 		}
 	}
-}
-
-func (s *server) projectListResponse(ctx context.Context, config *config.Config) (*protocol.Response, error) {
-	srv, err := s.getTmuxServer(config)
-	if err != nil {
-		return nil, err
-	}
-	projects, err := project.List(ctx, srv, config)
-	if err != nil {
-		return nil, err
-	}
-	disp, err := display.Projects(ctx, projects)
-	if err != nil {
-		return nil, err
-	}
-	return &protocol.Response{Projects: disp}, nil
 }
 
 func Run(args ...string) error {
@@ -137,7 +160,7 @@ func Run(args ...string) error {
 	}
 
 	grpcServer := grpc.NewServer()
-	srv := &server{tmuxServers: make(map[string]*tmux.Server)}
+	srv := &server{tmuxServers: make(map[string]*tmux.Server), stop: make(chan bool)}
 	protocol.RegisterTmixerServer(grpcServer, srv)
 
 	ctx := log.ContextLogger(context.Background())
@@ -164,7 +187,10 @@ func Run(args ...string) error {
 			}
 		}
 	}()
-
+	go func() {
+		<-srv.stop
+		grpcServer.GracefulStop()
+	}()
 	stdLog.Println("Server listening on", socket)
 	if err := grpcServer.Serve(lis); err != nil {
 		stdLog.Fatal(err)
@@ -175,13 +201,13 @@ func Run(args ...string) error {
 	return nil
 }
 
-func (s *server) runCommand(ctx context.Context, config *config.Config, args ...string) error {
+func (s *server) runCommand(ctx context.Context, config *config.Config, args ...string) (*protocol.Output, error) {
 	logEvent := log.Track(ctx, "runEvent")
 	defer logEvent.Done()
 	srv, err := s.getTmuxServer(config)
 	if err != nil {
 		logEvent.Error(err)
-		return err
+		return nil, err
 	}
 	command := "switch"
 	if len(args) >= 1 {
@@ -191,18 +217,18 @@ func (s *server) runCommand(ctx context.Context, config *config.Config, args ...
 	projects, err := project.List(ctx, srv, config)
 	if err != nil {
 		logEvent.Error(err)
-		return err
+		return nil, err
 	}
 	query := ""
 	if len(args) >= 2 {
 		query = args[1]
 	}
-	err = executeCommand(ctx, srv, command, query, config, projects)
+	out, err := executeCommand(ctx, srv, command, query, config, projects)
 	if err != nil {
 		logEvent.Error(err)
-		return err
+		return out, err
 	}
-	return nil
+	return out, nil
 }
 
 func (s *server) getTmuxServer(config *config.Config) (*tmux.Server, error) {
@@ -223,19 +249,31 @@ func (s *server) getTmuxServer(config *config.Config) (*tmux.Server, error) {
 	}
 }
 
-func executeCommand(ctx context.Context, srv *tmux.Server, command, query string, config *config.Config, projects []*project.Project) error {
+func executeCommand(ctx context.Context, srv *tmux.Server, command, query string, config *config.Config, projects []*project.Project) (*protocol.Output, error) {
 	switch command {
 	// Internal (undocumented) commands
+	case "list":
+		projects, err := project.List(ctx, srv, config)
+		if err != nil {
+			return nil, err
+		}
+		disp, err := display.Projects(ctx, projects)
+		if err != nil {
+			return nil, err
+		}
+		return &protocol.Output{
+			Output: ptr(strings.Join(disp, "\n")),
+		}, nil
 	case "start":
-		return start(ctx, srv, query, config, projects)
+		return nil, start(ctx, srv, query, config, projects)
 	case "switch":
-		return runSwitch(ctx, query, projects)
+		return nil, runSwitch(ctx, query, projects)
 	case "kill":
-		return kill(ctx, query, projects)
+		return nil, kill(ctx, query, projects)
 	case "reset":
-		return reset(ctx, query, projects)
+		return nil, reset(ctx, query, projects)
 	default:
-		return runSwitch(ctx, command, projects)
+		return nil, runSwitch(ctx, command, projects)
 	}
 }
 

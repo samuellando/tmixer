@@ -4,9 +4,13 @@
 all: build
 
 check: check-fmt lint spell
+build: build-protobuf build-app
 
-build:
+build-app:
 	go build ./cmd/tmixer
+
+build-protobuf:
+	protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative internal/protocol/service.proto
 
 install:
 	go install ./...

@@ -1,16 +1,14 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 
 	"samuellando.com/tmixer/cmd/tmixer/client"
 	"samuellando.com/tmixer/cmd/tmixer/server"
 	"samuellando.com/tmixer/internal/flags"
-	"samuellando.com/tmixer/internal/log"
-	"samuellando.com/tmixer/internal/project"
 )
 
 var ErrNoSelection = errors.New("NO SELECTION MADE")
@@ -26,6 +24,7 @@ func main() {
 		err = client.Run(args...)
 	}
 	if err != nil {
+		log.Println(err)
 		os.Exit(1)
 	}
 }
@@ -64,29 +63,29 @@ Flags: `)
 	fmt.Print(flags.HelpMessage(FLAGS))
 }
 
-func cleanupStaleProjects(ctx context.Context, projects []*project.Project) error {
-	logEvent := log.Track(ctx, "cleanupStaleProjects")
-	projectsKilled := make([]string, 0)
-	defer logEvent.Done()
-	var errs error
-	for _, p := range projects {
-		status, err := p.Status()
-		if err != nil {
-			logEvent.Error(err)
-			errs = errors.Join(errs, err)
-		}
-		if status == project.PROJECT_STATUS_ACTIVE {
-			if passed, _ := p.TtlPassed(); passed {
-				_, err := p.Kill(ctx)
-				if err != nil {
-					logEvent.Error(err)
-					errs = errors.Join(errs, err)
-				} else {
-					projectsKilled = append(projectsKilled, p.Name)
-				}
-			}
-		}
-	}
-	logEvent.Log("projectsKilled", projectsKilled)
-	return errs
-}
+// func cleanupStaleProjects(ctx context.Context, projects []*project.Project) error {
+// 	logEvent := log.Track(ctx, "cleanupStaleProjects")
+// 	projectsKilled := make([]string, 0)
+// 	defer logEvent.Done()
+// 	var errs error
+// 	for _, p := range projects {
+// 		status, err := p.Status()
+// 		if err != nil {
+// 			logEvent.Error(err)
+// 			errs = errors.Join(errs, err)
+// 		}
+// 		if status == project.PROJECT_STATUS_ACTIVE {
+// 			if passed, _ := p.TtlPassed(); passed {
+// 				_, err := p.Kill(ctx)
+// 				if err != nil {
+// 					logEvent.Error(err)
+// 					errs = errors.Join(errs, err)
+// 				} else {
+// 					projectsKilled = append(projectsKilled, p.Name)
+// 				}
+// 			}
+// 		}
+// 	}
+// 	logEvent.Log("projectsKilled", projectsKilled)
+// 	return errs
+// }
