@@ -2,9 +2,9 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 	"syscall"
@@ -13,51 +13,103 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"samuellando.com/tmixer/cmd/tmixer/server"
+	"samuellando.com/tmixer/internal/config"
 	"samuellando.com/tmixer/internal/flags"
 	"samuellando.com/tmixer/internal/fzf"
+	"samuellando.com/tmixer/internal/log"
 	"samuellando.com/tmixer/internal/protocol"
+
+	stdLog "log"
 )
 
-func Run(args ...string) error {
-	ctx := context.Background()
-	client, conn, err := getServerConnection(ctx)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-	srv, err := client.Session(ctx)
-	if err != nil {
-		return err
-	}
+var ErrNoSelection = errors.New("NO SELECTION MADE")
 
+func Run(args ...string) (err error) {
+	ctx := context.Background()
+	ctx = log.ContextLogger(ctx)
+	defer func() {
+		err = errors.Join(err, log.Done(ctx))
+	}()
 	conf, remaining, err := flags.ParseArgs(ctx, args, server.FLAGS)
 	if err != nil {
-		return err
+		return errors.Join(err, log.Fatal(ctx, err))
+	}
+	if conf.DisplayLog != nil && *conf.DisplayLog {
+		defer func() {
+			stdLog.Println("Client log:")
+			err = errors.Join(err, log.Display(ctx))
+		}()
 	}
 
+	client, conn, err := getServerConnection(ctx)
+	if err != nil {
+		return errors.Join(err, log.Fatal(ctx, err))
+	}
+	defer func() {
+		err = errors.Join(err, conn.Close())
+	}()
+
+	srv, err := client.Session(ctx)
+	if err != nil {
+		return errors.Join(err, log.Fatal(ctx, err))
+	}
+	// Run the command on the server
+	selected, err := handshake(ctx, srv, args, conf)
+	if err != nil {
+		return errors.Join(err, log.Fatal(ctx, err))
+	}
+
+	if len(remaining) == 1 && remaining[0] == "start" {
+		err = startClient(selected)
+		return errors.Join(err, startClient(selected))
+	}
+
+	return nil
+}
+
+func handshake(ctx context.Context, srv grpc.BidiStreamingClient[protocol.Request, protocol.Response], args []string, conf *config.Config) (string, error) {
+	logEvent := log.Track(ctx, "serverCommunication")
+	requests := make([]string, 0)
+	responses := make([]string, 0)
+	defer func() {
+		logEvent.Log("requests", requests)
+		logEvent.Log("responses", responses)
+	}()
+	defer logEvent.Done()
+
 	var selected string
-	srv.Send(&protocol.Request{Payload: &protocol.Request_Args{Args: &protocol.Args{Args: args}}})
+
+	req := &protocol.Request{Payload: &protocol.Request_Args{Args: &protocol.Args{Args: args}}}
+	requests = append(requests, req.String())
+	err := srv.Send(req)
+	if err != nil {
+		return "", err
+	}
 	for {
 		resp, err := srv.Recv()
+		responses = append(responses, resp.String())
 		if err != nil {
 			// When the server hangs up, we can exit.
 			if err == io.EOF {
 				break
 			}
-			return err
+			return "", err
 		}
 		switch resp.Payload.(type) {
 		case *protocol.Response_NeedsSelection:
 			selection, err := fzf.Pick(ctx, conf, resp.GetNeedsSelection().Projects)
 			if err != nil {
-				return err
+				return "", err
 			}
 			if selection == nil {
-				return nil
+				return "", ErrNoSelection
 			}
-			err = srv.Send(&protocol.Request{Payload: &protocol.Request_Selection{Selection: &protocol.Selection{Project: *&selection}}})
+
+			req := &protocol.Request{Payload: &protocol.Request_Selection{Selection: &protocol.Selection{Project: selection}}}
+			requests = append(requests, req.String())
+			err = srv.Send(req)
 			if err != nil {
-				log.Fatal(err)
+				return "", nil
 			}
 		case *protocol.Response_Output:
 			resp := *resp.GetOutput()
@@ -68,15 +120,11 @@ func Run(args ...string) error {
 				selected = *resp.Selected
 			}
 		case *protocol.Response_Err:
-			return fmt.Errorf(*resp.GetErr().Error)
+			return "", errors.New(*resp.GetErr().Error)
 		}
 	}
-
-	if len(remaining) == 1 && remaining[0] == "start" {
-		return startClient(selected)
-	}
-
-	return nil
+	logEvent.Log("selection", selected)
+	return selected, nil
 }
 
 func startClient(proj string) error {
@@ -95,6 +143,8 @@ func startClient(proj string) error {
 }
 
 func getServerConnection(ctx context.Context) (protocol.TmixerClient, *grpc.ClientConn, error) {
+	logEvent := log.Track(ctx, "getServerConnection")
+	defer logEvent.Done()
 	conn, err := grpc.NewClient(
 		server.TMIXER_SOCKET,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -106,7 +156,7 @@ func getServerConnection(ctx context.Context) (protocol.TmixerClient, *grpc.Clie
 	client := protocol.NewTmixerClient(conn)
 	pingResp, err := client.Ping(ctx, &protocol.Empty{})
 	if err != nil {
-		log.Println("Starting tmixer server...")
+		stdLog.Println("Starting tmixer server...")
 		err = server.Start()
 		if err != nil {
 			return nil, nil, err
@@ -127,7 +177,7 @@ func getServerConnection(ctx context.Context) (protocol.TmixerClient, *grpc.Clie
 	}
 	// If the version on the server does no match, we should shut it down and start a new server.
 	if *pingResp.Version != server.TMIXER_SERVER_VERSION {
-		log.Println("Server version does not match, restarting...")
+		stdLog.Println("Server version does not match, restarting...")
 		_, err = client.ShutDown(ctx, &protocol.Empty{})
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed shutdown outdated server: %v", err)
