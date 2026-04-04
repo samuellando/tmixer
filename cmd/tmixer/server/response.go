@@ -29,13 +29,13 @@ func (s *server) projectListResponse(ctx context.Context, config *config.Config)
 	}}, nil
 }
 
-func (s *server) errorResponse(ctx context.Context, err error) *protocol.Response {
+func errorResponse(err error) *protocol.Response {
 	return &protocol.Response{Payload: &protocol.Response_Err{
 		Err: &protocol.Error{Error: ptr(err.Error())},
 	}}
 }
 
-func (s *server) outputResponse(ctx context.Context, out *protocol.Output) *protocol.Response {
+func outputResponse(out *protocol.Output) *protocol.Response {
 	return &protocol.Response{Payload: &protocol.Response_Output{
 		Output: out,
 	}}

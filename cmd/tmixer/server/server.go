@@ -22,7 +22,7 @@ import (
 )
 
 const TMIXER_SOCKET = "unix:///tmp/tmixer.sock"
-const TMIXER_SERVER_VERSION = "0.6.0"
+const TMIXER_SERVER_VERSION = "0.6.1"
 
 var ErrNoSelection = errors.New("NO SELECTION MADE")
 var ErrProjectNotFound = errors.New("PROJECT NOT FOUND")
@@ -69,10 +69,7 @@ func (s *server) Session(conn grpc.BidiStreamingServer[protocol.Request, protoco
 			if conf == nil {
 				conf, args, err = flags.ParseArgs(ctx, req.Args.Args, FLAGS)
 				if err != nil {
-					conn.Send(&protocol.Response{Payload: &protocol.Response_Err{
-						Err: &protocol.Error{Error: ptr(err.Error())},
-					},
-					})
+					conn.Send(errorResponse(err))
 					log.Fatal(ctx, err)
 					return nil
 				}
@@ -86,6 +83,10 @@ func (s *server) Session(conn grpc.BidiStreamingServer[protocol.Request, protoco
 					return nil
 				}
 			}
+			if conf.DisplayHelp != nil && *conf.DisplayHelp {
+				conn.Send(createHelpResponse())
+				return nil
+			}
 			out, err := s.runCommand(ctx, conf, args...)
 			if err == ErrNoSelection {
 				resp, err := s.projectListResponse(ctx, conf)
@@ -98,7 +99,7 @@ func (s *server) Session(conn grpc.BidiStreamingServer[protocol.Request, protoco
 				}
 				conn.Send(resp)
 			} else if out != nil {
-				resp := s.outputResponse(ctx, out)
+				resp := outputResponse(out)
 				conn.Send(resp)
 				return nil
 			} else {
