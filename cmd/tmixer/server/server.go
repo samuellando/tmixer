@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"time"
 
 	"google.golang.org/grpc"
 	"samuellando.com/tmixer/internal/config"
@@ -22,7 +23,7 @@ import (
 )
 
 const TMIXER_SOCKET = "unix:///tmp/tmixer.sock"
-const TMIXER_SERVER_VERSION = "0.6.1"
+const TMIXER_SERVER_VERSION = "0.6.0.2"
 
 var ErrNoSelection = errors.New("NO SELECTION MADE")
 var ErrProjectNotFound = errors.New("PROJECT NOT FOUND")
@@ -191,6 +192,16 @@ func Run(args ...string) error {
 	go func() {
 		<-srv.stop
 		grpcServer.GracefulStop()
+	}()
+	go func() {
+		t := time.NewTicker(time.Minute)
+		for {
+			<-t.C
+			config, _, _ := flags.ParseArgs(ctx, args, FLAGS)
+			config.LoadFiles(ctx)
+			list, _ := project.List(ctx, tmux, config)
+			cleanupStaleProjects(ctx, list)
+		}
 	}()
 	stdLog.Println("Server listening on", socket)
 	if err := grpcServer.Serve(lis); err != nil {
