@@ -25,7 +25,7 @@ import (
 )
 
 const TMIXER_SOCKET = "/tmp/tmixer.sock"
-const TMIXER_SERVER_VERSION = "0.6.0.5"
+const TMIXER_SERVER_VERSION = "0.6.0.6"
 
 var ErrNoSelection = errors.New("NO SELECTION MADE")
 var ErrProjectNotFound = errors.New("PROJECT NOT FOUND")
@@ -33,10 +33,10 @@ var ErrCommandNotRecognized = errors.New("COMMAND NOT RECOGNIZED")
 
 type server struct {
 	protocol.UnimplementedTmixerServer
-	mu          sync.Mutex
-	tmuxServers map[string]*tmux.Server
-	lastConfig  *config.Config
-	stop        chan bool
+	mu           sync.Mutex
+	tmuxServers  map[string]*tmux.Server
+	serverConfig map[*tmux.Server]*config.Config
+	stop         chan bool
 }
 
 func (s *server) Ping(_ context.Context, _ *protocol.Empty) (*protocol.PingResponse, error) {
@@ -67,32 +67,29 @@ func (s *server) Session(conn grpc.BidiStreamingServer[protocol.Request, protoco
 			if err == io.EOF {
 				return nil
 			}
-			log.Fatal(ctx, err)
-			return err
+			return errors.Join(err, log.Fatal(ctx, err))
 		}
 		switch req := req.Payload.(type) {
 		case *protocol.Request_Args:
 			if conf == nil {
 				conf, args, err = flags.ParseArgs(ctx, req.Args.Args, options.FLAGS)
 				if err != nil {
-					conn.Send(errorResponse(err))
-					log.Fatal(ctx, err)
-					return nil
+					sendErr := conn.Send(errorResponse(err))
+					return errors.Join(err, sendErr, log.Fatal(ctx, err))
 				}
 				err = conf.LoadFiles(ctx)
 				if err != nil {
-					conn.Send(&protocol.Response{Payload: &protocol.Response_Err{
+					sendErr := conn.Send(&protocol.Response{Payload: &protocol.Response_Err{
 						Err: &protocol.Error{Error: ptr(err.Error())},
 					},
 					})
-					log.Fatal(ctx, err)
-					return nil
+					return errors.Join(err, sendErr, log.Fatal(ctx, err))
 				}
-				s.lastConfig = conf
+				tmux, _ := s.getTmuxServer(conf)
+				s.serverConfig[tmux] = conf
 			}
 			if conf.DisplayHelp != nil && *conf.DisplayHelp {
-				conn.Send(createHelpResponse())
-				return nil
+				return conn.Send(createHelpResponse())
 			}
 			out, err := s.runCommand(ctx, conf, args...)
 			if err == ErrNoSelection {
@@ -164,26 +161,29 @@ func Run(ctx context.Context, args ...string) error {
 	}
 
 	grpcServer := grpc.NewServer()
-	srv := &server{tmuxServers: make(map[string]*tmux.Server), stop: make(chan bool)}
+	srv := &server{
+		tmuxServers:  make(map[string]*tmux.Server),
+		serverConfig: make(map[*tmux.Server]*config.Config),
+		stop:         make(chan bool),
+	}
 	protocol.RegisterTmixerServer(grpcServer, srv)
 
 	config, _, err := flags.ParseArgs(ctx, args, options.FLAGS)
 	if err != nil {
 		return err
 	}
-	srv.lastConfig = config
 	tmux, _ := srv.getTmuxServer(config)
+	srv.serverConfig[tmux] = config
 	ch := tmux.Sub()
 	go func() {
 		for {
 			if e, ok := <-ch; ok {
 				srv.mu.Lock()
-				config = srv.lastConfig
+				config = srv.serverConfig[tmux]
 				// config.LoadFiles(ctx)
 				list, _ := project.List(ctx, tmux, config)
 				p := getProject(e.SessionName, list)
 				if p != nil {
-					stdLog.Println(p.Name)
 					err = p.RunSwitchCommands(ctx)
 					if err != nil {
 						stdLog.Println(err)
@@ -200,21 +200,20 @@ func Run(ctx context.Context, args ...string) error {
 		grpcServer.GracefulStop()
 	}()
 	go func() {
-		t := time.NewTicker(10 * time.Second)
+		t := time.NewTicker(time.Second)
 		for {
 			<-t.C
-			srv.mu.Lock()
-			config = srv.lastConfig
-			// config.LoadFiles(ctx)
-			list, err := project.List(ctx, tmux, config)
+			next, err := srv.cleanupStaleProjects(ctx)
 			if err != nil {
-				stdLog.Fatal(err)
+				srv.stop <- true
+				break
 			}
-			err = cleanupStaleProjects(ctx, list)
-			if err != nil {
-				stdLog.Fatal(err)
+			d := time.Minute
+			if next != nil {
+				d = *next
 			}
-			srv.mu.Unlock()
+			t.Reset(d)
+			stdLog.Printf("Next cleanup for: %s\n", d.String())
 		}
 	}()
 	stdLog.Println("Server listening on", TMIXER_SOCKET)
@@ -223,6 +222,12 @@ func Run(ctx context.Context, args ...string) error {
 	}
 
 	tmux.UnSub(ch)
+	for _, tmuxSrv := range srv.tmuxServers {
+		err := tmuxSrv.StopControlMode()
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
