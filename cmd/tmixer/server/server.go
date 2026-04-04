@@ -8,9 +8,11 @@ import (
 	"net"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"google.golang.org/grpc"
+	"samuellando.com/tmixer/cmd/tmixer/options"
 	"samuellando.com/tmixer/internal/config"
 	"samuellando.com/tmixer/internal/display"
 	"samuellando.com/tmixer/internal/flags"
@@ -22,8 +24,8 @@ import (
 	stdLog "log"
 )
 
-const TMIXER_SOCKET = "unix:///tmp/tmixer.sock"
-const TMIXER_SERVER_VERSION = "0.6.0.2"
+const TMIXER_SOCKET = "/tmp/tmixer.sock"
+const TMIXER_SERVER_VERSION = "0.6.0.5"
 
 var ErrNoSelection = errors.New("NO SELECTION MADE")
 var ErrProjectNotFound = errors.New("PROJECT NOT FOUND")
@@ -31,7 +33,9 @@ var ErrCommandNotRecognized = errors.New("COMMAND NOT RECOGNIZED")
 
 type server struct {
 	protocol.UnimplementedTmixerServer
+	mu          sync.Mutex
 	tmuxServers map[string]*tmux.Server
+	lastConfig  *config.Config
 	stop        chan bool
 }
 
@@ -48,8 +52,9 @@ func (s *server) ShutDown(_ context.Context, _ *protocol.Empty) (*protocol.Empty
 }
 
 func (s *server) Session(conn grpc.BidiStreamingServer[protocol.Request, protocol.Response]) error {
-	ctx := context.Background()
-	ctx = log.ContextLogger(ctx)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ctx := log.ContextLogger(context.Background())
 	defer log.Done(ctx)
 	// defer log.Display(ctx)
 
@@ -68,7 +73,7 @@ func (s *server) Session(conn grpc.BidiStreamingServer[protocol.Request, protoco
 		switch req := req.Payload.(type) {
 		case *protocol.Request_Args:
 			if conf == nil {
-				conf, args, err = flags.ParseArgs(ctx, req.Args.Args, FLAGS)
+				conf, args, err = flags.ParseArgs(ctx, req.Args.Args, options.FLAGS)
 				if err != nil {
 					conn.Send(errorResponse(err))
 					log.Fatal(ctx, err)
@@ -83,6 +88,7 @@ func (s *server) Session(conn grpc.BidiStreamingServer[protocol.Request, protoco
 					log.Fatal(ctx, err)
 					return nil
 				}
+				s.lastConfig = conf
 			}
 			if conf.DisplayHelp != nil && *conf.DisplayHelp {
 				conn.Send(createHelpResponse())
@@ -137,44 +143,43 @@ func (s *server) Session(conn grpc.BidiStreamingServer[protocol.Request, protoco
 	}
 }
 
-func Run(args ...string) error {
-	socket := "/tmp/tmixer.sock"
+func Run(ctx context.Context, args ...string) error {
+	// Step 1: check if something is actually listening
+	conn, err := net.Dial("unix", TMIXER_SOCKET)
+	if err == nil {
+		err = errors.New("server already running on socket")
+		err = errors.Join(err, conn.Close())
+		return err
+	}
 
-	lis, err := net.Listen("unix", socket)
+	// Step 2: stale socket → safe to remove
+	if err := os.Remove(TMIXER_SOCKET); err != nil {
+		return fmt.Errorf("failed to remove stale socket: %w", err)
+	}
+
+	// Step 3: retry listen
+	lis, err := net.Listen("unix", TMIXER_SOCKET)
 	if err != nil {
-		// Step 1: check if something is actually listening
-		conn, dialErr := net.Dial("unix", socket)
-		if dialErr == nil {
-			conn.Close()
-			stdLog.Fatal("server already running on socket")
-		}
-
-		// Step 2: stale socket → safe to remove
-		if rmErr := os.Remove(socket); rmErr != nil {
-			stdLog.Fatalf("failed to remove stale socket: %v", rmErr)
-		}
-
-		// Step 3: retry listen
-		lis, err = net.Listen("unix", socket)
-		if err != nil {
-			stdLog.Fatalf("failed to bind after cleanup: %v", err)
-		}
+		return fmt.Errorf("failed to bind after cleanup: %w", err)
 	}
 
 	grpcServer := grpc.NewServer()
 	srv := &server{tmuxServers: make(map[string]*tmux.Server), stop: make(chan bool)}
 	protocol.RegisterTmixerServer(grpcServer, srv)
 
-	ctx := log.ContextLogger(context.Background())
-	config, _, err := flags.ParseArgs(ctx, args, FLAGS)
-	config.LoadFiles(ctx)
+	config, _, err := flags.ParseArgs(ctx, args, options.FLAGS)
+	if err != nil {
+		return err
+	}
+	srv.lastConfig = config
 	tmux, _ := srv.getTmuxServer(config)
 	ch := tmux.Sub()
 	go func() {
 		for {
 			if e, ok := <-ch; ok {
-				config, _, err := flags.ParseArgs(ctx, args, FLAGS)
-				config.LoadFiles(ctx)
+				srv.mu.Lock()
+				config = srv.lastConfig
+				// config.LoadFiles(ctx)
 				list, _ := project.List(ctx, tmux, config)
 				p := getProject(e.SessionName, list)
 				if p != nil {
@@ -184,6 +189,7 @@ func Run(args ...string) error {
 						stdLog.Println(err)
 					}
 				}
+				srv.mu.Unlock()
 			} else {
 				break
 			}
@@ -194,16 +200,24 @@ func Run(args ...string) error {
 		grpcServer.GracefulStop()
 	}()
 	go func() {
-		t := time.NewTicker(time.Minute)
+		t := time.NewTicker(10 * time.Second)
 		for {
 			<-t.C
-			config, _, _ := flags.ParseArgs(ctx, args, FLAGS)
-			config.LoadFiles(ctx)
-			list, _ := project.List(ctx, tmux, config)
-			cleanupStaleProjects(ctx, list)
+			srv.mu.Lock()
+			config = srv.lastConfig
+			// config.LoadFiles(ctx)
+			list, err := project.List(ctx, tmux, config)
+			if err != nil {
+				stdLog.Fatal(err)
+			}
+			err = cleanupStaleProjects(ctx, list)
+			if err != nil {
+				stdLog.Fatal(err)
+			}
+			srv.mu.Unlock()
 		}
 	}()
-	stdLog.Println("Server listening on", socket)
+	stdLog.Println("Server listening on", TMIXER_SOCKET)
 	if err := grpcServer.Serve(lis); err != nil {
 		stdLog.Fatal(err)
 	}

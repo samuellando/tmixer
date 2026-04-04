@@ -12,6 +12,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"samuellando.com/tmixer/cmd/tmixer/options"
 	"samuellando.com/tmixer/cmd/tmixer/server"
 	"samuellando.com/tmixer/internal/config"
 	"samuellando.com/tmixer/internal/flags"
@@ -24,46 +25,32 @@ import (
 
 var ErrNoSelection = errors.New("NO SELECTION MADE")
 
-func Run(args ...string) (err error) {
-	ctx := context.Background()
-	ctx = log.ContextLogger(ctx)
-	defer func() {
-		err = errors.Join(err, log.Done(ctx))
-	}()
-	conf, remaining, err := flags.ParseArgs(ctx, args, server.FLAGS)
+func Run(ctx context.Context, args ...string) (err error) {
+	conf, remaining, err := flags.ParseArgs(ctx, args, options.FLAGS)
 	if err != nil {
-		return errors.Join(err, log.Fatal(ctx, err))
+		return err
 	}
-	if conf.DisplayLog != nil && *conf.DisplayLog {
-		defer func() {
-			stdLog.Println("Client log:")
-			err = errors.Join(err, log.Display(ctx))
-		}()
-	}
-
+	// Get a server session
 	client, conn, err := getServerConnection(ctx)
 	if err != nil {
-		return errors.Join(err, log.Fatal(ctx, err))
+		return err
 	}
 	defer func() {
 		err = errors.Join(err, conn.Close())
 	}()
-
 	srv, err := client.Session(ctx)
 	if err != nil {
-		return errors.Join(err, log.Fatal(ctx, err))
+		return err
 	}
 	// Run the command on the server
 	selected, err := handshake(ctx, srv, args, conf)
 	if err != nil {
-		return errors.Join(err, log.Fatal(ctx, err))
+		return err
 	}
-
+	// If the bare start comman was used start a tmux client
 	if len(remaining) == 1 && remaining[0] == "start" {
-		err = startClient(selected)
 		return errors.Join(err, startClient(selected))
 	}
-
 	return nil
 }
 
@@ -146,7 +133,7 @@ func getServerConnection(ctx context.Context) (protocol.TmixerClient, *grpc.Clie
 	logEvent := log.Track(ctx, "getServerConnection")
 	defer logEvent.Done()
 	conn, err := grpc.NewClient(
-		server.TMIXER_SOCKET,
+		"unix://"+server.TMIXER_SOCKET,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {

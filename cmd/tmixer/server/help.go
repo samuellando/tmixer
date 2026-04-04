@@ -3,6 +3,7 @@ package server
 import (
 	"strings"
 
+	"samuellando.com/tmixer/cmd/tmixer/options"
 	"samuellando.com/tmixer/internal/flags"
 	"samuellando.com/tmixer/internal/protocol"
 )
@@ -42,7 +43,7 @@ func createHelpResponse() *protocol.Response {
 	b.WriteString(helpMessage)
 	b.WriteRune('\n')
 	b.WriteRune('\n')
-	b.WriteString(flags.HelpMessage(FLAGS))
+	b.WriteString(flags.HelpMessage(options.FLAGS))
 	return outputResponse(&protocol.Output{
 		Output: ptr(b.String()),
 	})
