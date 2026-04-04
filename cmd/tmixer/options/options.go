@@ -1,8 +1,6 @@
 package options
 
 import (
-	"fmt"
-
 	"samuellando.com/tmixer/internal/config"
 	"samuellando.com/tmixer/internal/flags"
 )
@@ -31,18 +29,5 @@ var FLAGS = map[string]flags.Flag{
 			c.DisplayLog = ptr(true)
 			return nil
 		},
-	},
-	"config": {
-		ShortName:   "c",
-		Description: "Provide an additional config file overriding global configs from ~/.tmixer.yml and ~/.config/tmixer/config.yml",
-		Usage:       "--config config.yml or -c config.yml",
-		ParseInput: func(s string, c *config.Config) error {
-			if s == "" {
-				return fmt.Errorf("config file must be provided")
-			}
-			c.ConfigFiles = append(c.ConfigFiles, s)
-			return nil
-		},
-		EnvironmentVariable: "TMIXER_CONFIG",
 	},
 }
