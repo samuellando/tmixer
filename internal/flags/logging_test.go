@@ -24,7 +24,7 @@ func TestFlagParseEventFields(t *testing.T) {
 	}
 
 	args := []string{"--test", "value", "remaining"}
-	_, _, err := flags.ParseArgs(ctx, args, testFlags)
+	_, _, err := flags.ParseArgs(ctx, args, testFlags, &config.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +102,7 @@ func TestFlagParseEventWithError(t *testing.T) {
 	}
 
 	args := []string{"tmixer", "--failing", "value"}
-	_, _, err := flags.ParseArgs(ctx, args, testFlags)
+	_, _, err := flags.ParseArgs(ctx, args, testFlags, &config.Config{})
 	if err == nil {
 		t.Fatal("Should return an error")
 	}

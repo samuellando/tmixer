@@ -26,7 +26,7 @@ import (
 var ErrNoSelection = errors.New("NO SELECTION MADE")
 
 func Run(ctx context.Context, args ...string) (err error) {
-	conf, remaining, err := flags.ParseArgs(ctx, args, options.FLAGS)
+	conf, remaining, err := flags.ParseArgs(ctx, args, options.FLAGS, options.DEFAULT_CONFIG)
 	if err != nil {
 		return err
 	}

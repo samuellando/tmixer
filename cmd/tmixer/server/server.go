@@ -72,7 +72,7 @@ func (s *server) Session(conn grpc.BidiStreamingServer[protocol.Request, protoco
 		switch req := req.Payload.(type) {
 		case *protocol.Request_Args:
 			if conf == nil {
-				conf, args, err = flags.ParseArgs(ctx, req.Args.Args, options.FLAGS)
+				conf, args, err = flags.ParseArgs(ctx, req.Args.Args, options.FLAGS, options.DEFAULT_CONFIG)
 				if err != nil {
 					sendErr := conn.Send(errorResponse(err))
 					return errors.Join(err, sendErr, log.Fatal(ctx, err))
@@ -168,7 +168,7 @@ func Run(ctx context.Context, args ...string) error {
 	}
 	protocol.RegisterTmixerServer(grpcServer, srv)
 
-	config, _, err := flags.ParseArgs(ctx, args, options.FLAGS)
+	config, _, err := flags.ParseArgs(ctx, args, options.FLAGS, options.DEFAULT_CONFIG)
 	if err != nil {
 		return err
 	}

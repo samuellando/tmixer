@@ -34,7 +34,7 @@ func run(ctx context.Context, args ...string) (err error) {
 	defer func() {
 		err = errors.Join(err, log.Done(ctx))
 	}()
-	conf, remaining, err := flags.ParseArgs(ctx, args, options.FLAGS)
+	conf, remaining, err := flags.ParseArgs(ctx, args, options.FLAGS, options.DEFAULT_CONFIG)
 	if err != nil {
 		return err
 	}

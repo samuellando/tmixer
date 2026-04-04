@@ -18,8 +18,7 @@ import (
 //
 // 2. If the flag's environment variable is set, it will be set to that value
 // 3. FInally, if the flag has a default value, it will be set to that value
-func ParseArgs(ctx context.Context, args []string, inFlags map[string]Flag) (*config.Config, []string, error) {
-	conf := &config.Config{}
+func ParseArgs(ctx context.Context, args []string, inFlags map[string]Flag, conf *config.Config) (*config.Config, []string, error) {
 	logEvent := log.Track(ctx, "flagParseEvent")
 	defer logEvent.Done()
 	logEvent.Log("inputArgs", args)

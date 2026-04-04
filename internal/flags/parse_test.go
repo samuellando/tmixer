@@ -82,7 +82,7 @@ func TestParseArgs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, remaining, err := flags.ParseArgs(ctx, args, inFlags)
+	_, remaining, err := flags.ParseArgs(ctx, args, inFlags, &config.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}
