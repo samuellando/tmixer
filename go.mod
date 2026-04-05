@@ -11,6 +11,7 @@ require (
 )
 
 require (
+	github.com/Shopify/go-lua v0.0.0-20250718183320-1e37f32ad7d0 // indirect
 	golang.org/x/net v0.48.0 // indirect
 	golang.org/x/sys v0.40.0 // indirect
 	golang.org/x/text v0.32.0 // indirect
