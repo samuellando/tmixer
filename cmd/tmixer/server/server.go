@@ -25,7 +25,7 @@ import (
 )
 
 const TMIXER_SOCKET = "/tmp/tmixer.sock"
-const TMIXER_SERVER_VERSION = "0.6.0.6"
+const TMIXER_SERVER_VERSION = "0.6.0.8"
 
 var ErrNoSelection = errors.New("NO SELECTION MADE")
 var ErrProjectNotFound = errors.New("PROJECT NOT FOUND")
@@ -150,7 +150,7 @@ func Run(ctx context.Context, args ...string) error {
 	}
 
 	// Step 2: stale socket → safe to remove
-	if err := os.Remove(TMIXER_SOCKET); err != nil {
+	if err := os.Remove(TMIXER_SOCKET); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("failed to remove stale socket: %w", err)
 	}
 

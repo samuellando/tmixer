@@ -18,7 +18,7 @@ import (
 //
 // 2. If the flag's environment variable is set, it will be set to that value
 // 3. FInally, if the flag has a default value, it will be set to that value
-func ParseArgs(ctx context.Context, args []string, inFlags map[string]Flag, conf *config.Config) (*config.Config, []string, error) {
+func ParseArgs(ctx context.Context, args []string, inFlags map[string]Flag, conf config.Config) (*config.Config, []string, error) {
 	logEvent := log.Track(ctx, "flagParseEvent")
 	defer logEvent.Done()
 	logEvent.Log("inputArgs", args)
@@ -30,25 +30,25 @@ func ParseArgs(ctx context.Context, args []string, inFlags map[string]Flag, conf
 		flags[name] = &cpFlag
 	}
 
-	remaining, err := setFlagsFromArgs(conf, args, flags)
+	remaining, err := setFlagsFromArgs(&conf, args, flags)
 	if err != nil {
 		logEvent.Error(err)
 		return nil, nil, err
 	}
-	err = setFlagsFromEnvVars(conf, flags)
+	err = setFlagsFromEnvVars(&conf, flags)
 	if err != nil {
 		logEvent.Error(err)
 		return nil, nil, err
 	}
-	err = setFlagsToDefault(conf, flags)
+	err = setFlagsToDefault(&conf, flags)
 	if err != nil {
 		logEvent.Error(err)
 		return nil, nil, err
 	}
 
 	logEvent.Log("remainingArgs", remaining)
-	logEvent.Log("result", *conf)
-	return conf, remaining, nil
+	logEvent.Log("result", conf)
+	return &conf, remaining, nil
 }
 
 func setFlagsFromArgs(conf *config.Config, args []string, flags map[string]*Flag) ([]string, error) {
