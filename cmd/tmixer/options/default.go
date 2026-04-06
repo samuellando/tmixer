@@ -4,6 +4,10 @@ import (
 	"samuellando.com/tmixer/internal/config"
 )
 
+func ptr[T any](v T) *T {
+	return &v
+}
+
 var DEFAULT_CONFIG = config.Config{
 	ConfigFiles: []string{
 		"~/.config/tmixer/config.yml",

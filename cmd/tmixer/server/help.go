@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"samuellando.com/tmixer/cmd/tmixer/options"
-	"samuellando.com/tmixer/internal/flags"
 	"samuellando.com/tmixer/internal/protocol"
 )
 
@@ -40,10 +39,11 @@ Flags: `
 
 func createHelpResponse() *protocol.Response {
 	b := strings.Builder{}
+	options.FLAG_SET.SetOutput(&b)
 	b.WriteString(helpMessage)
 	b.WriteRune('\n')
 	b.WriteRune('\n')
-	b.WriteString(flags.HelpMessage(options.FLAGS))
+	options.FLAG_SET.PrintDefaults()
 	return outputResponse(&protocol.Output{
 		Output: ptr(b.String()),
 	})

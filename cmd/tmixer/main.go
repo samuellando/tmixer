@@ -8,7 +8,6 @@ import (
 	"samuellando.com/tmixer/cmd/tmixer/client"
 	"samuellando.com/tmixer/cmd/tmixer/options"
 	"samuellando.com/tmixer/cmd/tmixer/server"
-	"samuellando.com/tmixer/internal/flags"
 	"samuellando.com/tmixer/internal/log"
 
 	stdLog "log"
@@ -27,18 +26,22 @@ func main() {
 		err = errors.Join(err, log.Fatal(ctx, err))
 		stdLog.Println(err)
 		os.Exit(1)
+	} else {
+		err = log.Done(ctx)
+		if err != nil {
+			stdLog.Println(err)
+			os.Exit(1)
+		}
 	}
 }
 
 func run(ctx context.Context, args ...string) (err error) {
-	defer func() {
-		err = errors.Join(err, log.Done(ctx))
-	}()
-	conf, remaining, err := flags.ParseArgs(ctx, args, options.FLAGS, options.DEFAULT_CONFIG)
+	err = options.FLAG_SET.Parse(args)
 	if err != nil {
 		return err
 	}
-	if conf.DisplayLog != nil && *conf.DisplayLog {
+	remaining := options.FLAG_SET.Args()
+	if options.VERBOSE {
 		defer func() {
 			err = errors.Join(err, log.Display(ctx))
 		}()

@@ -14,8 +14,6 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"samuellando.com/tmixer/cmd/tmixer/options"
 	"samuellando.com/tmixer/cmd/tmixer/server"
-	"samuellando.com/tmixer/internal/config"
-	"samuellando.com/tmixer/internal/flags"
 	"samuellando.com/tmixer/internal/fzf"
 	"samuellando.com/tmixer/internal/log"
 	"samuellando.com/tmixer/internal/protocol"
@@ -26,10 +24,11 @@ import (
 var ErrNoSelection = errors.New("NO SELECTION MADE")
 
 func Run(ctx context.Context, args ...string) (err error) {
-	conf, remaining, err := flags.ParseArgs(ctx, args, options.FLAGS, options.DEFAULT_CONFIG)
+	err = options.FLAG_SET.Parse(args)
 	if err != nil {
 		return err
 	}
+	remaining := options.FLAG_SET.Args()
 	// Get a server session
 	client, conn, err := getServerConnection(ctx)
 	if err != nil {
@@ -43,7 +42,7 @@ func Run(ctx context.Context, args ...string) (err error) {
 		return err
 	}
 	// Run the command on the server
-	selected, err := handshake(ctx, srv, args, conf)
+	selected, err := handshake(ctx, srv, args)
 	if err != nil {
 		return err
 	}
@@ -54,7 +53,12 @@ func Run(ctx context.Context, args ...string) (err error) {
 	return nil
 }
 
-func handshake(ctx context.Context, srv grpc.BidiStreamingClient[protocol.Request, protocol.Response], args []string, conf *config.Config) (string, error) {
+func handshake(ctx context.Context, srv grpc.BidiStreamingClient[protocol.Request, protocol.Response], args []string) (string, error) {
+	conf := options.DEFAULT_CONFIG
+	err := conf.LoadFiles(ctx)
+	if err != nil {
+		return "", err
+	}
 	logEvent := log.Track(ctx, "serverCommunication")
 	requests := make([]string, 0)
 	responses := make([]string, 0)
@@ -68,7 +72,7 @@ func handshake(ctx context.Context, srv grpc.BidiStreamingClient[protocol.Reques
 
 	req := &protocol.Request{Payload: &protocol.Request_Args{Args: &protocol.Args{Args: args}}}
 	requests = append(requests, req.String())
-	err := srv.Send(req)
+	err = srv.Send(req)
 	if err != nil {
 		return "", err
 	}
@@ -84,7 +88,7 @@ func handshake(ctx context.Context, srv grpc.BidiStreamingClient[protocol.Reques
 		}
 		switch resp.Payload.(type) {
 		case *protocol.Response_NeedsSelection:
-			selection, err := fzf.Pick(ctx, conf, resp.GetNeedsSelection().Projects)
+			selection, err := fzf.Pick(ctx, &conf, resp.GetNeedsSelection().Projects)
 			if err != nil {
 				return "", err
 			}
