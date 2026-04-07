@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"sync"
+	"time"
 
 	"google.golang.org/grpc"
 	"samuellando.com/tmixer/cmd/tmixer/options"
@@ -26,6 +27,126 @@ type server struct {
 	mu   sync.Mutex
 	tmux *tmux.Server
 	stop chan bool
+}
+
+func (s *server) Ping(_ context.Context, _ *protocol.Empty) (*protocol.PingResponse, error) {
+	// TODO: Add a client command for this
+	return &protocol.PingResponse{
+		Version: ptr(TMIXER_SERVER_VERSION),
+		Pid:     ptr(int64(os.Getpid())),
+	}, nil
+}
+
+func (s *server) ShutDown(_ context.Context, _ *protocol.Empty) (*protocol.Empty, error) {
+	// TODO: Add a client command for this
+	s.stop <- true
+	return &protocol.Empty{}, nil
+}
+
+func (s *server) Session(conn grpc.BidiStreamingServer[protocol.Request, protocol.Response]) (err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ctx, config, err := setup()
+	if err != nil {
+		return err
+	}
+	var args []string
+	gotArgs := false
+	for {
+		req, err := conn.Recv()
+		fmt.Println(args)
+		fmt.Println(req)
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return errors.Join(err, log.Fatal(ctx, err))
+		}
+		switch req := req.Payload.(type) {
+		case *protocol.Request_Args:
+			gotArgs = true
+			config, err = options.Config(ctx)
+			if err != nil {
+				sendErr := conn.Send(errorResponse(err))
+				return errors.Join(err, sendErr)
+			}
+			err = options.FLAG_SET.Parse(req.Args.Args)
+			if err != nil {
+				sendErr := conn.Send(errorResponse(err))
+				return errors.Join(err, sendErr, log.Fatal(ctx, err))
+			}
+			args = options.FLAG_SET.Args()
+			if options.DISPLAY_HELP {
+				return conn.Send(createHelpResponse())
+			}
+			out, err := s.runCommand(ctx, config, args...)
+			if err == ErrNoSelection {
+				resp, err := s.projectListResponse(ctx, config)
+				if err != nil {
+					sendErr := conn.Send(errorResponse(err))
+					return errors.Join(err, sendErr)
+				}
+				sendErr := conn.Send(resp)
+				if sendErr != nil {
+					return sendErr
+				}
+			} else if out != nil {
+				resp := outputResponse(out)
+				return conn.Send(resp)
+			} else {
+				return nil
+			}
+		case *protocol.Request_Selection:
+			if !gotArgs {
+				err = errors.New("must send args first")
+				sendErr := conn.Send(errorResponse(err))
+				return errors.Join(err, sendErr)
+			} else {
+				name, err := display.GetProjectNameFromOutput(*req.Selection.Project)
+				if err != nil {
+					sendErr := conn.Send(errorResponse(err))
+					return errors.Join(err, sendErr)
+				}
+				args = append(args, name)
+				_, err = s.runCommand(ctx, config, args...)
+				return err
+			}
+		default:
+			sendErr := conn.Send(errorResponse(err))
+			return errors.Join(err, sendErr)
+		}
+	}
+}
+
+func (s *server) monitorAndCleanupStaleProjects() error {
+	t := time.NewTicker(time.Minute)
+	for {
+		err := s.cleanupStaleProjects()
+		if err != nil {
+			return err
+		}
+		<-t.C
+	}
+}
+
+func (s *server) cleanupStaleProjects() (err error) {
+	if s.tmux == nil {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ctx, config, err := setup()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			err = log.Done(ctx)
+		} else {
+			err = errors.Join(err, log.Fatal(ctx, err))
+		}
+	}()
+	return cleanupStaleProjects(ctx, config, s.tmux)
 }
 
 func (s *server) getTmuxServer(config *config.Config) (*tmux.Server, error) {
@@ -58,94 +179,4 @@ func (s *server) getTmuxServer(config *config.Config) (*tmux.Server, error) {
 		}
 	}()
 	return srv, nil
-}
-
-func (s *server) Ping(_ context.Context, _ *protocol.Empty) (*protocol.PingResponse, error) {
-	return &protocol.PingResponse{
-		Version: ptr(TMIXER_SERVER_VERSION),
-		Pid:     ptr(int64(os.Getpid())),
-	}, nil
-}
-
-func (s *server) ShutDown(_ context.Context, _ *protocol.Empty) (*protocol.Empty, error) {
-	s.stop <- true
-	return &protocol.Empty{}, nil
-}
-
-func (s *server) Session(conn grpc.BidiStreamingServer[protocol.Request, protocol.Response]) (err error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	ctx := log.ContextLogger(context.Background())
-	defer func() {
-		if err != nil {
-			err = errors.Join(err, log.Fatal(ctx, err))
-		} else {
-			err = log.Done(ctx)
-		}
-	}()
-	// We reload the config for each session
-	var conf *config.Config
-	var args []string
-	for {
-		req, err := conn.Recv()
-		fmt.Println(req)
-		if err != nil {
-			if err == io.EOF {
-				return nil
-			}
-			return errors.Join(err, log.Fatal(ctx, err))
-		}
-		switch req := req.Payload.(type) {
-		case *protocol.Request_Args:
-			conf, err = options.Config(ctx)
-			if err != nil {
-				sendErr := conn.Send(errorResponse(err))
-				return errors.Join(err, sendErr)
-			}
-			err = options.FLAG_SET.Parse(req.Args.Args)
-			if err != nil {
-				sendErr := conn.Send(errorResponse(err))
-				return errors.Join(err, sendErr, log.Fatal(ctx, err))
-			}
-			args = options.FLAG_SET.Args()
-			if options.DISPLAY_HELP {
-				return conn.Send(createHelpResponse())
-			}
-			out, err := s.runCommand(ctx, conf, args...)
-			if err == ErrNoSelection {
-				resp, err := s.projectListResponse(ctx, conf)
-				if err != nil {
-					sendErr := conn.Send(errorResponse(err))
-					return errors.Join(err, sendErr)
-				}
-				sendErr := conn.Send(resp)
-				if sendErr != nil {
-					return sendErr
-				}
-			} else if out != nil {
-				resp := outputResponse(out)
-				return conn.Send(resp)
-			} else {
-				return nil
-			}
-		case *protocol.Request_Selection:
-			if conf == nil {
-				err = errors.New("must send args first")
-				sendErr := conn.Send(errorResponse(err))
-				return errors.Join(err, sendErr)
-			} else {
-				name, err := display.GetProjectNameFromOutput(*req.Selection.Project)
-				if err != nil {
-					sendErr := conn.Send(errorResponse(err))
-					return errors.Join(err, sendErr)
-				}
-				args = append(args, name)
-				_, err = s.runCommand(ctx, conf, args...)
-				return err
-			}
-		default:
-			sendErr := conn.Send(errorResponse(err))
-			return errors.Join(err, sendErr)
-		}
-	}
 }
