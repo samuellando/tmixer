@@ -15,8 +15,8 @@ func TestConfigLoadEventFields(t *testing.T) {
 	ctx = testutil.SetupLogging(ctx)
 
 	// Create a valid config file
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "config.yml")
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "config.yml")
 	configContent := `
 defaultProject: test
 projects:
@@ -28,9 +28,9 @@ projects:
 		t.Fatal(err)
 	}
 
-	cfg := &config.Config{}
-	cfg.ConfigFiles = []string{configFile}
-	err = cfg.LoadFiles(ctx)
+	_, err = config.LoadFiles(ctx, []config.FSref{
+		{FS: os.DirFS(tempDir), Name: "config.yml"},
+	})
 	if err != nil {
 		t.Error(err)
 	}
@@ -65,10 +65,11 @@ func TestConfigLoadEventWithSingleError(t *testing.T) {
 	ctx := context.Background()
 	ctx = testutil.SetupLogging(ctx)
 
+	tempDir := t.TempDir()
 	// Use a non-existent file to trigger an error
-	cfg := &config.Config{}
-	cfg.ConfigFiles = []string{"/nonexistent/path/config.yml"}
-	err := cfg.LoadFiles(ctx)
+	_, err := config.LoadFiles(ctx, []config.FSref{
+		{FS: os.DirFS(tempDir), Name: "dne.yml"},
+	})
 	if err != nil {
 		t.Error(err)
 	}
@@ -107,8 +108,8 @@ func TestConfigLoadEventWithMultipleErrors(t *testing.T) {
 	// 1. Non-existent file
 	// 2. Another non-existent file
 	// 3. Invalid YAML file
-	tmpDir := t.TempDir()
-	invalidYamlFile := filepath.Join(tmpDir, "invalid.yml")
+	tempDir := t.TempDir()
+	invalidYamlFile := filepath.Join(tempDir, "invalid.yml")
 	invalidContent := `
 defaultProject: test
 projects:
@@ -120,13 +121,11 @@ projects:
 		t.Fatal(err)
 	}
 
-	cfg := &config.Config{}
-	cfg.ConfigFiles = []string{
-		"/nonexistent/path1/config.yml",
-		"/nonexistent/path2/config.yml",
-		invalidYamlFile,
-	}
-	err = cfg.LoadFiles(ctx)
+	_, err = config.LoadFiles(ctx, []config.FSref{
+		{FS: os.DirFS(tempDir), Name: "dne1.yml"},
+		{FS: os.DirFS(tempDir), Name: "dne2.yml"},
+		{FS: os.DirFS(tempDir), Name: "invalid.yml"},
+	})
 	if err == nil {
 		t.Fatal("Should return an error")
 	}
@@ -163,10 +162,11 @@ func TestConfigLoadEventResultPopulatedWithErrors(t *testing.T) {
 	ctx := context.Background()
 	ctx = testutil.SetupLogging(ctx)
 
+	tempDir := t.TempDir()
 	// Use a non-existent file to trigger an error
-	cfg := &config.Config{}
-	cfg.ConfigFiles = []string{"/nonexistent/path/config.yml"}
-	err := cfg.LoadFiles(ctx)
+	_, err := config.LoadFiles(ctx, []config.FSref{
+		{FS: os.DirFS(tempDir), Name: "dne1.yml"},
+	})
 	if err != nil {
 		t.Error(err)
 	}

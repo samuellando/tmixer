@@ -54,8 +54,7 @@ func Run(ctx context.Context, args ...string) (err error) {
 }
 
 func handshake(ctx context.Context, srv grpc.BidiStreamingClient[protocol.Request, protocol.Response], args []string) (string, error) {
-	conf := options.DEFAULT_CONFIG
-	err := conf.LoadFiles(ctx)
+	config, err := options.Config(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -88,7 +87,7 @@ func handshake(ctx context.Context, srv grpc.BidiStreamingClient[protocol.Reques
 		}
 		switch resp.Payload.(type) {
 		case *protocol.Response_NeedsSelection:
-			selection, err := fzf.Pick(ctx, &conf, resp.GetNeedsSelection().Projects)
+			selection, err := fzf.Pick(ctx, config, resp.GetNeedsSelection().Projects)
 			if err != nil {
 				return "", err
 			}

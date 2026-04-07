@@ -25,13 +25,12 @@ func (srv *server) runSwitchHook(tmux *tmux.Server, name string) (err error) {
 		}
 	}()
 
-	config := options.DEFAULT_CONFIG
-	err = config.LoadFiles(ctx)
+	config, err := options.Config(ctx)
 	if err != nil {
 		return err
 	}
 
-	list, _ := project.List(ctx, tmux, &config)
+	list, _ := project.List(ctx, tmux, config)
 	p := getProject(name, list)
 	if p != nil {
 		err = p.RunSwitchCommands(ctx)

@@ -40,8 +40,7 @@ func (s *server) cleanupStaleProjects() (err error) {
 	projectsKilled := make([]string, 0)
 	defer logEvent.Done()
 	// Reload the configs
-	config := options.DEFAULT_CONFIG
-	err = config.LoadFiles(ctx)
+	config, err := options.Config(ctx)
 	if err != nil {
 		logEvent.Error(err)
 		return err
@@ -50,7 +49,7 @@ func (s *server) cleanupStaleProjects() (err error) {
 		return nil
 	}
 	// Check all projects
-	projects, err := project.List(ctx, s.tmux, &config)
+	projects, err := project.List(ctx, s.tmux, config)
 	if err != nil {
 		logEvent.Error(err)
 		return err

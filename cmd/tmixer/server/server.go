@@ -97,14 +97,12 @@ func (s *server) Session(conn grpc.BidiStreamingServer[protocol.Request, protoco
 		}
 		switch req := req.Payload.(type) {
 		case *protocol.Request_Args:
-			df := options.DEFAULT_CONFIG
-			conf = &df
-			err = conf.LoadFiles(ctx)
+			conf, err = options.Config(ctx)
 			if err != nil {
 				sendErr := conn.Send(errorResponse(err))
 				return errors.Join(err, sendErr)
 			}
-			err := options.FLAG_SET.Parse(req.Args.Args)
+			err = options.FLAG_SET.Parse(req.Args.Args)
 			if err != nil {
 				sendErr := conn.Send(errorResponse(err))
 				return errors.Join(err, sendErr, log.Fatal(ctx, err))

@@ -14,7 +14,7 @@ import (
 )
 
 const TMIXER_SOCKET = "/tmp/tmixer.sock"
-const TMIXER_SERVER_VERSION = "0.6.0.19"
+const TMIXER_SERVER_VERSION = "0.6.0.24"
 
 func Run(ctx context.Context, args ...string) error {
 	lis, err := getSocketListener()
