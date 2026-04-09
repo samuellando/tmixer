@@ -1,10 +1,8 @@
 package server
 
 import (
-	"context"
 	"errors"
 
-	"samuellando.com/tmixer/cmd/tmixer/options"
 	"samuellando.com/tmixer/internal/log"
 	"samuellando.com/tmixer/internal/project"
 	"samuellando.com/tmixer/internal/tmux"
@@ -12,23 +10,20 @@ import (
 	stdLog "log"
 )
 
-func (srv *server) runSwitchHook(tmux *tmux.Server, name string) (err error) {
-	srv.mu.Lock()
-	defer srv.mu.Unlock()
-
-	ctx := log.ContextLogger(context.Background())
-	defer func() {
-		if err != nil {
-			err = log.Done(ctx)
-		} else {
-			err = errors.Join(err, log.Fatal(ctx, err))
-		}
-	}()
-
-	config, err := options.Config(ctx)
+func runSwitchHook(tmux *tmux.Server, name string) (err error) {
+	ctx, config, err := setup()
 	if err != nil {
 		return err
 	}
+	defer func() {
+		if err != nil {
+			err = errors.Join(err, log.Fatal(ctx, err))
+		} else {
+			err = log.Done(ctx)
+		}
+		// Always display the log on the server
+		err = errors.Join(err, log.Display(ctx))
+	}()
 
 	list, _ := project.List(ctx, tmux, config)
 	p := getProject(name, list)

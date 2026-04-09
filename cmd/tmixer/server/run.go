@@ -14,7 +14,7 @@ import (
 )
 
 const TMIXER_SOCKET = "/tmp/tmixer.sock"
-const TMIXER_SERVER_VERSION = "0.6.0.28"
+const TMIXER_SERVER_VERSION = "0.6.0.35"
 
 func Run(ctx context.Context, args ...string) error {
 	lis, err := getSocketListener()
@@ -40,6 +40,15 @@ func Run(ctx context.Context, args ...string) error {
 			srv.stop <- true
 		}
 	}()
+
+	_, config, err := setup()
+	if err != nil {
+		return err
+	}
+	_, err = srv.getTmuxServer(config)
+	if err != nil {
+		return err
+	}
 
 	// Start listening
 	stdLog.Println("Server listening on", TMIXER_SOCKET)

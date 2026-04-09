@@ -9,24 +9,18 @@ import (
 	"samuellando.com/tmixer/internal/display"
 	"samuellando.com/tmixer/internal/log"
 	"samuellando.com/tmixer/internal/project"
-	"samuellando.com/tmixer/internal/protocol"
 	"samuellando.com/tmixer/internal/tmux"
 )
 
-func (s *server) runCommand(ctx context.Context, config *config.Config, args ...string) (*protocol.Output, error) {
+func runCommand(ctx context.Context, config *config.Config, tmux *tmux.Server, args ...string) (*string, error) {
 	logEvent := log.Track(ctx, "runEvent")
 	defer logEvent.Done()
-	srv, err := s.getTmuxServer(config)
-	if err != nil {
-		logEvent.Error(err)
-		return nil, err
-	}
 	command := "switch"
 	if len(args) >= 1 {
 		command = args[0]
 	}
 	logEvent.Log("command", command)
-	projects, err := project.List(ctx, srv, config)
+	projects, err := project.List(ctx, tmux, config)
 	if err != nil {
 		logEvent.Error(err)
 		return nil, err
@@ -35,7 +29,7 @@ func (s *server) runCommand(ctx context.Context, config *config.Config, args ...
 	if len(args) >= 2 {
 		query = args[1]
 	}
-	out, err := executeCommand(ctx, srv, command, query, config, projects)
+	out, err := executeCommand(ctx, tmux, command, query, config, projects)
 	if err != nil {
 		logEvent.Error(err)
 		return out, err
@@ -43,7 +37,7 @@ func (s *server) runCommand(ctx context.Context, config *config.Config, args ...
 	return out, nil
 }
 
-func executeCommand(ctx context.Context, srv *tmux.Server, command, query string, config *config.Config, projects []*project.Project) (*protocol.Output, error) {
+func executeCommand(ctx context.Context, srv *tmux.Server, command, query string, config *config.Config, projects []*project.Project) (*string, error) {
 	switch command {
 	// Internal (undocumented) commands
 	case "list":
@@ -55,9 +49,7 @@ func executeCommand(ctx context.Context, srv *tmux.Server, command, query string
 		if err != nil {
 			return nil, err
 		}
-		return &protocol.Output{
-			Output: ptr(strings.Join(disp, "\n")),
-		}, nil
+		return ptr(strings.Join(disp, "\n")), nil
 	case "start":
 		return nil, start(ctx, srv, query, config, projects)
 	case "switch":

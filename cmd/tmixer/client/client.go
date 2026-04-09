@@ -99,7 +99,7 @@ func handshake(ctx context.Context, srv grpc.BidiStreamingClient[protocol.Reques
 			requests = append(requests, req.String())
 			err = srv.Send(req)
 			if err != nil {
-				return "", nil
+				return "", err
 			}
 		case *protocol.Response_Output:
 			resp := *resp.GetOutput()

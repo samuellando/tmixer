@@ -9,7 +9,7 @@ import (
 	"samuellando.com/tmixer/internal/protocol"
 )
 
-func (s *server) projectListResponse(ctx context.Context, config *config.Config) (*protocol.Response, error) {
+func (s *server) createProjectListResponse(ctx context.Context, config *config.Config) (*protocol.Response, error) {
 	srv, err := s.getTmuxServer(config)
 	if err != nil {
 		return nil, err
@@ -29,14 +29,16 @@ func (s *server) projectListResponse(ctx context.Context, config *config.Config)
 	}}, nil
 }
 
-func errorResponse(err error) *protocol.Response {
+func createErrorResponse(err error) *protocol.Response {
 	return &protocol.Response{Payload: &protocol.Response_Err{
 		Err: &protocol.Error{Error: ptr(err.Error())},
 	}}
 }
 
-func outputResponse(out *protocol.Output) *protocol.Response {
+func createOutputResponse(out *string) *protocol.Response {
 	return &protocol.Response{Payload: &protocol.Response_Output{
-		Output: out,
+		Output: &protocol.Output{
+			Output: out,
+		},
 	}}
 }

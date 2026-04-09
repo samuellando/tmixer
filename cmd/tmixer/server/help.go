@@ -44,7 +44,5 @@ func createHelpResponse() *protocol.Response {
 	b.WriteRune('\n')
 	b.WriteRune('\n')
 	options.FLAG_SET.PrintDefaults()
-	return outputResponse(&protocol.Output{
-		Output: ptr(b.String()),
-	})
+	return createOutputResponse(ptr(b.String()))
 }
