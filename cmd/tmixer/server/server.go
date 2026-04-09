@@ -29,7 +29,6 @@ type server struct {
 }
 
 func (s *server) Ping(_ context.Context, _ *protocol.Empty) (*protocol.PingResponse, error) {
-	// TODO: Add a client command for this
 	return &protocol.PingResponse{
 		Version: ptr(TMIXER_SERVER_VERSION),
 		Pid:     ptr(int64(os.Getpid())),
@@ -37,7 +36,6 @@ func (s *server) Ping(_ context.Context, _ *protocol.Empty) (*protocol.PingRespo
 }
 
 func (s *server) ShutDown(_ context.Context, _ *protocol.Empty) (*protocol.Empty, error) {
-	// TODO: Add a client command for this
 	s.stop <- true
 	return &protocol.Empty{}, nil
 }

@@ -53,8 +53,9 @@ func Run(ctx context.Context, args ...string) error {
 	// Start listening
 	stdLog.Println("Server listening on", TMIXER_SOCKET)
 	if err := grpcServer.Serve(lis); err != nil {
-		stdLog.Fatal(err)
+		return err
 	}
+	stdLog.Println("Exiting")
 
 	if srv.tmux != nil {
 		err := srv.tmux.StopControlMode()

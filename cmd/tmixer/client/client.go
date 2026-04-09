@@ -37,6 +37,19 @@ func Run(ctx context.Context, args ...string) (err error) {
 	defer func() {
 		err = errors.Join(err, conn.Close())
 	}()
+
+	if len(remaining) >= 1 {
+		switch remaining[0] {
+		case "kill-server":
+			_, err := client.ShutDown(ctx, &protocol.Empty{})
+			return err
+		case "ping":
+			resp, err := client.Ping(ctx, &protocol.Empty{})
+			fmt.Println(resp)
+			return err
+		}
+	}
+
 	srv, err := client.Session(ctx)
 	if err != nil {
 		return err
