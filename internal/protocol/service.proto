@@ -34,7 +34,6 @@ message Response {
   oneof payload {
     NeedsSelection needsSelection = 1;
     Output output = 2;
-    Error err = 3;
   }
 }
 
@@ -45,8 +44,4 @@ message NeedsSelection {
 message Output {
   optional string output = 1;
   optional string selected = 2;
-}
-
-message Error {
-  required string error = 1;
 }

@@ -29,12 +29,6 @@ func (s *server) createProjectListResponse(ctx context.Context, config *config.C
 	}}, nil
 }
 
-func createErrorResponse(err error) *protocol.Response {
-	return &protocol.Response{Payload: &protocol.Response_Err{
-		Err: &protocol.Error{Error: ptr(err.Error())},
-	}}
-}
-
 func createOutputResponse(out *string) *protocol.Response {
 	return &protocol.Response{Payload: &protocol.Response_Output{
 		Output: &protocol.Output{

@@ -43,12 +43,6 @@ func (s *server) ShutDown(_ context.Context, _ *protocol.Empty) (*protocol.Empty
 func (s *server) Session(conn grpc.BidiStreamingServer[protocol.Request, protocol.Response]) (err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	// If any error happens, we should also send it to the client
-	defer func() {
-		if err != nil {
-			err = errors.Join(err, conn.Send(createErrorResponse(err)))
-		}
-	}()
 	// Setup the config and logging
 	ctx, config, err := setup()
 	if err != nil {

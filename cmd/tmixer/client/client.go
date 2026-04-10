@@ -149,8 +149,8 @@ func handshake(ctx context.Context, srv grpc.BidiStreamingClient[protocol.Reques
 			if resp.Selected != nil {
 				selected = *resp.Selected
 			}
-		case *protocol.Response_Err:
-			err := errors.New(*resp.GetErr().Error)
+		default:
+			err := fmt.Errorf("unexpected response type")
 			logEvent.Error(err)
 			return "", err
 		}
