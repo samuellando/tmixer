@@ -13,10 +13,6 @@ import (
 	stdLog "log"
 )
 
-var ErrNoSelection = errors.New("NO SELECTION MADE")
-var ErrProjectNotFound = errors.New("PROJECT NOT FOUND")
-var ErrCommandNotRecognized = errors.New("COMMAND NOT RECOGNIZED")
-
 func main() {
 	args := os.Args[1:]
 	ctx := context.Background()
