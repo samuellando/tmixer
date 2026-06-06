@@ -141,6 +141,7 @@ func (s *server) monitorAndCleanupStaleProjects() error {
 		s.mu.Lock()
 		err := cleanupStaleProjects(s.tmux)
 		if err != nil {
+			s.mu.Unlock()
 			return err
 		}
 		s.mu.Unlock()
