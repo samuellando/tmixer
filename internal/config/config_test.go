@@ -23,8 +23,6 @@ fzfFlags: ["--ansi", "--bind"]
 tmuxSocketPath: "/tmp/sock"
 configFiles: ["one", "two"]
 combineProjects: false
-displayHelp: true
-displayLog: true
 
 projects:
   - name: home
@@ -45,18 +43,18 @@ projects:
             split: vertical
       - command: ["ls"]
 `
-	configFile := filepath.Join(t.TempDir(), "config.yml")
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "config.yml")
 	err := os.WriteFile(configFile, []byte(configText), 0755)
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected := config.Config{
+	expected := &config.Config{
 		DefaultProject:  Ptr("home"),
 		LogFile:         Ptr("/tmp/tmixer-log.json"),
 		Ttl:             Ptr("24h"),
 		FzfFlags:        []string{"--ansi", "--bind"},
 		TmuxSocketPath:  Ptr("/tmp/sock"),
-		ConfigFiles:     []string{configFile},
 		CombineProjects: Ptr(false),
 		Projects: []*config.ProjectConfig{
 			{
@@ -91,13 +89,10 @@ projects:
 				},
 			},
 		},
-		DisplayHelp: Ptr(true),
-		DisplayLog:  Ptr(true),
 	}
-	config := config.Config{
-		ConfigFiles: []string{configFile},
-	}
-	err = config.LoadFiles(context.Background())
+	config, err := config.LoadFiles(context.Background(), []config.FSref{
+		{FS: os.DirFS(tempDir), Name: "config.yml"},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,6 +103,7 @@ projects:
 
 func TestCombineProjects(t *testing.T) {
 	configText1 := `
+combineProjects: true
 projects:
   - name: home
     directory: "/"
@@ -117,18 +113,18 @@ projects:
   - name: bin
     directory: "/bin"
 `
-	configFile1 := filepath.Join(t.TempDir(), "config1.yml")
+	tempDir := t.TempDir()
+	configFile1 := filepath.Join(tempDir, "config1.yml")
 	err := os.WriteFile(configFile1, []byte(configText1), 0755)
 	if err != nil {
 		t.Fatal(err)
 	}
-	configFile2 := filepath.Join(t.TempDir(), "config2.yml")
+	configFile2 := filepath.Join(tempDir, "config2.yml")
 	err = os.WriteFile(configFile2, []byte(configText2), 0755)
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected := config.Config{
-		ConfigFiles:     []string{configFile1, configFile2},
+	expected := &config.Config{
 		CombineProjects: Ptr(true),
 		Projects: []*config.ProjectConfig{
 			{
@@ -142,11 +138,10 @@ projects:
 			},
 		},
 	}
-	config := config.Config{
-		ConfigFiles:     []string{configFile1, configFile2},
-		CombineProjects: Ptr(true),
-	}
-	err = config.LoadFiles(context.Background())
+	config, err := config.LoadFiles(context.Background(), []config.FSref{
+		{FS: os.DirFS(tempDir), Name: "config1.yml"},
+		{FS: os.DirFS(tempDir), Name: "config2.yml"},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,19 +161,18 @@ projects:
   - name: bin
     directory: "/bin"
 `
-	configFile1 := filepath.Join(t.TempDir(), "config1.yml")
+	tempDir := t.TempDir()
+	configFile1 := filepath.Join(tempDir, "config1.yml")
 	err := os.WriteFile(configFile1, []byte(configText1), 0755)
 	if err != nil {
 		t.Fatal(err)
 	}
-	configFile2 := filepath.Join(t.TempDir(), "config2.yml")
+	configFile2 := filepath.Join(tempDir, "config2.yml")
 	err = os.WriteFile(configFile2, []byte(configText2), 0755)
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected := config.Config{
-		ConfigFiles:     []string{configFile1, configFile2},
-		CombineProjects: Ptr(false),
+	expected := &config.Config{
 		Projects: []*config.ProjectConfig{
 			{
 				Name:           "bin",
@@ -187,11 +181,10 @@ projects:
 			},
 		},
 	}
-	config := config.Config{
-		ConfigFiles:     []string{configFile1, configFile2},
-		CombineProjects: Ptr(false),
-	}
-	err = config.LoadFiles(context.Background())
+	config, err := config.LoadFiles(context.Background(), []config.FSref{
+		{FS: os.DirFS(tempDir), Name: "config1.yml"},
+		{FS: os.DirFS(tempDir), Name: "config2.yml"},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -210,27 +203,26 @@ ttl: "one"
 defaultProject: "two"
 logFile: "two"
 `
-	configFile1 := filepath.Join(t.TempDir(), "config1.yml")
+	tempDir := t.TempDir()
+	configFile1 := filepath.Join(tempDir, "config1.yml")
 	err := os.WriteFile(configFile1, []byte(configText1), 0755)
 	if err != nil {
 		t.Fatal(err)
 	}
-	configFile2 := filepath.Join(t.TempDir(), "config2.yml")
+	configFile2 := filepath.Join(tempDir, "config2.yml")
 	err = os.WriteFile(configFile2, []byte(configText2), 0755)
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected := config.Config{
-		DefaultProject: Ptr("three"),
+	expected := &config.Config{
+		DefaultProject: Ptr("two"),
 		LogFile:        Ptr("two"),
 		Ttl:            Ptr("one"),
-		ConfigFiles:    []string{configFile1, configFile2},
 	}
-	config := config.Config{
-		DefaultProject: Ptr("three"),
-		ConfigFiles:    []string{configFile1, configFile2},
-	}
-	err = config.LoadFiles(context.Background())
+	config, err := config.LoadFiles(context.Background(), []config.FSref{
+		{FS: os.DirFS(tempDir), Name: "config1.yml"},
+		{FS: os.DirFS(tempDir), Name: "config2.yml"},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

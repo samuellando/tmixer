@@ -11,6 +11,7 @@ import (
 type logger struct {
 	Sinks     []io.WriteCloser
 	wideEvent wideEvent
+	done      bool
 }
 
 type contextKey string
@@ -42,6 +43,9 @@ func Done(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	if logger.done {
+		return nil
+	}
 	err = logger.commit()
 	if err != nil {
 		return err
@@ -52,6 +56,7 @@ func Done(ctx context.Context) error {
 			return err
 		}
 	}
+	logger.done = true
 	return err
 }
 

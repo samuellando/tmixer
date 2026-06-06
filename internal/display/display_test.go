@@ -108,17 +108,13 @@ func TestDisplayProjects(t *testing.T) {
 }
 
 func TestGetSelectedProject(t *testing.T) {
-	first := &project.Project{Name: "alpha"}
-	second := &project.Project{Name: "beta"}
-	projects := []*project.Project{first, second}
-
-	if got, err := display.GetProjectFromOutput("i beta", projects); got != second && err != nil {
+	if got, err := display.GetProjectNameFromOutput("i beta"); got != "beta" && err != nil {
 		t.Fatalf("unexpected project: %#v", got)
 	}
-	if got, err := display.GetProjectFromOutput("i missing", projects); got != nil && err != nil {
+	if got, err := display.GetProjectNameFromOutput("i missing"); got != "missing" && err != nil {
 		t.Fatalf("expected nil, got %#v", got)
 	}
-	if got, err := display.GetProjectFromOutput("badFormat", projects); got != nil && err == nil {
+	if got, err := display.GetProjectNameFromOutput("badFormat"); got != "" && err == nil {
 		t.Fatal("expected an error for a bad format")
 	}
 }

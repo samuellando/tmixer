@@ -35,17 +35,8 @@ func Projects(ctx context.Context, projects []*project.Project) ([]string, error
 	return result, nil
 }
 
-func GetProjectFromOutput(info string, projects []*project.Project) (*project.Project, error) {
-	name, err := parseOutput(info)
-	if err != nil {
-		return nil, err
-	}
-	for _, project := range projects {
-		if project.Name == name {
-			return project, nil
-		}
-	}
-	return nil, nil
+func GetProjectNameFromOutput(info string) (string, error) {
+	return parseOutput(info)
 }
 
 func sortProjects(projects []*project.Project) ([]*project.Project, error) {

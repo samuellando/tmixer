@@ -4,8 +4,9 @@
 all: build
 
 check: check-fmt lint spell
+build: build-app
 
-build:
+build-app:
 	go build ./cmd/tmixer
 
 install:

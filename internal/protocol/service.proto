@@ -1,0 +1,47 @@
+syntax = "proto2";
+
+option go_package = "./protocol";
+
+service Tmixer {
+  rpc Session(stream Request) returns (stream Response);
+  rpc Ping(Empty) returns (PingResponse);
+  rpc ShutDown(Empty) returns (Empty);
+}
+
+message Empty { }
+
+message PingResponse {
+  required string version = 1;
+  required int64 pid = 2;
+}
+
+message Request {
+  oneof payload {
+    Args args = 1;
+    Selection selection = 2;
+  }
+}
+
+message Args {
+  repeated string args = 1;
+}
+
+message Selection {
+  required string project = 1;
+}
+
+message Response {
+  oneof payload {
+    NeedsSelection needsSelection = 1;
+    Output output = 2;
+  }
+}
+
+message NeedsSelection {
+  repeated string projects = 1;
+}
+
+message Output {
+  optional string output = 1;
+  optional string selected = 2;
+}
